@@ -1,6 +1,7 @@
 /** Extracted module: src/core/modal.js lines 1438-1476 — DO NOT rewrite business logic */
 const Modal = {
   _onConfirm: null,
+  _resolve: null,
   open(title, body, buttons) {
     document.getElementById('modalTitle').textContent = title;
     document.getElementById('modalBody').innerHTML = body;
@@ -8,14 +9,22 @@ const Modal = {
       `<button class="btn ${b.cls || 'btn-s'}" data-modal-action="${b.action || ''}">${b.label}</button>`
     ).join('');
     document.getElementById('modal').classList.add('show');
-    // focus first input
     setTimeout(() => {
       const inp = document.querySelector('#modalBody input, #modalBody textarea, #modalBody select');
       if (inp) inp.focus();
     }, 50);
+    // Promise API for callers that use .then()
+    return new Promise((resolve) => {
+      this._resolve = resolve;
+    });
   },
-  close() {
+  close(result) {
     document.getElementById('modal').classList.remove('show');
+    const res = result != null ? result : { action: 'cancel' };
+    if (typeof this._resolve === 'function') {
+      try { this._resolve(res); } catch (_) {}
+    }
+    this._resolve = null;
     this._onConfirm = null;
   },
   confirm(msg, onYes) {

@@ -144,7 +144,7 @@ const Views = {
         ';--art-hue:' + hue + ';--art-pattern:' + (g.pattern || 0) +
         ';transform:translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) scale(1);opacity:1;visibility:visible"' +
         ' title="' + title +
-        '" data-gift-id="' + (g.giftId || '') + '" data-action="inspect-artifact" data-gift-uid="' + (g.id || '') + '">' +
+        '" data-gift-id="' + (g.giftId || '') + '" data-action="inspect-artifact" data-gift-uid="' + (g.uid || g.id || '') + '">' +
         '<span class="nft-art-core" aria-hidden="true"></span>' +
         '<span class="nft-art-ico tg-emoji-anim anim-' + (g.anim || 'float') + '">' + (g.mediaUrl ? ('<img class="tg-emoji-media" src="' + String(g.mediaUrl).replace(/"/g,'') + '" alt="">') : (g.ico || '★')) + '</span>' +
         '<span class="nft-art-wave" aria-hidden="true"></span></span>';
@@ -367,7 +367,7 @@ const Views = {
 
     return `
       <div class="club-profile">
-        <div class="app-build-tag" aria-hidden="true">build 2026.10.28-t · full</div>
+        <div class="app-build-tag" aria-hidden="true">build 2026.10.28-x · full</div>
 
         <!-- Telegram-style profile card (coach/player) -->
         ${(() => {
@@ -626,7 +626,7 @@ const Views = {
             : (g.special ? (' art-' + String(g.special).replace(/[^a-z0-9-]/gi, '')) : '');
           return '<span class="fifa-gift-chip nft-chip rarity-' + rar + sp + '" style="--art-hue:' + (g.hue != null ? g.hue : 42) + '" title="' +
             sanitize((g.label || '') + (g.serial ? (' · ' + g.serial) : '') + (g.note ? (' — ' + g.note) : '')) +
-            '" data-action="inspect-artifact" data-gift-uid="' + (g.id || '') + '">' +
+            '" data-action="inspect-artifact" data-gift-uid="' + (g.uid || g.id || '') + '">' +
             (g.ico || '★') + ' ' + sanitize(g.label || '') +
             '<small>' + sanitize(rarL) + (g.serial ? (' · ' + sanitize(g.serial)) : '') + '</small></span>';
         }).join('') + '</div>')
@@ -636,9 +636,16 @@ const Views = {
     const otherId = (typeof window !== 'undefined' && (window.__fifaCompareId || window.__coachCompareId || window.__playerCompareId)) || '';
     const compareHtml = this._compareBlock(p, otherId);
 
-    const clubLogo = (Store.get().settings && (Store.get().settings.logoUrl || Store.get().settings.clubLogo)) || 'assets/metalist-mark.svg';
+    const _st = Store.get().settings || {};
+    let clubLogo = 'assets/metalist-mark.svg';
+    if (_st.logoData && String(_st.logoData).startsWith('data:image/')) clubLogo = _st.logoData;
+    else if (_st.logoUrl) clubLogo = _st.logoUrl;
+    else if (_st.clubLogo) clubLogo = _st.clubLogo;
+    const logoTag = clubLogo
+      ? ('<img class="fifa-club-logo" src="' + (typeof sanitize==='function'?sanitize(clubLogo):clubLogo) + '" alt="club" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'"/>')
+      : '';
     return `
-      <div class="fifa-card fifa-card-live" style="--pos-color:'${posColor}'" glass" data-fifa-player="${p.id}" data-compare-host="${p.id}"><img class="fifa-club-logo" src="${sanitize(clubLogo)}" alt="" onerror="this.style.display=\'none\'"/>
+      <div class="fifa-card fifa-card-live glass" style="--pos-color:${posColor}" data-fifa-player="${p.id}" data-compare-host="${p.id}">${logoTag}
         <div class="fifa-shine"></div>
         <div class="fifa-top">
           <div class="fifa-ovr" style="border-color:${posColor}">
@@ -1946,7 +1953,7 @@ const Views = {
       <div class="card"><div class="ct">${t('about_app')}</div>
         <p style="font-size:12px;color:var(--muted);line-height:1.6">
           Тренерська платформа · МЕТАЛІСТ ШТУТГАРТ<br>
-          Schema v${typeof SCHEMA_VERSION !== 'undefined' ? SCHEMA_VERSION : 2} · build 2026.10.28-t<br>
+          Schema v${typeof SCHEMA_VERSION !== 'undefined' ? SCHEMA_VERSION : 2} · build 2026.10.28-x<br>
           localStorage · Telegram Cloud
         </p>
       </div>`;

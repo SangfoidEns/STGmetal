@@ -356,6 +356,32 @@ const App = {
     const boardTime = (typeof App !== 'undefined' && App.formatDurationMs) ? App.formatDurationMs(cs.boardMs || 0) : '—';
     const boardsN = (s.boards || []).length;
     const playersN = (s.players || []).length;
+    const giftsGiven = (s.gifts || []).length;
+    // Coach EXP: sessions + planning time + gifts + boards
+    const appH = Math.floor((cs.appMs || 0) / 3600000);
+    const boardH = Math.floor((cs.boardMs || 0) / 3600000);
+    const coachXp = Math.max(0,
+      past.length * 40 +
+      planned.length * 5 +
+      giftsGiven * 25 +
+      boardsN * 8 +
+      Math.min(200, appH * 12) +
+      Math.min(150, boardH * 20) +
+      Math.round(totalMin / 10)
+    );
+    const coachLvl = Math.max(1, Math.floor(coachXp / 100) + 1);
+    const xpInLvl = coachXp % 100;
+    const rating = Math.min(99, 60 + Math.min(25, past.length) + Math.min(10, Math.floor(giftsGiven / 3)) + Math.min(4, boardsN));
+    const fmtShort = function (ms) {
+      ms = Math.max(0, Number(ms) || 0);
+      const m = Math.floor(ms / 60000);
+      if (m < 60) return m + 'хв';
+      const h = Math.floor(m / 60);
+      const rm = m % 60;
+      return rm ? (h + 'г ' + rm + 'хв') : (h + 'г');
+    };
+    const appShort = fmtShort(cs.appMs || 0);
+    const boardShort = fmtShort(cs.boardMs || 0);
 
     document.querySelectorAll('.coach-card-overlay').forEach(el => el.remove());
     const ov = document.createElement('div');
@@ -364,26 +390,34 @@ const App = {
       <div class="coach-card-fifa" role="dialog" aria-label="Картка тренера">
         <div class="cc-glow"></div>
         <div class="cc-frame">
-          <div class="cc-rating">${Math.min(99, 70 + Math.min(29, past.length))}</div>
+          <div class="cc-rating">${rating}</div>
           <div class="cc-pos">HEAD COACH</div>
           <div class="cc-photo">${photoHtml}</div>
           <div class="cc-club">METALIST STUTTGART</div>
           <div class="cc-name">${(typeof sanitize==='function'?sanitize(name):name).toUpperCase()}</div>
-          <div class="cc-stats">
-            <div class="cc-stat"><span>Тренувань</span><b>${past.length}</b></div>
-            <div class="cc-stat"><span>План</span><b>${planned.length}</b></div>
-            <div class="cc-stat"><span>Хв сесій</span><b>${totalMin}</b></div>
-            <div class="cc-stat"><span>Відвідув.</span><b>${attPct}%</b></div>
-            <div class="cc-stat"><span>У додатку</span><b>${appTime}</b></div>
-            <div class="cc-stat"><span>На дошці</span><b>${boardTime}</b></div>
-            <div class="cc-stat"><span>Схеми</span><b>${boardsN}</b></div>
-            <div class="cc-stat"><span>Склад</span><b>${playersN}</b></div>
+          <div class="cc-xp-row">
+            <span class="cc-lvl">LVL ${coachLvl}</span>
+            <div class="cc-xp-bar"><i style="width:${xpInLvl}%"></i></div>
+            <span class="cc-xp-num">${coachXp} XP</span>
+          </div>
+          <div class="cc-stats cc-stats-grid">
+            <div class="cc-stat"><span class="cc-k">Тренувань</span><b class="cc-v">${past.length}</b></div>
+            <div class="cc-stat"><span class="cc-k">План</span><b class="cc-v">${planned.length}</b></div>
+            <div class="cc-stat"><span class="cc-k">Хв сесій</span><b class="cc-v">${totalMin}</b></div>
+            <div class="cc-stat"><span class="cc-k">Моя відвід.</span><b class="cc-v">${attPct}%</b></div>
+            <div class="cc-stat"><span class="cc-k">У додатку</span><b class="cc-v">${appShort}</b></div>
+            <div class="cc-stat"><span class="cc-k">На дошці</span><b class="cc-v">${boardShort}</b></div>
+            <div class="cc-stat"><span class="cc-k">Схеми</span><b class="cc-v">${boardsN}</b></div>
+            <div class="cc-stat"><span class="cc-k">Склад</span><b class="cc-v">${playersN}</b></div>
+            <div class="cc-stat cc-stat-wide"><span class="cc-k">Нагород гравцям</span><b class="cc-v">${giftsGiven}</b></div>
+            <div class="cc-stat cc-stat-wide"><span class="cc-k">Досвід (XP)</span><b class="cc-v">${coachXp}</b></div>
           </div>
           <div class="cc-traits">
             <span>★ Головний тренер</span>
             <span>◆ Тактика</span>
             <span>◆ Розвиток гравців</span>
           </div>
+          <p class="cc-hint">Свій пропуск: Тренування → довгий тап → Відвідування → рядок «Тренер»</p>
           <button type="button" class="cc-back" data-action="close-coach-card">Повернутися</button>
         </div>
       </div>`;
@@ -1161,6 +1195,28 @@ const App = {
         if (AuthManager.isCoach && AuthManager.isCoach()) document.body.classList.add('role-coach');
         else if (AuthManager.isPlayer && AuthManager.isPlayer()) document.body.classList.add('role-player');
         else document.body.classList.add('role-guest');
+      }
+      // Player: only 3 bottom tabs (Головна / Тренування / Команда)
+      const mn = document.getElementById('mobileNav');
+      if (mn) {
+        const isPlayer = document.body.classList.contains('role-player');
+        const isGuest = document.body.classList.contains('role-guest');
+        mn.classList.toggle('nav-player-3', isPlayer);
+        mn.querySelectorAll('.mni').forEach(function (el) {
+          const v = el.getAttribute('data-view') || '';
+          const isCore = v === 'dashboard' || v === 'trainings' || v === 'players';
+          if (isPlayer) {
+            el.style.display = isCore ? 'flex' : 'none';
+          } else if (isGuest) {
+            const guestOk = v === 'dashboard' || v === 'trainings' || v === 'players' || v === 'calendar';
+            el.style.display = (guestOk || el.classList.contains('mni-more')) ? 'flex' : 'none';
+          } else {
+            el.style.display = '';
+          }
+        });
+        // rename players label for player role
+        const team = mn.querySelector('.mni[data-view="players"] .mni-label');
+        if (team) team.textContent = isPlayer ? 'Команда' : 'Склад';
       }
     } catch (_) {}
   },
@@ -2038,14 +2094,14 @@ const App = {
             const p = (s.players || []).find(x => x.id === me.id);
             if (!p) return;
             if (!p.profile) p.profile = {};
-            p.firstName = (document.getElementById('ppFirst') || {}).value || p.firstName;
-            p.lastName = (document.getElementById('ppLast') || {}).value || p.lastName;
-            const bd = (document.getElementById('ppBirth') || {}).value || '';
+            p.firstName = ((r.values&&r.values.ppFirst)!=null?r.values.ppFirst:(document.getElementById('ppFirst')||{}).value) || p.firstName;
+            p.lastName = ((r.values&&r.values.ppLast)!=null?r.values.ppLast:(document.getElementById('ppLast')||{}).value) || p.lastName;
+            const bd = ((r.values&&r.values.ppBirth)!=null?r.values.ppBirth:(document.getElementById('ppBirth')||{}).value) || '';
             if (bd) { p.birthDate = bd; p.profile.birthDate = bd; }
-            p.profile.phone = ((document.getElementById('ppPhone') || {}).value || '').slice(0, 40);
+            p.profile.phone = (((r.values&&r.values.ppPhone)!=null?r.values.ppPhone:(document.getElementById('ppPhone')||{}).value) || '').slice(0, 40);
             p.profile.social = ((document.getElementById('ppSocial') || {}).value || '').slice(0, 200);
-            p.profile.status = ((document.getElementById('ppStatus') || {}).value || '').slice(0, 80);
-            p.profile.bio = ((document.getElementById('ppBio') || {}).value || '').slice(0, 400);
+            p.profile.status = (((r.values&&r.values.ppStatus)!=null?r.values.ppStatus:(document.getElementById('ppStatus')||{}).value) || '').slice(0, 80);
+            p.profile.bio = (((r.values&&r.values.ppBio)!=null?r.values.ppBio:(document.getElementById('ppBio')||{}).value) || '').slice(0, 400);
             p.statusText = p.profile.status;
             p.bio = p.profile.bio;
             const ph = ((document.getElementById('ppPhoto') || {}).value || '').trim();
@@ -2164,9 +2220,9 @@ const App = {
           { label: 'Зберегти', cls: 'btn-p', action: 'ok' }
         ]).then(function(r) {
           if (!r || r.action !== 'ok') return;
-          const st = (document.getElementById('socStatus') || {}).value || '';
-          const b = (document.getElementById('socBio') || {}).value || '';
-          const ph = (document.getElementById('socPhoto') || {}).value || '';
+          const st = ((r.values&&r.values.socStatus)!=null?r.values.socStatus:(document.getElementById('socStatus')||{}).value) || '';
+          const b = ((r.values&&r.values.socBio)!=null?r.values.socBio:(document.getElementById('socBio')||{}).value) || '';
+          const ph = ((r.values&&r.values.socPhoto)!=null?r.values.socPhoto:(document.getElementById('socPhoto')||{}).value) || '';
           const s = Store.get();
           const p = (s.players || []).find(x => x.id === me.id);
           if (!p) return;
@@ -2488,77 +2544,99 @@ const App = {
 
       if (action === 'use-gift-status') {
         e.preventDefault(); e.stopPropagation();
-        const uid = t.dataset.giftUid;
+        const uid = t.dataset.giftUid || t.getAttribute('data-gift-uid');
         const s = Store.get();
-        const g = (s.gifts || []).find(x => x.id === uid || x.uid === uid);
-        if (!g) return;
-        (s.gifts || []).forEach(x => { if (x.playerId === g.playerId) x.featured = false; });
+        if (!s.gifts) s.gifts = [];
+        const g = s.gifts.find(x => String(x.id) === String(uid) || String(x.uid) === String(uid));
+        if (!g) { Toast.show('Подарунок не знайдено', 'warn'); return; }
+        s.gifts.forEach(x => { if (x.playerId === g.playerId) x.featured = false; });
         g.featured = true;
+        if (!g.id) g.id = g.uid || ('g_' + Date.now());
+        if (!g.uid) g.uid = g.id;
         const p = (s.players || []).find(x => x.id === g.playerId);
         if (p) {
           if (!p.profile) p.profile = {};
           if (g.hue != null) p.profile.themeHue = g.hue;
+          p.profile.featuredGiftId = g.id;
         }
         try { StorageManager.save(); } catch (_) {}
-        Toast.show('Подарунок біля імені + колір профілю', 'ok');
-        try { Modal.close && Modal.close(); App.renderCurrent && App.renderCurrent(); } catch (_) {}
+        try { if (StorageManager.syncCloud) StorageManager.syncCloud(); } catch (_) {}
+        Toast.show('Статус біля імені оновлено', 'ok');
+        try { Modal.close && Modal.close({ action: 'cancel' }); App.renderCurrent && App.renderCurrent(); } catch (_) {}
         return;
       }
       if (action === 'wear-gift') {
         e.preventDefault(); e.stopPropagation();
-        const uid = t.dataset.giftUid;
+        const uid = t.dataset.giftUid || t.getAttribute('data-gift-uid');
         const s = Store.get();
-        const g = (s.gifts || []).find(x => x.id === uid || x.uid === uid);
-        if (!g) return;
-        const worn = (s.gifts || []).filter(x => x.playerId === g.playerId && x.attached !== false);
-        if (g.attached === false) {
-          if (worn.length >= 10) { Toast.show('Максимум 10 на профілі', 'warn'); return; }
-          g.attached = true;
-        } else if (g.attached === true || g.attached == null) {
+        if (!s.gifts) s.gifts = [];
+        const g = s.gifts.find(x => String(x.id) === String(uid) || String(x.uid) === String(uid));
+        if (!g) { Toast.show('Подарунок не знайдено', 'warn'); return; }
+        if (!g.id) g.id = g.uid || ('g_' + Date.now());
+        if (!g.uid) g.uid = g.id;
+        const worn = s.gifts.filter(x => x.playerId === g.playerId && x.attached !== false && x !== g);
+        const currentlyOn = g.attached !== false;
+        if (currentlyOn) {
           g.attached = false;
         } else {
+          if (worn.length >= 10) { Toast.show('Максимум 10 на профілі', 'warn'); return; }
           g.attached = true;
         }
         try { StorageManager.save(); } catch (_) {}
-        Toast.show(g.attached !== false ? 'Надягнуто' : 'Знято з профілю', 'ok');
-        try { Modal.close && Modal.close(); App.renderCurrent && App.renderCurrent(); } catch (_) {}
+        try { if (StorageManager.syncCloud) StorageManager.syncCloud(); } catch (_) {}
+        Toast.show(g.attached !== false ? 'Надягнуто на профіль' : 'Знято з профілю', 'ok');
+        try { Modal.close && Modal.close({ action: 'cancel' }); App.renderCurrent && App.renderCurrent(); } catch (_) {}
         return;
       }
       if (action === 'comment-gift') {
         e.preventDefault(); e.stopPropagation();
-        const uid = t.dataset.giftUid;
+        const uid = t.dataset.giftUid || t.getAttribute('data-gift-uid');
         const s = Store.get();
-        const g = (s.gifts || []).find(x => x.id === uid || x.uid === uid);
-        if (!g) return;
-        const text = window.prompt('Коментар до подарунка:');
-        if (!text || !String(text).trim()) return;
-        if (!g.comments) g.comments = [];
-        let author = 'Гість';
-        try {
-          if (AuthManager.isCoach && AuthManager.isCoach()) author = (s.settings && s.settings.coachName) || 'Тренер';
-          else if (AuthManager.getLinkedPlayer) {
-            const me = AuthManager.getLinkedPlayer();
-            if (me) author = [me.firstName, me.lastName].filter(Boolean).join(' ') || 'Гравець';
-          } else if (AuthManager.user) author = AuthManager.user.username || AuthManager.user.first_name || 'Гравець';
-        } catch (_) {}
-        g.comments.push({ author: author, text: String(text).slice(0, 200), at: new Date().toISOString() });
-        try { StorageManager.save(); } catch (_) {}
-        Toast.show('Коментар додано', 'ok');
+        if (!s.gifts) s.gifts = [];
+        const g = s.gifts.find(x => String(x.id) === String(uid) || String(x.uid) === String(uid));
+        if (!g) { Toast.show('Подарунок не знайдено', 'warn'); return; }
+        const body = '<div class="fgr full"><label>Коментар</label>' +
+          '<textarea id="giftCommentInput" class="inp" rows="3" maxlength="200" placeholder="Ваш коментар…"></textarea></div>';
+        Modal.open('Коментар до «' + (g.label || 'подарунка') + '»', body, [
+          { label: 'Скасувати', cls: 'btn-s', action: 'cancel' },
+          { label: 'Надіслати', cls: 'btn-p', action: 'ok' }
+        ]).then(function (r) {
+          if (!r || r.action !== 'ok') return;
+          const text = (r.values && r.values.giftCommentInput) || (document.getElementById('giftCommentInput') || {}).value || '';
+          if (!String(text).trim()) { Toast.show('Порожній коментар', 'warn'); return; }
+          if (!g.comments) g.comments = [];
+          let author = 'Гість';
+          try {
+            if (AuthManager.isCoach && AuthManager.isCoach()) author = (Store.get().settings && Store.get().settings.coachName) || 'Тренер';
+            else if (AuthManager.getLinkedPlayer) {
+              const me = AuthManager.getLinkedPlayer();
+              if (me) author = [me.firstName, me.lastName].filter(Boolean).join(' ') || 'Гравець';
+            } else if (AuthManager.user) author = AuthManager.user.username || AuthManager.user.first_name || 'Гравець';
+          } catch (_) {}
+          g.comments.push({ author: author, text: String(text).trim().slice(0, 200), at: new Date().toISOString() });
+          if (!g.id) g.id = g.uid;
+          if (!g.uid) g.uid = g.id;
+          try { StorageManager.save(); } catch (_) {}
+          try { if (StorageManager.syncCloudNow) StorageManager.syncCloudNow(); } catch (_) {}
+          Toast.show('Коментар збережено', 'ok');
+          try { App.renderCurrent && App.renderCurrent(); } catch (_) {}
+        });
         return;
       }
 
-      if (action === 'coach-easter') {
-        e.preventDefault(); e.stopPropagation();
-        return this.openCoachCard();
-      }
-      if (action === 'open-coach-card') {
-        e.preventDefault(); e.stopPropagation();
-        if (typeof App !== 'undefined' && App.openCoachCard) App.openCoachCard();
+      if (action === 'coach-easter' || action === 'open-coach-card') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        try { if (typeof this.openCoachCard === 'function') this.openCoachCard();
+        else if (typeof App !== 'undefined' && App.openCoachCard) App.openCoachCard(); } catch (err) { console.error(err); }
         return;
       }
       if (action === 'close-coach-card') {
         e.preventDefault(); e.stopPropagation();
-        return this.closeCoachCard();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        try { this.closeCoachCard && this.closeCoachCard(); } catch (_) {}
+        return;
       }
       if (action === 'toggle-theme') {
         e.preventDefault(); e.stopPropagation();
@@ -2938,7 +3016,16 @@ const App = {
       if (t.dataset.delMatch) return Modal.confirm('Видалити матч?', () => { Store.get().matches = Store.get().matches.filter(x => x.id !== t.dataset.delMatch); StorageManager.save(); App.renderCurrent(); });
       if (t.dataset.tpl) return Actions.applyTemplate(t.dataset.tpl);
 
-      if (t.dataset.modalAction === 'cancel') return Modal.close();
+      if (t.dataset.modalAction === 'cancel') return Modal.close({ action: 'cancel' });
+      if (t.dataset.modalAction === 'ok') {
+        const values = {};
+        try {
+          document.querySelectorAll('#modalBody input, #modalBody textarea, #modalBody select').forEach(function (el) {
+            if (el && el.id) values[el.id] = el.value;
+          });
+        } catch (_) {}
+        return Modal.close({ action: 'ok', values: values });
+      }
       if (t.dataset.modalAction === 'open-training-board') {
         e.preventDefault(); e.stopPropagation();
         const tid = t.dataset.tid;
@@ -2950,7 +3037,7 @@ const App = {
       }
       if (t.dataset.modalAction === 'confirm') {
         const fn = Modal._onConfirm;
-        Modal.close();
+        Modal.close({ action: 'confirm' });
         if (fn) fn();
         return;
       }

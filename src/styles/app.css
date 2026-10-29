@@ -1,25 +1,45 @@
 
 :root {
+  /* Brand */
   --club-primary: #1a3a5c;
   --club-secondary: #c8a84b;
   --club-accent: #e8c547;
+  --gold: #e8c547;
+  --gold-soft: rgba(232,197,71,0.14);
+  --gold-line: rgba(232,197,71,0.28);
+  /* Semantic */
   --danger: #e74c3c;
   --success: #2ecc71;
   --warning: #f39c12;
-  --bg: #0d1117;
-  --panel: #161b22;
-  --panel-h: #1c2128;
-  --border: #30363d;
-  --text: #e6edf3;
-  --muted: #8b949e;
+  /* Surfaces (dark default) */
+  --bg: #0b0d10;
+  --bg-elevated: #12151a;
+  --panel: rgba(22, 27, 34, 0.78);
+  --panel-solid: #161b22;
+  --panel-h: rgba(28, 33, 40, 0.92);
+  --border: rgba(255,255,255,0.10);
+  --border-strong: rgba(255,255,255,0.16);
+  --text: #eef2f6;
+  --muted: #9aa3ad;
+  /* Glass */
+  --glass-bg: rgba(18, 22, 28, 0.72);
+  --glass-blur: 18px;
+  --glass-sat: 160%;
+  --glass-shadow: 0 10px 36px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.12);
+  --glass-radius: 18px;
+  --glass-radius-sm: 12px;
+  /* Components */
+  --btn-radius: 12px;
+  --row-radius: 14px;
   --gk: #f1c40f;
   --own: #3498db;
   --opp: #e74c3c;
   --sw: 240px;
   --rw: 300px;
   --hh: 0px;
-  --r: 8px;
-  --t: .2s ease;
+  --r: 12px;
+  --t: .22s cubic-bezier(.2,.8,.2,1);
+  --font: 'SF Pro Display', 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
@@ -8971,3 +8991,494 @@ body.role-player .mni.mni-player[data-view="analytics"] { display: none !importa
 .artifact-player-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .gift-comments { margin-top: 10px; font-size: 12px; }
 .gift-comment { padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,.05); margin-top: 4px; }
+
+/* overflow-hardening */
+.cp-title, .cp-title-name, .player-status-line, .player-bio-home {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.cp-avatar-wrap {
+  position: relative;
+  width: min(220px, 70vw);
+  height: min(220px, 70vw);
+  margin: 0 auto;
+  overflow: visible;
+}
+.tg-gift-cloud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.tg-gift-item {
+  pointer-events: auto;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  display: grid;
+  place-items: center;
+  z-index: 2;
+}
+.gift-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 2.2em;
+  vertical-align: middle;
+  margin-left: 6px;
+  overflow: hidden;
+}
+.fifa-modal-wrap, .artifact-inspect {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+.artifact-title, .artifact-desc {
+  overflow-wrap: anywhere;
+}
+.cp-hero.player-profile-hero {
+  overflow: hidden;
+  padding-bottom: 16px;
+}
+
+/* player-bottom-3 */
+body.role-player #mobileNav .mni-extra,
+body.role-player #mobileNav .mni[data-view="analytics"],
+body.role-player #mobileNav .mni[data-view="calendar"],
+body.role-player #mobileNav .mni[data-view="tactics"],
+body.role-player #mobileNav .mni-more {
+  display: none !important;
+}
+body.role-player #mobileNav {
+  display: flex !important;
+  justify-content: space-around;
+  align-items: stretch;
+  gap: 0;
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+}
+body.role-player #mobileNav .mni[data-view="dashboard"],
+body.role-player #mobileNav .mni[data-view="trainings"],
+body.role-player #mobileNav .mni[data-view="players"] {
+  display: flex !important;
+  flex: 1 1 0;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+body.role-guest #mobileNav .mni-extra,
+body.role-guest #mobileNav .mni-more {
+  display: none !important;
+}
+/* coach card overlay isolation */
+.coach-card-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 100000 !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.72);
+  pointer-events: auto !important;
+}
+.coach-card-overlay .coach-card-fifa,
+.coach-card-overlay .cc-card {
+  pointer-events: auto !important;
+  max-width: min(360px, 92vw);
+  z-index: 100001;
+}
+body.coach-card-mode #mobileNav,
+body.coach-card-mode .mn {
+  pointer-events: none !important;
+  opacity: 0.35;
+}
+.fifa-club-logo {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  border-radius: 8px;
+  z-index: 3;
+  background: rgba(0,0,0,0.25);
+  padding: 2px;
+}
+
+/* coach-card-fix-v */
+.coach-card-fifa .cc-stats,
+.coach-card-fifa .cc-stats-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 8px !important;
+  width: 100%;
+  margin: 10px 0 12px !important;
+}
+.coach-card-fifa .cc-stat {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  gap: 2px !important;
+  padding: 8px 10px !important;
+  min-height: 48px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.coach-card-fifa .cc-stat span,
+.coach-card-fifa .cc-stat .cc-k {
+  font-size: 10px !important;
+  line-height: 1.2 !important;
+  color: rgba(245,230,184,0.65) !important;
+  white-space: nowrap !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.coach-card-fifa .cc-stat b,
+.coach-card-fifa .cc-stat .cc-v {
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  color: #e8c547 !important;
+  line-height: 1.15 !important;
+  white-space: nowrap !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.coach-card-fifa .cc-stat-wide {
+  grid-column: span 1;
+}
+.coach-card-fifa .cc-xp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 0 2px;
+}
+.coach-card-fifa .cc-lvl {
+  font-size: 11px;
+  font-weight: 800;
+  color: #e8c547;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+.coach-card-fifa .cc-xp-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 99px;
+  background: rgba(255,255,255,0.08);
+  overflow: hidden;
+}
+.coach-card-fifa .cc-xp-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #c9a227, #f0d878);
+}
+.coach-card-fifa .cc-xp-num {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(245,230,184,0.75);
+  flex-shrink: 0;
+}
+.coach-card-fifa .cc-hint {
+  font-size: 10px;
+  line-height: 1.35;
+  color: rgba(245,230,184,0.55);
+  margin: 0 0 10px;
+  text-align: center;
+}
+.coach-card-fifa .cc-frame {
+  max-height: min(92vh, 720px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
+}
+.att-coach-row {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(232,197,71,0.35);
+  background: rgba(232,197,71,0.08);
+}
+.att-coach-row label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: #e8c547;
+}
+
+
+/* === UNIFIED SYSTEM 2026.10.28-x === */
+html, body {
+  font-family: var(--font) !important;
+  background: var(--bg) !important;
+  color: var(--text) !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Global glass surface */
+.glass,
+.card,
+.card.glass,
+.sc,
+.list-card,
+.tg-row,
+.pl-card,
+.coach-public-card,
+.guest-hero-card,
+.player-stats-card,
+.next-tr-card,
+.next-match-card,
+.soc-profile,
+.soc-feed,
+.soc-peers,
+.cp-block,
+.coach-tools-collapse,
+.metric-card,
+.dash-metric,
+.st-card {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat)) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--glass-radius) !important;
+  box-shadow: var(--glass-shadow) !important;
+  color: var(--text);
+}
+
+.card, .sc {
+  padding: 14px 16px;
+  margin: 0 0 12px;
+}
+
+.ct, .card-title, .section-title, .st {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+.note-sm, .muted, .pl-card-meta, .coach-pub-meta {
+  color: var(--muted) !important;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* Buttons — one family */
+.btn, .btn-p, .btn-s, .btn-d, button.btn {
+  border-radius: var(--btn-radius) !important;
+  min-height: 40px;
+  padding: 8px 14px !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  letter-spacing: 0.01em;
+  transition: transform var(--t), background var(--t), border-color var(--t), opacity var(--t);
+  border: 1px solid transparent;
+}
+.btn:active, .btn-p:active, .btn-s:active { transform: scale(0.97); }
+.btn-p {
+  background: linear-gradient(135deg, #f0d878, #c9a227) !important;
+  color: #1a1408 !important;
+  border-color: rgba(232,197,71,0.45) !important;
+  box-shadow: 0 4px 16px rgba(232,197,71,0.28);
+}
+.btn-s {
+  background: rgba(255,255,255,0.06) !important;
+  color: var(--text) !important;
+  border-color: var(--border-strong) !important;
+}
+.btn-d {
+  background: rgba(231,76,60,0.16) !important;
+  color: #ff8f84 !important;
+  border-color: rgba(231,76,60,0.35) !important;
+}
+.btn-sm { min-height: 34px; padding: 6px 10px !important; font-size: 12px !important; }
+
+/* Inputs */
+.inp, input.inp, textarea.inp, select.inp,
+#modalBody input, #modalBody textarea, #modalBody select,
+.fgr input, .fgr textarea, .fgr select {
+  background: rgba(0,0,0,0.28) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: 12px !important;
+  color: var(--text) !important;
+  padding: 10px 12px !important;
+  min-height: 42px;
+}
+#modalBody textarea, .fgr textarea { min-height: 88px; }
+.fgr label, #modalBody label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 4px;
+  display: block;
+}
+
+/* Modal = glass sheet */
+.mo.show, #modal.show {
+  background: rgba(0,0,0,0.62) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.md, #modal .md {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(22px) saturate(170%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(170%) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.12) !important;
+  color: var(--text) !important;
+}
+.mh h2, #modalTitle { font-size: 16px; font-weight: 800; color: var(--text); }
+.mf { gap: 8px; }
+
+/* Bottom nav */
+#mobileNav.glass-nav, .mn.glass-nav {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border-top: 1px solid var(--border) !important;
+  box-shadow: 0 -8px 28px rgba(0,0,0,0.35) !important;
+}
+#mobileNav .mni {
+  color: var(--muted) !important;
+  border-radius: 12px;
+  transition: color var(--t), background var(--t);
+}
+#mobileNav .mni.on {
+  color: var(--club-accent) !important;
+  background: var(--gold-soft) !important;
+}
+#mobileNav .mni-label { font-size: 10px; font-weight: 700; }
+
+/* Header pill */
+.header.glass-hdr, .header.glass-pill-hdr, .tg-hdr-pill {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(18px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(160%) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: var(--glass-shadow) !important;
+}
+
+/* Sidebar drawer */
+.sidebar, .app > .sidebar {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(20px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(160%) !important;
+  border-left: 1px solid var(--border) !important;
+}
+.sidebar .nav {
+  border-radius: 12px !important;
+  margin: 3px 8px !important;
+}
+.sidebar .nav.on {
+  background: var(--gold-soft) !important;
+  color: var(--club-accent) !important;
+}
+
+/* Player / coach cards */
+.pl-card {
+  display: flex;
+  gap: 12px;
+  padding: 12px !important;
+  align-items: center;
+  transition: transform var(--t), border-color var(--t);
+}
+.pl-card:active { transform: scale(0.985); }
+.pl-card.is-me, .pl-card.is-coach {
+  border-color: var(--gold-line) !important;
+}
+.pl-card-name { font-weight: 800; font-size: 14px; }
+.pl-card-av, .coach-av {
+  width: 48px; height: 48px; border-radius: 50%;
+  overflow: hidden; border: 2px solid var(--gold-line);
+  flex-shrink: 0;
+}
+.pl-card-av img, .coach-av img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Training list rows */
+.card-training, .tr-card, .training-row {
+  border-radius: var(--row-radius) !important;
+  border: 1px solid var(--border) !important;
+  background: var(--glass-bg) !important;
+  margin-bottom: 10px;
+}
+.training-row.status-done, .tr-card.done { border-left: 3px solid var(--success) !important; }
+.training-row.status-cancelled, .tr-card.cancelled { border-left: 3px solid var(--danger) !important; opacity: 0.85; }
+.training-row.status-planned, .tr-card.planned { border-left: 3px solid var(--club-accent) !important; }
+
+/* Toast */
+.toast, #toast, .toasts .toast {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: 14px !important;
+  color: var(--text) !important;
+}
+
+/* Main scroll area spacing */
+.main, #main, .pt, .page {
+  background: transparent !important;
+}
+.page > .card:first-child, .pt > .card:first-child { margin-top: 4px; }
+
+/* Light theme parity */
+[data-theme="light"] {
+  --bg: #f2f4f7;
+  --bg-elevated: #ffffff;
+  --panel: rgba(255,255,255,0.82);
+  --panel-solid: #ffffff;
+  --panel-h: rgba(255,255,255,0.95);
+  --border: rgba(0,0,0,0.08);
+  --border-strong: rgba(0,0,0,0.12);
+  --text: #12151a;
+  --muted: #5c6670;
+  --glass-bg: rgba(255,255,255,0.78);
+  --glass-shadow: 0 10px 32px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.8);
+  --gold-soft: rgba(201,162,39,0.12);
+  --gold-line: rgba(201,162,39,0.35);
+}
+[data-theme="light"] .btn-s {
+  background: rgba(0,0,0,0.04) !important;
+  color: var(--text) !important;
+}
+[data-theme="light"] .inp,
+[data-theme="light"] #modalBody input,
+[data-theme="light"] #modalBody textarea,
+[data-theme="light"] #modalBody select {
+  background: rgba(0,0,0,0.04) !important;
+  color: var(--text) !important;
+}
+
+/* Board toolbar stays liquid glass */
+.board-toolbar, .bw-tools, .tools-tray {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 16px !important;
+  box-shadow: var(--glass-shadow) !important;
+}
+
+/* Safe content padding under fixed chrome */
+body.tg-mini-app .main, body.tg-mini-app #main {
+  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Action sheet / TG sheet */
+.tg-sheet, #tgActionSheet, .action-sheet {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(22px) saturate(170%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(170%) !important;
+  border-radius: 20px 20px 0 0 !important;
+  border: 1px solid var(--border-strong) !important;
+  color: var(--text) !important;
+}

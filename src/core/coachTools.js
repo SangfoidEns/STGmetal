@@ -295,7 +295,13 @@ CoachTools.giftById = function (id) {
 CoachTools.coachAttendanceRate = function () {
   try {
     const s = Store.get();
-    const trainings = (s.trainings || []).filter(t => t.status === 'done');
+    const todayStr = (typeof today === 'function' ? today() : new Date().toISOString().slice(0, 10));
+    const trainings = (s.trainings || []).filter(t => {
+      if (t.status === 'cancelled' || t.status === 'canceled' || t.status === 'draft') return false;
+      if (t.status === 'done') return true;
+      // past sessions treated as eligible for coach attendance
+      return (t.date || '') < todayStr;
+    });
     if (!trainings.length) return 100;
     let present = 0;
     trainings.forEach(t => { if (t.coachPresent !== false) present++; });

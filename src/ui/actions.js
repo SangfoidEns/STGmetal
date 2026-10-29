@@ -715,8 +715,13 @@ const Actions = {
         <input type="number" class="att-rpe" min="1" max="10" value="${intv}" title="Індивідуальний RPE" ${checked ? '' : 'disabled'}>
       </div>`;
     }).join('');
+    const coachPresent = t.coachPresent !== false;
     Modal.open('Відвідування · ' + sanitize(t.name), `
-      <p class="note-sm">Позначте присутніх і RPE (1–10). Можна заповнити і для <strong>минулих</strong> тренувань — нові гравці в списку теж зʼявляться тут.</p>
+      <p class="note-sm">Позначте присутніх і RPE (1–10). <strong>Рядок «Тренер»</strong> — ваша особиста відмітка (присутній / пропуск).</p>
+      <div class="att-coach-row">
+        <label><input type="checkbox" id="attCoachPresent" ${coachPresent ? 'checked' : ''}> ★ Тренер на тренуванні</label>
+        <p class="note-sm" style="margin:6px 0 0">Зніміть галочку = пропуск тренера (впливає на % відвідування на золотій картці).</p>
+      </div>
       <div class="att-toolbar">
         <button type="button" class="btn btn-s btn-sm" id="attAllOn">Усі ✓</button>
         <button type="button" class="btn btn-s btn-sm" id="attAllOff">Нікого</button>
@@ -763,6 +768,9 @@ const Actions = {
     const t = Store.get().trainings.find(x => x.id === trainingId);
     if (!t) return;
     if (!t.attendance) t.attendance = {};
+    // Тренер: присутній / пропуск
+    const coachEl = document.getElementById('attCoachPresent');
+    if (coachEl) t.coachPresent = !!coachEl.checked;
     document.querySelectorAll('.att-row').forEach(row => {
       const pid = row.dataset.pid;
       if (!pid) return;
@@ -770,13 +778,14 @@ const Actions = {
       const intensity = Math.max(1, Math.min(10, +row.querySelector('.att-rpe')?.value || t.intensity || 6));
       t.attendance[pid] = { present, intensity, updatedAt: new Date().toISOString() };
     });
-    // позначення сесії як проведеної, якщо була planned
     if (t.status === 'planned') t.status = 'done';
     try { LoadModel.recomputePlayerLoads(Store.get().players, Store.get().trainings); } catch (_) {}
     StorageManager.save();
-    Modal.close();
-    const n = Object.values(t.attendance).filter(a => a.present).length;
-    Toast.show('Відвідування: ' + n + ' присутніх', 'ok');
+    try { if (StorageManager.syncCloud) StorageManager.syncCloud(); } catch (_) {}
+    Modal.close({ action: 'ok' });
+    const n = Object.values(t.attendance).filter(a => a && a.present).length;
+    const coachTxt = t.coachPresent === false ? ' · тренер: пропуск' : ' · тренер: ✓';
+    Toast.show('Відвідування: ' + n + ' присутніх' + coachTxt, 'ok');
     App.renderCurrent();
   },
 
