@@ -310,7 +310,7 @@ const Views = {
 
     return `
       <div class="club-profile">
-        <div class="app-build-tag" aria-hidden="true">build 2026.10.28-m · full</div>
+        <div class="app-build-tag" aria-hidden="true">build 2026.10.28-r · full</div>
 
         <!-- Telegram-style profile card (coach/player) -->
         ${(() => {
@@ -1143,6 +1143,96 @@ const Views = {
     </div>`;
   },
 
+
+  /** Соцмережа гравця: профіль + прокачка (не футбольна картка тренера) */
+  _playerSocialHub(me, list, attPctFn) {
+    const prog = (typeof PlayerProgress !== 'undefined')
+      ? PlayerProgress.compute(me.id)
+      : { level: 1, levelProgress: 0, xp: 0, attPct: 0, present: 0, absent: 0, history: [], form: 'rising' };
+    const photo = this._resolvePlayerAvatar ? this._resolvePlayerAvatar(me) : (me.photoUrl || me.profilePhoto || '');
+    const name = [me.firstName, me.lastName].filter(Boolean).join(' ') || me.name || 'Гравець';
+    const bio = (me.profile && me.profile.bio) || me.bio || '';
+    const status = (me.profile && me.profile.status) || me.statusText || '';
+    const initials = this._initials ? this._initials(name) : '??';
+    const ph = photo
+      ? '<img class="soc-av-img" src="' + sanitize(photo) + '" alt="" referrerpolicy="no-referrer"/>'
+      : '<span class="soc-av-ph">' + sanitize(initials) + '</span>';
+    let gifs = [];
+    try {
+      if (typeof CoachTools !== 'undefined' && CoachTools.playerGifts)
+        gifs = CoachTools.playerGifts(me.id) || [];
+      else
+        gifs = (Store.get().gifts || []).filter(g => g.playerId === me.id);
+    } catch (_) {}
+    const giftRow = (gifs.slice(0, 6).map(g =>
+      '<span class="soc-gift" title="' + sanitize(g.label || '') + '">' + (g.ico || '🎁') + '</span>'
+    ).join('') || '<span class="note-sm">Подарунків ще немає</span>');
+
+    const feed = (prog.history || []).map(h => {
+      const cls = h.kind === 'absent' ? 'neg' : (h.kind === 'gift' ? 'gift' : 'pos');
+      const sign = h.delta > 0 ? ('+' + h.delta) : String(h.delta);
+      return '<div class="soc-feed-item ' + cls + '">' +
+        '<span class="soc-feed-date">' + sanitize(h.date || '') + '</span>' +
+        '<span class="soc-feed-title">' + sanitize(h.name || '') + '</span>' +
+        '<span class="soc-feed-xp">' + sign + ' XP</span></div>';
+    }).join('') || '<div class="note-sm">Прокачка з’явиться після тренувань із відміткою відвідування</div>';
+
+    const peers = list.filter(p => p.id !== me.id).slice(0, 12).map(p => {
+      const n = [p.firstName, p.lastName].filter(Boolean).join(' ') || ('#' + (p.number || ''));
+      const pr = (typeof PlayerProgress !== 'undefined') ? PlayerProgress.compute(p.id) : { level: 1 };
+      const av = this._resolvePlayerAvatar ? this._resolvePlayerAvatar(p) : '';
+      const inn = this._initials ? this._initials(n) : '?';
+      const img = av ? '<img src="' + sanitize(av) + '" alt=""/>' : '<span>' + sanitize(inn) + '</span>';
+      return '<button type="button" class="soc-peer" data-action="open-player-card" data-player-id="' + p.id + '">' +
+        '<div class="soc-peer-av">' + img + '</div>' +
+        '<div class="soc-peer-name">' + sanitize(n) + '</div>' +
+        '<div class="soc-peer-lv">LVL ' + pr.level + '</div></button>';
+    }).join('');
+
+    return `
+    <div class="soc-hub">
+      <section class="soc-profile glass soc-anim">
+        <div class="soc-profile-top">
+          <div class="soc-av-wrap">
+            <div class="soc-av ring-glow">${ph}</div>
+            <div class="soc-level-badge" title="Рівень акаунта">LVL ${prog.level}</div>
+          </div>
+          <div class="soc-profile-meta">
+            <div class="soc-name">${sanitize(name)}</div>
+            <div class="soc-pos">#${me.number || '—'} · ${sanitize(me.position || '')}</div>
+            <div class="soc-status">${sanitize(status || 'Статус не задано')}</div>
+          </div>
+        </div>
+        <div class="soc-xp-block">
+          <div class="soc-xp-head"><span>Прокачка акаунта</span><span>${prog.xp} XP</span></div>
+          <div class="soc-xp-bar" aria-valuenow="${prog.levelProgress}" aria-valuemin="0" aria-valuemax="100">
+            <div class="soc-xp-fill" style="width:${prog.levelProgress}%"></div>
+          </div>
+          <div class="soc-xp-sub">До LVL ${prog.level + 1}: ${prog.xpToNext || 0} XP · Форма: ${sanitize(prog.form)}</div>
+        </div>
+        <div class="soc-stats-row">
+          <div class="soc-stat"><b>${prog.attPct}%</b><span>Відвідуваність</span></div>
+          <div class="soc-stat pos"><b>${prog.present || 0}</b><span>Був</span></div>
+          <div class="soc-stat neg"><b>${prog.absent || 0}</b><span>Пропуск</span></div>
+          <div class="soc-stat"><b>${(gifs || []).length}</b><span>Подарунки</span></div>
+        </div>
+        <div class="soc-bio">${sanitize(bio || 'Розкажи про себе — це твій профіль у клубі, не ігрова картка FIFA.')}</div>
+        <div class="soc-gifts-row">${giftRow}</div>
+        <button type="button" class="btn btn-p soc-edit-btn" data-action="edit-my-profile">✏️ Редагувати профіль</button>
+        <button type="button" class="btn btn-s" data-action="open-fifa-card" data-player-id="${me.id}">⚽ Ігрова картка (перегляд)</button>
+      </section>
+      <section class="soc-feed glass soc-anim delay-1">
+        <div class="soc-sec-title">Активність · прокачка</div>
+        <p class="note-sm">Відвідування дає XP. Пропуск — невеликий мінус. Інтенсивність і подарунки підсилюють прогрес.</p>
+        <div class="soc-feed-list">${feed}</div>
+      </section>
+      <section class="soc-peers glass soc-anim delay-2">
+        <div class="soc-sec-title">Команда</div>
+        <div class="soc-peers-grid">${peers || '<div class="note-sm">Немає інших гравців</div>'}</div>
+      </section>
+    </div>`;
+  },
+
   players() {
     const s = Store.get();
     const sortKey = (s.ui && s.ui.playerSort) || 'role';
@@ -1210,7 +1300,16 @@ const Views = {
     const isCoach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
     const compareBlock = ''; /* порівняння лише у FIFA */
 
-    // Для гравців / гостей — картки профілів (як на головній), без редагування
+    // Гравець зі зв’язаним акаунтом — соцмережа / прокачка (не редагування FIFA-картки)
+    const mePlayer = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer)
+      ? AuthManager.getLinkedPlayer()
+      : null;
+    const isPlayerRole = typeof AuthManager !== 'undefined' && AuthManager.isPlayer && AuthManager.isPlayer();
+    if (isPlayerRole && mePlayer) {
+      return this._playerSocialHub(mePlayer, list, attPct);
+    }
+
+    // Для гостей — картки профілів, без редагування
     if (!isCoach) {
       const cards = list.map(p => {
         const photo = this._resolvePlayerAvatar ? this._resolvePlayerAvatar(p) : (p.photoUrl || '');
@@ -1630,8 +1729,7 @@ const Views = {
       </div>
 
       <div class="card glass coach-tools-settings">
-        ${typeof CoachTools !== 'undefined' && CoachTools.clubBotPanelHtml ? CoachTools.clubBotPanelHtml() : ''}
-        <div class="ct">${t('telegram_tools')}</div>
+                <div class="ct">${t('telegram_tools')}</div>
         <p class="note-sm">Синхронізація Cloud Storage та шеринг у чат команди.</p>
         <div class="coach-tools-grid" style="display:flex;flex-wrap:wrap;gap:8px">
           <button type="button" class="btn btn-s coach-tool" data-coach-tool="sync-push">☁ ${t('save_cloud')}</button>
@@ -1690,7 +1788,7 @@ const Views = {
       <div class="card"><div class="ct">${t('about_app')}</div>
         <p style="font-size:12px;color:var(--muted);line-height:1.6">
           Тренерська платформа · МЕТАЛІСТ ШТУТГАРТ<br>
-          Schema v${typeof SCHEMA_VERSION !== 'undefined' ? SCHEMA_VERSION : 2} · build 2026.10.28-m<br>
+          Schema v${typeof SCHEMA_VERSION !== 'undefined' ? SCHEMA_VERSION : 2} · build 2026.10.28-r<br>
           localStorage · Telegram Cloud
         </p>
       </div>`;

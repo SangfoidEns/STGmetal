@@ -2,7 +2,6 @@
 const App = {
   init() {
     try { (typeof CoachTools !== "undefined" && CoachTools.loadCustomArtifacts && CoachTools.loadCustomArtifacts());
-    try { if (typeof ClubBot !== 'undefined') ClubBot.startScheduler(); } catch (_) {}
     TelegramManager.init(); } catch (e) { console.warn('Telegram', e); }
     try { StorageManager.init(); } catch (e) {
       console.error('Storage init failed', e);
@@ -1310,7 +1309,7 @@ const App = {
         <div class="tr-stat"><b>${totalMin}</b><span>хв плану</span></div>
         <div class="tr-stat"><b>${t.intensity != null ? t.intensity : '—'}</b><span>RPE план</span></div>
         <div class="tr-stat"><b>${load || '—'}</b><span>Load</span></div>
-        <div class="tr-stat"><b>${attPct != null ? attPct + '%' : '—'}</b><span>' + (typeof I18n!=='undefined'?I18n.t('longpress_attendance','Відвідування'):'Відвідування') + '</span></div>
+        <div class="tr-stat"><b>${attPct != null ? attPct + '%' : '—'}</b><span>${typeof I18n!=='undefined'?I18n.t('longpress_attendance','Відвідування'):'Відвідування'}</span></div>
         <div class="tr-stat"><b>${rpeN ? avgRpe : '—'}</b><span>Сер. RPE</span></div>
         <div class="tr-stat"><b>${attPresent}/${attTotal || '—'}</b><span>Було</span></div>
       </div>`;
@@ -1322,15 +1321,15 @@ const App = {
         ${statsBlock}
       </div>`;
     const coachActions = isCoach ? `
-      <button type="button" class="tg-sheet-btn" data-sheet-act="edit" data-tid="${t.id}">✏️ ' + (typeof I18n!=='undefined'?I18n.t('sheet_edit','Редагувати'):'Редагувати') + '</button>
+      <button type="button" class="tg-sheet-btn" data-sheet-act="edit" data-tid="${t.id}">✏️ ${typeof I18n!=='undefined'?I18n.t('sheet_edit','Редагувати'):'Редагувати'}</button>
       <button type="button" class="tg-sheet-btn" data-sheet-act="attendance" data-tid="${t.id}">✓ ${(typeof I18n!=='undefined'?I18n.t('sheet_attendance','Відвідування'):'Відвідування')}</button>
       <button type="button" class="tg-sheet-btn" data-sheet-act="dup" data-tid="${t.id}">⧉ ${(typeof I18n!=='undefined'?I18n.t('sheet_dup','Дубль / копія'):'Дубль / копія')}</button>
       <button type="button" class="tg-sheet-btn" data-sheet-act="open-board" data-tid="${t.id}">⚽ ${(typeof I18n!=='undefined'?I18n.t('open_board','Відкрити дошку'):'Відкрити дошку')}</button>
-      <button type="button" class="tg-sheet-btn" data-sheet-act="attach-board" data-tid="${t.id}">📌 ' + (typeof I18n!=='undefined'?I18n.t('sheet_attach','Прикріпити поточну дошку'):'Прикріпити поточну дошку') + '</button>
+      <button type="button" class="tg-sheet-btn" data-sheet-act="attach-board" data-tid="${t.id}">📌 ${typeof I18n!=='undefined'?I18n.t('sheet_attach','Прикріпити поточну дошку'):'Прикріпити поточну дошку'}</button>
       ${cancelled
         ? `<button type="button" class="tg-sheet-btn" data-sheet-act="restore" data-tid="${t.id}">↩ ${(typeof I18n!=='undefined'?I18n.t('planned','Відновити'):'Відновити')}</button>`
         : `<button type="button" class="tg-sheet-btn tg-sheet-warn" data-sheet-act="cancel" data-tid="${t.id}">🚫 ${(typeof I18n!=='undefined'?I18n.t('sheet_cancel_tr','Скасувати тренування'):'Скасувати тренування')}</button>`}
-      <button type="button" class="tg-sheet-btn tg-sheet-danger" data-sheet-act="delete" data-tid="${t.id}">🗑 ' + (typeof I18n!=='undefined'?I18n.t('sheet_delete','Видалити'):'Видалити') + '</button>
+      <button type="button" class="tg-sheet-btn tg-sheet-danger" data-sheet-act="delete" data-tid="${t.id}">🗑 ${typeof I18n!=='undefined'?I18n.t('sheet_delete','Видалити'):'Видалити'}</button>
     ` : `
       <button type="button" class="tg-sheet-btn" data-sheet-act="open-board" data-tid="${t.id}">⚽ ${(typeof I18n!=='undefined'?I18n.t('open_board','Переглянути дошку'):'Переглянути дошку')}</button>
     `;
@@ -2058,6 +2057,41 @@ const App = {
         return;
       }
 
+
+      if (action === 'edit-my-profile') {
+        e.preventDefault(); e.stopPropagation();
+        const me = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer) ? AuthManager.getLinkedPlayer() : null;
+        if (!me) { Toast.show('Акаунт гравця не прив’язано', 'warn'); return; }
+        const bio = (me.profile && me.profile.bio) || me.bio || '';
+        const status = (me.profile && me.profile.status) || me.statusText || '';
+        const body = '<div class="soc-edit-form">' +
+          '<p class="note-sm">Профіль клубу (соцмережа). Номер, позицію і склад змінює лише тренер.</p>' +
+          '<label class="fld"><span>Статус</span><input id="socStatus" class="inp" maxlength="80" value="' + (typeof sanitize==='function'?sanitize(status):status) + '"/></label>' +
+          '<label class="fld"><span>Про себе</span><textarea id="socBio" class="inp" rows="4" maxlength="400">' + (typeof sanitize==='function'?sanitize(bio):bio) + '</textarea></label>' +
+          '<label class="fld"><span>Фото (URL або залиш порожнім)</span><input id="socPhoto" class="inp" placeholder="https://…" value="' + (typeof sanitize==='function'?sanitize(me.profilePhoto||''):'') + '"/></label>' +
+          '</div>';
+        Modal.open('Мій профіль', body, [
+          { label: 'Скасувати', cls: 'btn-s', action: 'cancel' },
+          { label: 'Зберегти', cls: 'btn-p', action: 'ok' }
+        ]).then(function(r) {
+          if (!r || r.action !== 'ok') return;
+          const st = (document.getElementById('socStatus') || {}).value || '';
+          const b = (document.getElementById('socBio') || {}).value || '';
+          const ph = (document.getElementById('socPhoto') || {}).value || '';
+          const s = Store.get();
+          const p = (s.players || []).find(x => x.id === me.id);
+          if (!p) return;
+          if (!p.profile) p.profile = {};
+          p.profile.bio = String(b).slice(0, 400);
+          p.profile.status = String(st).slice(0, 80);
+          if (ph.trim()) { p.profilePhoto = ph.trim(); p.photoUrl = p.photoUrl || ph.trim(); }
+          try { StorageManager.save(); } catch (_) {}
+          Toast.show('Профіль оновлено', 'ok');
+          try { App.render && App.render(); } catch (_) {}
+        });
+        return;
+      }
+
       if (action === 'open-fifa-card' || action === 'open-player-card') {
         e.preventDefault(); e.stopPropagation();
         const pid = (t.dataset && t.dataset.playerId) || t.getAttribute('data-player-id');
@@ -2135,9 +2169,22 @@ const App = {
     if (action === 'inspect-artifact') {
         e.preventDefault(); e.stopPropagation();
         const uid = t.dataset.giftUid || t.getAttribute('data-gift-uid');
+        const gid = t.dataset.giftId || t.getAttribute('data-gift-id');
         const s = Store.get();
-        const g = (s.gifts || []).find(x => x.id === uid);
+        let g = (s.gifts || []).find(x => x.id === uid || x.uid === uid);
+        if (!g && gid && typeof CoachTools !== 'undefined' && CoachTools.giftById) {
+          const def = CoachTools.giftById(gid);
+          if (def) g = Object.assign({ id: uid || gid, giftId: gid }, def);
+        }
+        if (!g) {
+          // catalog-only inspect
+          if (gid && typeof CoachTools !== 'undefined' && CoachTools.giftById) {
+            g = Object.assign({}, CoachTools.giftById(gid), { id: gid, giftId: gid });
+          }
+        }
         if (!g) return;
+
+        const openCard = function () {
         const rar = (typeof CoachTools !== 'undefined' && CoachTools.RARITY_LABEL && CoachTools.RARITY_LABEL[g.rarity]) || g.rarity || '';
         const isNeural = g.special === 'neural-horse' || g.giftId === 'neural_horse_tester';
         const isGolden = g.special === 'golden-ball' || g.giftId === 'tyshchenko_first_golden_ball';
@@ -2145,15 +2192,16 @@ const App = {
         const isCoach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
         const attached = g.attached !== false;
         let coachBtns = '';
-        if (isCoach) {
+        if (isCoach && (g.uid || g.id)) {
+          const u = g.uid || g.id;
           coachBtns =
             '<div class="artifact-coach-actions">' +
-            '<button type="button" class="btn btn-s btn-sm" data-action="edit-gift-note" data-gift-uid="' + uid + '">✏️ Момент</button>' +
-            '<button type="button" class="btn btn-s btn-sm" data-action="toggle-attach-gift" data-gift-uid="' + uid + '">' +
+            '<button type="button" class="btn btn-s btn-sm" data-action="edit-gift-note" data-gift-uid="' + u + '">✏️ Момент</button>' +
+            '<button type="button" class="btn btn-s btn-sm" data-action="toggle-attach-gift" data-gift-uid="' + u + '">' +
               (attached ? '📎 Зняти з профілю' : '📌 На профіль') + '</button>' +
             (g.playerId ? ('<button type="button" class="btn btn-s btn-sm" data-action="set-featured-gift" data-player-id="' +
-              g.playerId + '" data-gift-uid="' + uid + '">⭐ Біля імені</button>') : '') +
-            '<button type="button" class="btn btn-s btn-sm btn-danger" data-action="delete-gift" data-gift-uid="' + uid + '">🗑 ' + (typeof I18n!=='undefined'?I18n.t('sheet_delete','Видалити'):'Видалити') + '</button>' +
+              g.playerId + '" data-gift-uid="' + u + '">⭐ Біля імені</button>') : '') +
+            '<button type="button" class="btn btn-s btn-sm btn-danger" data-action="delete-gift" data-gift-uid="' + u + '">🗑 ' + (typeof I18n!=='undefined'?I18n.t('sheet_delete','Видалити'):'Видалити') + '</button>' +
             '</div>';
         }
         const html = '<div class="artifact-inspect' + (isNeural ? ' neural-inspect' : '') + (isGolden ? ' golden-inspect' : '') + (isCrest ? ' crest-inspect' : '') + '">' +
@@ -2173,7 +2221,15 @@ const App = {
         if (typeof Modal !== 'undefined' && Modal.open) {
           Modal.open('Артефакт клубу', html, [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
         }
-        try { TelegramManager.haptic && TelegramManager.haptic('medium'); } catch (_) {}
+        try { TelegramManager.haptic && TelegramManager.haptic('light'); } catch (_) {}
+        };
+
+        if (typeof CoachTools !== 'undefined' && CoachTools.openGiftAnimation) {
+          CoachTools.openGiftAnimation(g, openCard);
+        } else {
+          openCard();
+        }
+
         return;
       }
       if (action === 'edit-gift-note') {
@@ -2858,13 +2914,86 @@ const App = {
 /* ─── ACTIONS ───────────────────────────────────────────── */
 ;try {
   const _origRender = App.renderCurrent && App.renderCurrent.bind(App);
-  if (_origRender && !App._clubBotWrapped) {
-    App._clubBotWrapped = true;
-    App.renderCurrent = function () {
-      const r = _origRender.apply(this, arguments);
-      try { if (typeof CoachTools !== 'undefined' && CoachTools.bindClubBot) CoachTools.bindClubBot(document); } catch (_) {}
-      try { if (typeof ClubBot !== 'undefined' && ClubBot.autoPollEnabled && ClubBot.autoPollEnabled()) ClubBot.startScheduler(); } catch (_) {}
-      return r;
-    };
-  }
 } catch (_) {}
+
+/* motion fx bootstrap */
+(function bindMetalistFx(){
+ try {
+
+  // Micro-interactions: ripple + XP bar heat
+  if (!App._fxBound) {
+    App._fxBound = true;
+    document.addEventListener('pointerdown', function (ev) {
+      const btn = ev.target.closest('.btn, .soc-edit-btn, .nav-item, .tnav button');
+      if (!btn || btn.classList.contains('no-ripple')) return;
+      const r = btn.getBoundingClientRect();
+      const ripple = document.createElement('span');
+      ripple.className = 'soc-tap-ripple';
+      const size = Math.max(r.width, r.height);
+      ripple.style.width = ripple.style.height = size + 'px';
+      ripple.style.left = (ev.clientX - r.left - size / 2) + 'px';
+      ripple.style.top = (ev.clientY - r.top - size / 2) + 'px';
+      if (getComputedStyle(btn).position === 'static') btn.style.position = 'relative';
+      btn.appendChild(ripple);
+      setTimeout(function () { ripple.remove(); }, 560);
+    }, { passive: true });
+  }
+  try {
+    document.querySelectorAll('.soc-xp-bar').forEach(function (bar) {
+      const fill = bar.querySelector('.soc-xp-fill');
+      if (!fill) return;
+      const w = parseInt(fill.style.width, 10) || 0;
+      bar.classList.toggle('is-hot', w >= 70);
+      // replay fill animation
+      fill.style.width = '0%';
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { fill.style.width = w + '%'; });
+      });
+    });
+  } catch (_) {}
+
+ } catch(e) { console.warn(e); }
+})();
+
+(function () {
+  if (typeof App === 'undefined' || App._motionWrapped) return;
+  App._motionWrapped = true;
+  const _r = App.render ? App.render.bind(App) : null;
+  if (!_r) return;
+  App.render = function () {
+    const out = _r.apply(this, arguments);
+    try {
+      if (!App._fxBound) {
+        App._fxBound = true;
+        document.addEventListener('pointerdown', function (ev) {
+          const btn = ev.target.closest('.btn, .soc-edit-btn, .nav-item');
+          if (!btn) return;
+          const r = btn.getBoundingClientRect();
+          const ripple = document.createElement('span');
+          ripple.className = 'soc-tap-ripple';
+          const size = Math.max(r.width, r.height);
+          ripple.style.width = ripple.style.height = size + 'px';
+          ripple.style.left = (ev.clientX - r.left - size / 2) + 'px';
+          ripple.style.top = (ev.clientY - r.top - size / 2) + 'px';
+          if (getComputedStyle(btn).position === 'static') btn.style.position = 'relative';
+          btn.style.overflow = btn.style.overflow || 'hidden';
+          btn.appendChild(ripple);
+          setTimeout(function () { ripple.remove(); }, 560);
+        }, { passive: true });
+      }
+      document.querySelectorAll('.soc-xp-bar').forEach(function (bar) {
+        const fill = bar.querySelector('.soc-xp-fill');
+        if (!fill) return;
+        const w = parseInt(fill.style.width, 10) || 0;
+        bar.classList.toggle('is-hot', w >= 70);
+        fill.style.transition = 'none';
+        fill.style.width = '0%';
+        requestAnimationFrame(function () {
+          fill.style.transition = '';
+          requestAnimationFrame(function () { fill.style.width = w + '%'; });
+        });
+      });
+    } catch (_) {}
+    return out;
+  };
+})();
