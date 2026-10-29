@@ -880,60 +880,6 @@ const StorageManager = {
           return true;
         }
 
-        // legacy guard (should not reach)
-        if (false && data.type === 'metalist_roster_migration') {
-          this.createBackup();
-          const s = Store.get() || {};
-          if (!Array.isArray(s.players)) s.players = [];
-          if (!Array.isArray(s.trainings)) s.trainings = [];
-          const byId = {};
-          const byTg = {};
-          s.players.forEach(p => {
-            if (p && p.id) byId[p.id] = p;
-            const u = (p.telegramUsername || '').toLowerCase();
-            if (u) byTg[u] = p;
-          });
-          let added = 0, updated = 0;
-          (data.players || []).forEach(src => {
-            if (!src) return;
-            const u = (src.telegramUsername || '').toLowerCase();
-            let dst = (src.id && byId[src.id]) || (u && byTg[u]) || null;
-            if (dst) {
-              Object.keys(src).forEach(k => {
-                if (src[k] != null && src[k] !== '') dst[k] = src[k];
-              });
-              updated++;
-            } else {
-              if (!src.id) src.id = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-              s.players.push(src);
-              added++;
-            }
-          });
-          // merge trainings by id (attendance preserved)
-          const trById = {};
-          s.trainings.forEach(t => { if (t && t.id) trById[t.id] = t; });
-          (data.trainings || []).forEach(src => {
-            if (!src || !src.id) return;
-            if (trById[src.id]) {
-              const dst = trById[src.id];
-              if (src.attendance) dst.attendance = Object.assign({}, dst.attendance || {}, src.attendance);
-              if (src.status) dst.status = src.status;
-              if (src.duration != null) dst.duration = src.duration;
-              if (src.intensity != null) dst.intensity = src.intensity;
-            } else {
-              s.trainings.push(src);
-            }
-          });
-          if (data.club && s.settings) s.settings.clubName = s.settings.clubName || data.club;
-          try { localStorage.setItem('metalist_roster_migration', JSON.stringify(data)); } catch (_) {}
-          Store.set(s);
-          this.save();
-          try { if (typeof AuthManager !== 'undefined') AuthManager.afterDataImport(); } catch (_) {}
-          try { App.renderCurrent(); } catch (_) {}
-          try { App.updateHeader && App.updateHeader(); } catch (_) {}
-          Toast.show('Міграція складу: +' + added + ' / оновлено ' + updated, 'ok');
-          return true;
-        }
 
         // мінімальна валідація структури експорту
         if (!data.players && !data.activeBoard && !data.schemaVersion && !data.trainings && !data.boards && !data.schemes) {

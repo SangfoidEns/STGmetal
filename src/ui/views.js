@@ -310,7 +310,7 @@ const Views = {
 
     return `
       <div class="club-profile">
-        <div class="app-build-tag" aria-hidden="true">build 2026.10.28-c · full</div>
+        <div class="app-build-tag" aria-hidden="true">build 2026.10.28-m · full</div>
 
         <!-- Telegram-style profile card (coach/player) -->
         ${(() => {
@@ -1690,7 +1690,7 @@ const Views = {
       <div class="card"><div class="ct">${t('about_app')}</div>
         <p style="font-size:12px;color:var(--muted);line-height:1.6">
           Тренерська платформа · МЕТАЛІСТ ШТУТГАРТ<br>
-          Schema v${typeof SCHEMA_VERSION !== 'undefined' ? SCHEMA_VERSION : 2} · build 2026.10.28-c<br>
+          Schema v${typeof SCHEMA_VERSION !== 'undefined' ? SCHEMA_VERSION : 2} · build 2026.10.28-m<br>
           localStorage · Telegram Cloud
         </p>
       </div>`;
