@@ -2151,6 +2151,27 @@ const App = {
 
 
 
+      if (action === 'load-scheme-board') {
+        e.preventDefault(); e.stopPropagation();
+        const bid = t.dataset.boardId || t.getAttribute('data-board-id');
+        if (!bid) return;
+        try {
+          if (typeof App.allowBoardOnce === 'function') App.allowBoardOnce('scheme');
+          App.navigate('board');
+          setTimeout(function () {
+            try {
+              const b = (Store.get().boards || []).find(x => String(x.id) === String(bid));
+              if (!b) { Toast.show('Схему не знайдено', 'warn'); return; }
+              if (BoardEngine && BoardEngine.loadBoard) BoardEngine.loadBoard(b);
+              else if (BoardEngine && BoardEngine.loadState && b.state) BoardEngine.loadState(b.state);
+              else if (BoardEngine && b.objects) { BoardEngine.objects = b.objects; BoardEngine.render && BoardEngine.render(); }
+              Toast.show('Схему відкрито', 'ok');
+            } catch (err) { console.warn(err); }
+          }, 180);
+        } catch (_) {}
+        return;
+      }
+
       if (action === 'open-lineup-board') {
         e.preventDefault(); e.stopPropagation();
         try {
@@ -2237,38 +2258,56 @@ const App = {
         return;
       }
 
-      if (action === 'open-fifa-card' || action === 'open-player-card') {
+      if (action === 'open-player-card') {
         e.preventDefault(); e.stopPropagation();
         const pid = (t.dataset && t.dataset.playerId) || t.getAttribute('data-player-id');
-        const p = (Store.get().players || []).find(x => x.id === pid);
-        if (!p) return;
+        if (!pid) return;
         try { TelegramManager.haptic && TelegramManager.haptic('light'); } catch (_) {}
-        // Тренер бачить повну картку «як гравець» + інструменти; гравець — лише FIFA
+        // На себе → головна (свій акаунт)
+        try {
+          const me = AuthManager.getLinkedPlayer && AuthManager.getLinkedPlayer();
+          if (me && String(me.id) === String(pid)) {
+            App.navigate('dashboard');
+            return;
+          }
+        } catch (_) {}
+        const p = (Store.get().players || []).find(x => String(x.id) === String(pid));
+        if (!p) return;
+        try { if (CoachTools && CoachTools.ensureWornGift) CoachTools.ensureWornGift(p.id); } catch (_) {}
         const asCoach = (typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach());
-        if (asCoach && typeof Views !== 'undefined' && Views.coachPlayerDetail) {
+        if (asCoach && Views.coachPlayerDetail) {
           window.__coachCardPlayerId = p.id;
           const html = Views.coachPlayerDetail(p.id);
-          if (typeof Modal !== 'undefined' && Modal.open) {
-            Modal.open('Картка гравця · ' + (p.lastName || p.firstName || ''), '<div class="fifa-modal-wrap" data-compare-host="' + p.id + '">' + html + '</div>', [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
-            setTimeout(() => { try { const s2 = document.getElementById('playerCompareSel'); if (s2) s2._msCmpBound = false; App._bindPlayerCompare(); } catch (_) {} }, 40);
-          }
-        } else if (typeof Views !== 'undefined' && Views._fifaCard) {
-          window.__coachCardPlayerId = p.id;
-          window.__fifaCompareId = window.__fifaCompareId || '';
+          Modal.open('Картка гравця · ' + (p.lastName || p.firstName || ''), '<div class="fifa-modal-wrap" data-compare-host="' + p.id + '">' + html + '</div>', [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
+          setTimeout(() => { try { const s2 = document.getElementById('playerCompareSel'); if (s2) s2._msCmpBound = false; App._bindPlayerCompare(); } catch (_) {} }, 40);
+        } else if (Views._playerProfileCard) {
+          Modal.open((p.lastName || p.firstName || 'Гравець'), '<div class="player-profile-modal" data-player-id="' + p.id + '">' + Views._playerProfileCard(p) + '</div>', [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
+        } else if (Views._fifaCard) {
           const st = Views._playerStats ? Views._playerStats(p.id) : {};
-          const html = Views._fifaCard(p, st);
-          if (typeof Modal !== 'undefined' && Modal.open) {
-            Modal.open('FIFA-картка · ' + (p.lastName || p.firstName || ''),
-              '<div class="fifa-modal-wrap" data-compare-host="' + p.id + '">' + html + '</div>',
-              [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
-            setTimeout(() => {
-              try {
-                const s2 = document.getElementById('playerCompareSel');
-                if (s2) { s2._msCmpBound = false; App._bindPlayerCompare(); }
-              } catch (_) {}
-            }, 40);
-          }
+          Modal.open('FIFA · ' + (p.lastName || p.firstName || ''), Views._fifaCard(p, st), [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
         }
+        return;
+      }
+      if (action === 'open-fifa-card') {
+        e.preventDefault(); e.stopPropagation();
+        const pid = (t.dataset && t.dataset.playerId) || t.getAttribute('data-player-id');
+        if (!pid) return;
+        const p = (Store.get().players || []).find(x => String(x.id) === String(pid));
+        if (!p) return;
+        try { TelegramManager.haptic && TelegramManager.haptic('light'); } catch (_) {}
+        try { if (CoachTools && CoachTools.ensureWornGift) CoachTools.ensureWornGift(p.id); } catch (_) {}
+        window.__coachCardPlayerId = p.id;
+        const st = Views._playerStats ? Views._playerStats(p.id) : {};
+        const html = Views._fifaCard(p, st);
+        Modal.open('FIFA-картка · ' + (p.lastName || p.firstName || ''),
+          '<div class="fifa-modal-wrap" data-compare-host="' + p.id + '">' + html + '</div>',
+          [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
+        setTimeout(() => {
+          try {
+            const s2 = document.getElementById('playerCompareSel');
+            if (s2) { s2._msCmpBound = false; App._bindPlayerCompare(); }
+          } catch (_) {}
+        }, 40);
         return;
       }
       if (action === 'player-compare') {
@@ -2461,9 +2500,17 @@ const App = {
         }
         return;
       }
-      if (action === 'squad-view') {
+      if (action === 'squad-view' || action === 'toggle-squad-view') {
         e.preventDefault(); e.stopPropagation();
-        window.__squadViewMode = t.dataset.mode || 'list';
+        const s = Store.get();
+        s.ui = s.ui || {};
+        let mode = t.dataset.mode || '';
+        if (!mode || action === 'toggle-squad-view') {
+          mode = (s.ui.squadViewMode || window.__squadViewMode || 'list') === 'cards' ? 'list' : 'cards';
+        }
+        s.ui.squadViewMode = mode;
+        try { window.__squadViewMode = mode; } catch (_) {}
+        try { StorageManager.save(); } catch (_) {}
         try { App.renderCurrent(); } catch (_) {}
         return;
       }

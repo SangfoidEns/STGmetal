@@ -155,24 +155,20 @@ const Views = {
 
   /** Status chip near name — featured artifact only (Telegram-style) */
   _giftStatusBadge(gifts, playerId) {
-    let g = null;
+    let featured = null;
     try {
-      if (playerId && typeof CoachTools !== 'undefined' && CoachTools.getFeaturedGift)
-        g = CoachTools.getFeaturedGift(playerId);
+      if (typeof CoachTools !== 'undefined' && CoachTools.ensureWornGift && playerId) {
+        featured = CoachTools.ensureWornGift(playerId);
+      }
     } catch (_) {}
-    if (!g) {
-      const list = (gifts || []).filter(x => x && x.attached !== false);
-      if (!list.length) return '';
-      const rank = { legendary: 4, epic: 3, rare: 2, common: 1 };
-      list.sort((a, b) => (rank[b.rarity] || 0) - (rank[a.rarity] || 0));
-      g = list[0];
+    if (!featured && gifts && gifts.length) {
+      featured = gifts.find(g => g.featured) || null;
     }
-    if (!g) return '';
-    const rar = g.rarity || 'common';
-    const extra = (gifts && gifts.length > 1) ? ('+' + (gifts.length - 1)) : '';
-    return '<span class="gift-status-badge rarity-' + rar + '" title="' +
-      sanitize((g.label || '') + (g.serial ? (' · ' + g.serial) : '') + (g.note ? (' — ' + g.note) : '')) + '">' +
-      (g.ico || '★') + extra + '</span>';
+    if (!featured) return '';
+    return '<span class="gift-status-badge rarity-' + (featured.rarity || 'common') +
+      '" title="' + (typeof sanitize==='function'?sanitize(featured.label||''):'') +
+      '" style="--art-hue:' + (featured.hue != null ? featured.hue : 42) + '">' +
+      (featured.ico || '★') + '</span>';
   },
 
 
@@ -367,7 +363,7 @@ const Views = {
 
     return `
       <div class="club-profile">
-        <div class="app-build-tag" aria-hidden="true">build 2026.10.28-x · full</div>
+        <div class="app-build-tag" aria-hidden="true">build 2026.10.28-z · full</div>
 
         <!-- Telegram-style profile card (coach/player) -->
         ${(() => {
@@ -422,21 +418,17 @@ const Views = {
           </button>
           <div class="cp-stat cp-stat-chart">
             <span class="cp-stat-ic">⏱</span>
-            <span class="cp-stat-val">${totalMin || totalHours}</span>
-            <span class="cp-stat-lb">${totalMin ? t('min_total') : 'год'}</span>
-            <span class="cp-stat-sub">${tf('trainings_n',{n:pastForStats.length})}</span>
+            <span class="cp-stat-val">${totalMin || 0}</span>
+            <span class="cp-stat-lb">хв загалом</span>
+            <span class="cp-stat-sub">${pastForStats.length} тренувань</span>
             <div class="cp-stat-spark">${this._sparkline(minByDay, { color: '#7cf0c0', fill: 'rgba(124,240,192,.12)' })}</div>
           </div>
-          <div class="cp-stat cp-stat-chart cp-stat-split">
-            <div class="cp-stat-left">
-              <div class="cp-stat-spark">${this._sparkline(loadBySession, { color: '#3d7eff', fill: 'rgba(61,126,255,.12)' })}</div>
-              <span class="cp-stat-sub">сер. 3: ${avg3}</span>
-            </div>
-            <div class="cp-stat-right">
-              <span class="cp-stat-ic">📊</span>
-              <span class="cp-stat-val">${weekLoad || 0}</span>
-              <span class="cp-stat-lb">${t('weekly_load')}</span>
-            </div>
+          <div class="cp-stat cp-stat-chart">
+            <span class="cp-stat-ic">📊</span>
+            <span class="cp-stat-val">${weekLoad || 0}</span>
+            <span class="cp-stat-lb">Тижневе навантаження</span>
+            <span class="cp-stat-sub">сер. 3 сесії: ${avg3} · LOAD = хв × RPE</span>
+            <div class="cp-stat-spark">${this._sparkline(loadBySession, { color: '#3d7eff', fill: 'rgba(61,126,255,.12)' })}</div>
           </div>
           <div class="cp-stat cp-stat-chart">
             <span class="cp-stat-ic">✨</span>
@@ -588,6 +580,32 @@ const Views = {
     ).join('') + '</span>';
   },
 
+  _playerProfileCard(p) {
+    if (!p) return '';
+    try { if (typeof CoachTools !== 'undefined' && CoachTools.ensureWornGift) CoachTools.ensureWornGift(p.id); } catch (_) {}
+    const featured = (typeof CoachTools !== 'undefined' && CoachTools.ensureWornGift) ? CoachTools.ensureWornGift(p.id) : null;
+    const acc = (typeof CoachTools !== 'undefined' && CoachTools.giftAccent) ? CoachTools.giftAccent(featured) : { ring: '#c8a84b', bg: '#1a1408' };
+    const photo = this._resolvePlayerAvatar ? this._resolvePlayerAvatar(p) : (p.photo || p.profilePhoto || '');
+    const initials = ((p.firstName||'')[0]||'') + ((p.lastName||'')[0]||'');
+    const xp = (typeof CoachTools !== 'undefined' && CoachTools.playerXpTotal) ? CoachTools.playerXpTotal(p.id) : 0;
+    const lvl = Math.max(1, Math.floor(xp / 100) + 1);
+    const name = [p.firstName, p.lastName].filter(Boolean).join(' ') || 'Гравець';
+    const status = (p.profile && p.profile.status) || p.statusText || '';
+    const bio = (p.profile && p.profile.bio) || p.bio || '';
+    const badge = this._giftStatusBadge([], p.id);
+    const ph = photo
+      ? '<img src="' + sanitize(photo) + '" alt="" referrerpolicy="no-referrer"/>'
+      : '<span>' + sanitize(initials.toUpperCase()) + '</span>';
+    return '<div class="player-profile-sheet glass" style="border-color:' + acc.ring + '">' +
+      '<button type="button" class="pps-avatar" data-action="open-fifa-card" data-player-id="' + p.id + '" style="border-color:' + acc.ring + ';background:' + acc.bg + '">' + ph + '</button>' +
+      '<div class="pps-name">#' + (p.number||'—') + ' ' + sanitize(name) + ' ' + badge + '</div>' +
+      '<div class="pps-meta">' + sanitize(p.position||'') + ' · LVL ' + lvl + ' · ' + xp + ' XP</div>' +
+      (status ? ('<div class="pps-status">' + sanitize(status) + '</div>') : '') +
+      (bio ? ('<div class="pps-bio">' + sanitize(bio) + '</div>') : '') +
+      '<p class="note-sm">Тап по фото → FIFA-картка</p>' +
+      '<button type="button" class="btn btn-p btn-sm" data-action="open-fifa-card" data-player-id="' + p.id + '">⚽ FIFA-картка</button>' +
+      '</div>';
+  },
   _fifaCard(p, stats) {
     if (!p) return '';
     stats = stats || {};
@@ -659,8 +677,7 @@ const Views = {
             </div>
             ${giftOrbit}
           </div>
-          <div class="fifa-club">
-            <img class="fifa-club-mark" src="assets/metalist-mark.svg" alt="" onerror="this.style.display='none'"/>
+          <div class="fifa-club fifa-club-text-only">
             <div class="fifa-club-text">
               <div class="fifa-club-name">МЕТАЛІСТ</div>
               <div class="fifa-club-sub">Штутгарт</div>
@@ -1130,6 +1147,21 @@ const Views = {
       if (aUp !== bUp) return aUp - bUp;
       return aUp === 0 ? ad.localeCompare(bd) : bd.localeCompare(ad);
     });
+    const _isPlayerRole = typeof AuthManager !== 'undefined' && AuthManager.isPlayer && AuthManager.isPlayer();
+    let _schemesBlock = '';
+    if (_isPlayerRole) {
+      const boards = (s.boards || []).slice().sort((a,b) => String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||'')));
+      const schemesHtml = boards.length
+        ? boards.slice(0, 40).map(b => {
+            const title = sanitize(b.name || b.title || 'Схема');
+            const typ = sanitize(b.type || b.kind || 'тактика');
+            return '<button type="button" class="scheme-row glass" data-action="load-scheme-board" data-board-id="' + (b.id || '') + '">' +
+              '<span class="scheme-row-title">' + title + '</span>' +
+              '<span class="scheme-row-meta">' + typ + '</span></button>';
+          }).join('')
+        : '<div class="es note-sm">Немає збережених схем</div>';
+      _schemesBlock = '<div class="card glass player-schemes-block"><div class="ct">📐 Схеми</div><div class="scheme-list">' + schemesHtml + '</div></div>';
+    }
     return `
       <div class="st">${t('trainings_title')} ${canEdit ? '<button class="btn btn-p btn-sm" data-action="new-training">' + t('new_short') + '</button>' : '<span class="note-sm">' + t('planned_and_past') + '</span>'}</div>
       <div class="fb">
@@ -1409,6 +1441,12 @@ const Views = {
       ? AuthManager.getLinkedPlayer()
       : null;
     const isPlayerRole = typeof AuthManager !== 'undefined' && AuthManager.isPlayer && AuthManager.isPlayer();
+    // sort by XP desc for player team view
+    try {
+      if (isPlayerRole && typeof CoachTools !== 'undefined' && CoachTools.playerXpTotal) {
+        players = players.slice().sort((a, b) => (CoachTools.playerXpTotal(b.id) || 0) - (CoachTools.playerXpTotal(a.id) || 0));
+      }
+    } catch (_) {}
     if (isPlayerRole && mePlayer) {
       return this._playerSocialHub(mePlayer, list, attPct);
     }
@@ -1434,7 +1472,11 @@ const Views = {
         } catch (_) {}
         const giftOrbit = this._tgGiftCloud(gifs, 0.85, 'mini3');
         const giftBadge = this._giftStatusBadge(gifs);
-        return '<div class="pl-card glass' + (isMe ? ' is-me' : '') + '" data-player-id="' + p.id + '" data-action="open-player-card" role="button" tabindex="0">' +
+        try { if (typeof CoachTools !== 'undefined' && CoachTools.ensureWornGift) CoachTools.ensureWornGift(p.id); } catch(_){}
+      const featG = (typeof CoachTools !== 'undefined' && CoachTools.ensureWornGift) ? CoachTools.ensureWornGift(p.id) : null;
+      const accG = (typeof CoachTools !== 'undefined' && CoachTools.giftAccent) ? CoachTools.giftAccent(featG) : null;
+      const cardBorder = accG ? ('border-color:' + accG.border + ';') : '';
+      return '<div class="pl-card glass' + (isMe ? ' is-me' : '') + '" style="' + cardBorder + '" data-player-id="' + p.id + '" data-action="open-player-card" role="button" tabindex="0">' +
           '<div class="pl-card-av-wrap"><div class="pl-card-av" style="border-color:' + acc.ring + ';background:' + acc.bg + '">' + ph + '</div>' + giftOrbit + '</div>' +
           '<div class="pl-card-body">' +
           '<div class="pl-card-name">#' + (p.number || '—') + ' ' + sanitize(name) + ' ' + this._giftStatusBadge(gifs, p.id) + '</div>' +
@@ -1475,7 +1517,7 @@ const Views = {
         (!starters.length && !reserves.length && !infirmary.length ? '<div class="es">Немає гравців</div>' : '');
     }
 
-    const viewMode = (typeof window !== 'undefined' && window.__squadViewMode) || 'list';
+    const viewMode = (Store.get().ui && Store.get().ui.squadViewMode) || (typeof window !== 'undefined' && window.__squadViewMode) || 'list';
     const cardsCoach = list.map(p => {
       const photo = this._resolvePlayerAvatar ? this._resolvePlayerAvatar(p) : (p.photoUrl || '');
       const name = [p.firstName, p.lastName].filter(Boolean).join(' ') || p.name || ('#' + (p.number || ''));
@@ -1617,7 +1659,13 @@ const Views = {
       const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const dayTr = (s.trainings || []).filter(t => t.date === ds && t.status !== 'cancelled' && t.status !== 'canceled');
       const dayMatch = (s.matches || []).filter(m => m.date === ds);
-      const dayCal = (s.calendar || []).filter(e => e.date === ds && e.type !== 'TRAINING' && e.type !== 'training');
+      const dayCal = (s.calendar || []).filter(e => {
+        if (!e || e.date !== ds) return false;
+        const typ = String(e.type || e.eventType || '').toLowerCase();
+        if (typ === 'training' || typ === 'train' || typ === 'session') return false;
+        if (e.trainingId || e.matchId) return false;
+        return true;
+      });
       const has = dayTr.length || dayMatch.length || dayCal.length;
       let badge = '';
       const doneTr = dayTr.find(t => t.status === 'done' || (t.date && t.date < todayStr));
@@ -1766,9 +1814,20 @@ const Views = {
         </div>`;
       }).join('') || '<div class="es">Немає гравців</div>';
 
-      const statsTable = (s.players || []).slice().sort((a, b) =>
-        String(a.lastName || '').localeCompare(String(b.lastName || ''), 'uk')
-      ).map(p => {
+      const sortKey = (s.ui && s.ui.playerSort) || 'name';
+      const sortDir = (s.ui && s.ui.playerSortDir) === 'desc' ? -1 : 1;
+      const statsTable = (s.players || []).slice().sort((a, b) => {
+        const sa = this._playerStats ? this._playerStats(a.id) : {};
+        const sb = this._playerStats ? this._playerStats(b.id) : {};
+        let cmp = 0;
+        if (sortKey === 'pos') cmp = String(a.position || '').localeCompare(String(b.position || ''), 'uk');
+        else if (sortKey === 'group') cmp = ((a.group === 'reserve') ? 1 : 0) - ((b.group === 'reserve') ? 1 : 0);
+        else if (sortKey === 'att') cmp = ((sa.att != null) ? sa.att : -1) - ((sb.att != null) ? sb.att : -1);
+        else if (sortKey === 'rpe') cmp = ((sa.rpe != null) ? sa.rpe : -1) - ((sb.rpe != null) ? sb.rpe : -1);
+        else if (sortKey === 'load28') cmp = ((sa.load28 != null) ? sa.load28 : -1) - ((sb.load28 != null) ? sb.load28 : -1);
+        else cmp = String(a.lastName || a.firstName || '').localeCompare(String(b.lastName || b.firstName || ''), 'uk');
+        return cmp * sortDir;
+      }).map(p => {
         const st = this._playerStats ? this._playerStats(p.id) : {};
         const g = (p.group === 'reserve') ? t('reserve', 'Резерв') : t('starter', 'Основа');
         return `<div class="pl-stats-row">
@@ -1829,9 +1888,16 @@ const Views = {
       <div class="card"><div class="ct">${t('individual_load')}</div>
         ${loadRows}
       </div>
-      <div class="card glass"><div class="ct">${t('player_stats_block')}</div>
+      <div class="card glass"><div class="ct">${t('player_stats_block')} <span class="note-sm">тап по стовпчику — сортування</span></div>
         <div class="pl-stats-table">
-          <div class="pl-stats-head"><span>Гравець</span><span>Поз.</span><span>Група</span><span>Відв.%</span><span>RPE</span><span>Load28</span></div>
+          <div class="pl-stats-head">
+            <button type="button" class="pl-th" data-player-sort="name">Гравець</button>
+            <button type="button" class="pl-th" data-player-sort="pos">Поз.</button>
+            <button type="button" class="pl-th" data-player-sort="group">Група</button>
+            <button type="button" class="pl-th" data-player-sort="att">Відв.%</button>
+            <button type="button" class="pl-th" data-player-sort="rpe">RPE</button>
+            <button type="button" class="pl-th" data-player-sort="load28">Load28</button>
+          </div>
           ${statsTable}
         </div>
       </div>
@@ -1953,7 +2019,7 @@ const Views = {
       <div class="card"><div class="ct">${t('about_app')}</div>
         <p style="font-size:12px;color:var(--muted);line-height:1.6">
           Тренерська платформа · МЕТАЛІСТ ШТУТГАРТ<br>
-          Schema v${typeof SCHEMA_VERSION !== 'undefined' ? SCHEMA_VERSION : 2} · build 2026.10.28-x<br>
+          Schema v${typeof SCHEMA_VERSION !== 'undefined' ? SCHEMA_VERSION : 2} · build 2026.10.28-z<br>
           localStorage · Telegram Cloud
         </p>
       </div>`;

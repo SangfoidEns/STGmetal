@@ -531,3 +531,72 @@ if (typeof window !== 'undefined') window.PlayerProgress = PlayerProgress;
 CoachTools.playerGifts = function (playerId) {
   try { return (Store.get().gifts || []).filter(g => g.playerId === playerId); } catch (_) { return []; }
 };
+
+
+CoachTools.RARITY_RANK = { common: 1, rare: 2, epic: 3, legendary: 4, mythic: 5 };
+CoachTools.rarityRank = function (r) {
+  return CoachTools.RARITY_RANK[String(r || 'common').toLowerCase()] || 1;
+};
+CoachTools.playerGiftsSorted = function (playerId) {
+  const list = (CoachTools.playerGifts && CoachTools.playerGifts(playerId)) || [];
+  return list.slice().sort(function (a, b) {
+    const rd = CoachTools.rarityRank(b.rarity) - CoachTools.rarityRank(a.rarity);
+    if (rd) return rd;
+    return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+  });
+};
+/** Ensure at least one gift attached; prefer featured, else rarest */
+CoachTools.ensureWornGift = function (playerId) {
+  try {
+    const s = Store.get();
+    if (!s.gifts) return null;
+    const mine = s.gifts.filter(g => g.playerId === playerId);
+    if (!mine.length) return null;
+    let featured = mine.find(g => g.featured);
+    let worn = mine.filter(g => g.attached !== false);
+    if (!worn.length) {
+      const best = mine.slice().sort((a, b) => CoachTools.rarityRank(b.rarity) - CoachTools.rarityRank(a.rarity))[0];
+      if (best) {
+        best.attached = true;
+        if (!featured) { mine.forEach(x => { x.featured = false; }); best.featured = true; featured = best; }
+        try { StorageManager.save(); } catch (_) {}
+        worn = [best];
+      }
+    }
+    if (!featured && worn.length) {
+      const best = worn.slice().sort((a, b) => CoachTools.rarityRank(b.rarity) - CoachTools.rarityRank(a.rarity))[0];
+      mine.forEach(x => { x.featured = false; });
+      if (best) { best.featured = true; featured = best; try { StorageManager.save(); } catch (_) {} }
+    }
+    return featured || worn[0] || null;
+  } catch (_) { return null; }
+};
+CoachTools.giftAccent = function (g) {
+  if (!g) return { hue: 42, ring: 'rgba(232,197,71,0.55)', bg: 'linear-gradient(145deg,#2a2410,#12100a)' };
+  const hue = g.hue != null ? g.hue : 42;
+  return {
+    hue: hue,
+    ring: 'hsla(' + hue + ',75%,55%,0.85)',
+    bg: 'linear-gradient(145deg,hsla(' + hue + ',40%,18%,1),hsla(' + hue + ',30%,8%,1))',
+    border: 'hsla(' + hue + ',70%,50%,0.45)'
+  };
+};
+CoachTools.playerXpTotal = function (playerId) {
+  try {
+    if (typeof Views !== 'undefined' && Views._playerXp) return Views._playerXp(playerId).total || 0;
+  } catch (_) {}
+  // fallback: gifts * 25 + attendance rough
+  try {
+    const s = Store.get();
+    const gifts = (s.gifts || []).filter(g => g.playerId === playerId).length;
+    let xp = gifts * 25;
+    (s.trainings || []).forEach(t => {
+      if (t.status === 'cancelled' || t.status === 'canceled' || t.status === 'draft') return;
+      const a = (t.attendance || {})[playerId];
+      if (!a) return;
+      if (a.present === false) xp -= 6;
+      else xp += 18 + Math.round((a.intensity || 0) * 0.5);
+    });
+    return Math.max(0, xp);
+  } catch (_) { return 0; }
+};

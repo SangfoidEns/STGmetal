@@ -9482,3 +9482,136 @@ body.tg-mini-app .main, body.tg-mini-app #main {
   border: 1px solid var(--border-strong) !important;
   color: var(--text) !important;
 }
+
+/* player-ux-y */
+.fifa-club-mark { display: none !important; }
+.fifa-club-text-only { display: flex; align-items: flex-end; justify-content: flex-end; }
+.fifa-club-logo { top: 10px; right: 10px; width: 40px; height: 40px; }
+.gift-status-badge {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 1.35em;
+  height: 1.35em;
+  margin-left: 6px;
+  font-size: 1em;
+  vertical-align: middle;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.gift-status-badge::after { display: none !important; content: none !important; }
+.scheme-list { display: flex; flex-direction: column; gap: 8px; }
+.scheme-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px !important;
+  border-radius: 14px !important;
+  cursor: pointer;
+}
+.scheme-row-title { font-weight: 700; font-size: 14px; }
+.scheme-row-meta { font-size: 11px; color: var(--muted); }
+.player-profile-sheet {
+  text-align: center;
+  padding: 16px 12px 8px;
+}
+.pps-avatar {
+  width: 96px; height: 96px; border-radius: 50%;
+  overflow: hidden; margin: 0 auto 12px;
+  border: 3px solid rgba(232,197,71,0.6);
+  display: grid; place-items: center;
+  padding: 0;
+}
+.pps-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.pps-name { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+.pps-meta { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.pps-status { font-size: 13px; color: var(--club-accent); margin-bottom: 6px; }
+.pps-bio { font-size: 13px; color: var(--text); opacity: 0.9; margin-bottom: 10px; line-height: 1.4; }
+.pl-card[style*="border-color"] { border-width: 1.5px !important; }
+.player-schemes-block { margin-top: 12px; }
+
+/* tactics-text-fix */
+.tactics-page .card,
+.sg, .sb2, .scheme-row, [data-scheme], .tg-row {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+}
+.tg-row, .tg-row-body, .tg-row-title, .tg-row-meta, .scheme-row-title, .scheme-row-meta {
+  writing-mode: horizontal-tb !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+  max-width: 100%;
+}
+.tg-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  width: 100% !important;
+  min-height: 48px;
+  padding: 10px 12px !important;
+  box-sizing: border-box;
+}
+.tg-row-body { flex: 1; min-width: 0; }
+.sb2 {
+  writing-mode: horizontal-tb !important;
+  white-space: normal !important;
+  text-align: center;
+  min-height: 44px;
+  padding: 8px 6px !important;
+  font-size: 12px !important;
+  line-height: 1.25 !important;
+  overflow: hidden;
+}
+.cp-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 12px 14px !important;
+  min-height: 110px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.cp-stat-val {
+  font-size: 28px !important;
+  font-weight: 800 !important;
+  line-height: 1.1 !important;
+  color: var(--club-accent);
+}
+.cp-stat-lb {
+  font-size: 12px !important;
+  color: var(--muted) !important;
+  white-space: normal !important;
+}
+.cp-stat-spark { width: 100%; margin-top: 6px; }
+.cp-stat-spark svg { width: 100% !important; height: 40px !important; display: block; }
+.pl-stats-head {
+  display: grid;
+  grid-template-columns: 1.4fr 0.6fr 0.7fr 0.7fr 0.6fr 0.7fr;
+  gap: 4px;
+}
+.pl-stats-head .pl-th {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: left;
+  padding: 6px 2px;
+  cursor: pointer;
+}
+.pl-stats-row {
+  display: grid;
+  grid-template-columns: 1.4fr 0.6fr 0.7fr 0.7fr 0.6fr 0.7fr;
+  gap: 4px;
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+/* saved schemes list horizontal */
+.card .tg-row, .saved-schemes .tg-row {
+  flex-direction: row !important;
+}
