@@ -1782,6 +1782,49 @@ const App = {
       const action = t.dataset.action;
       const view = t.dataset.view;
 
+      // ── PRIORITY: картка тренера (ніколи не trainings) ──
+      if (action === 'coach-easter' || action === 'open-coach-card') {
+        e.preventDefault(); e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        try { App.openCoachCard(); } catch (err) { console.error('[coach-card]', err); Toast.show('Картка тренера', 'ok'); }
+        return;
+      }
+      if (action === 'close-coach-card') {
+        e.preventDefault(); e.stopPropagation();
+        try { App.closeCoachCard && App.closeCoachCard(); } catch (_) {}
+        return;
+      }
+      if (action === 'player-train-tab') {
+        e.preventDefault(); e.stopPropagation();
+        const s = Store.get(); s.ui = s.ui || {};
+        s.ui.playerTrainTab = t.dataset.tab || 'trainings';
+        try { StorageManager.save(); } catch (_) {}
+        try { App.renderCurrent(); } catch (_) {}
+        return;
+      }
+      if (action === 'open-self-profile') {
+        e.preventDefault(); e.stopPropagation();
+        try { App.navigate('home'); } catch (_) {}
+        return;
+      }
+      if (action === 'load-scheme-board') {
+        e.preventDefault(); e.stopPropagation();
+        const bid = t.dataset.boardId;
+        if (bid && typeof BoardEngine !== 'undefined') {
+          try {
+            const b = (Store.get().boards || []).find(x => String(x.id) === String(bid));
+            if (b) {
+              if (BoardEngine.loadBoard) BoardEngine.loadBoard(b);
+              else if (BoardEngine.loadScene) BoardEngine.loadScene(b);
+              App.navigate('board');
+              Toast.show('Схему відкрито', 'ok');
+            }
+          } catch (err) { console.warn(err); Toast.show('Не вдалося відкрити схему', 'error'); }
+        }
+        return;
+      }
+
+
       // Редагування / CRUD — ніколи не відкривають дошку (без stopImmediatePropagation,
       // щоб цей самий listener міг обробити кнопки далі)
       if (t.dataset.editTraining || t.dataset.delTraining || t.dataset.dupTraining ||
@@ -2267,7 +2310,7 @@ const App = {
         try {
           const me = AuthManager.getLinkedPlayer && AuthManager.getLinkedPlayer();
           if (me && String(me.id) === String(pid)) {
-            App.navigate('dashboard');
+            try { App.navigate('dashboard'); } catch (_) { try { App.navigate('home'); } catch (__) {} }
             return;
           }
         } catch (_) {}

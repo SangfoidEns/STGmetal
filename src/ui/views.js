@@ -363,7 +363,7 @@ const Views = {
 
     return `
       <div class="club-profile">
-        <div class="app-build-tag" aria-hidden="true">build 2026.10.28-z · full</div>
+        <div class="app-build-tag" aria-hidden="true">build 2026.10.28-z22 · full</div>
 
         <!-- Telegram-style profile card (coach/player) -->
         ${(() => {
@@ -663,9 +663,10 @@ const Views = {
       ? ('<img class="fifa-club-logo" src="' + (typeof sanitize==='function'?sanitize(clubLogo):clubLogo) + '" alt="club" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'"/>')
       : '';
     return `
-      <div class="fifa-card fifa-card-live glass" style="--pos-color:${posColor}" data-fifa-player="${p.id}" data-compare-host="${p.id}">${logoTag}
+      <div class="fifa-card fifa-card-live glass" style="--pos-color:${posColor}" data-fifa-player="${p.id}" data-compare-host="${p.id}">
         <div class="fifa-shine"></div>
-        <div class="fifa-top">
+        <div class="fifa-logo-top">${logoTag}</div>
+        <div class="fifa-top fifa-top-clean">
           <div class="fifa-ovr" style="border-color:${posColor}">
             <span class="fifa-ovr-num">${ovr}</span>
             <span class="fifa-pos" style="color:${posColor}">${sanitize(pos)}</span>
@@ -676,12 +677,6 @@ const Views = {
               ${cap}
             </div>
             ${giftOrbit}
-          </div>
-          <div class="fifa-club fifa-club-text-only">
-            <div class="fifa-club-text">
-              <div class="fifa-club-name">МЕТАЛІСТ</div>
-              <div class="fifa-club-sub">Штутгарт</div>
-            </div>
           </div>
         </div>
         <div class="fifa-name">
@@ -1065,7 +1060,7 @@ const Views = {
     return `
       <div class="card glass coach-public-card">
         <div class="ct">${t('head_coach')}</div>
-        <button type="button" class="coach-pub-row" data-action="coach-easter">
+        <button type="button" class="coach-pub-row coach-card-btn" data-action="open-coach-card" data-coach-card="1">
           <div class="coach-pub-av">${ph}</div>
           <div class="coach-pub-body">
             <div class="coach-pub-name">${sanitize(name)}</div>
@@ -1162,8 +1157,19 @@ const Views = {
         : '<div class="es note-sm">Немає збережених схем</div>';
       _schemesBlock = '<div class="card glass player-schemes-block"><div class="ct">📐 Схеми</div><div class="scheme-list">' + schemesHtml + '</div></div>';
     }
+    const _tab = (s.ui && s.ui.playerTrainTab) || 'trainings';
+    const _tabsHtml = _isPlayerRole ? (
+      '<div class="pt-tabs glass">' +
+        '<button type="button" class="pt-tab' + (_tab === 'trainings' ? ' on' : '') + '" data-action="player-train-tab" data-tab="trainings">📅 Тренування</button>' +
+        '<button type="button" class="pt-tab' + (_tab === 'schemes' ? ' on' : '') + '" data-action="player-train-tab" data-tab="schemes">📐 Схеми</button>' +
+      '</div>'
+    ) : '';
+    if (_isPlayerRole && _tab === 'schemes') {
+      return '<div class="st">Тренування · Схеми</div>' + _tabsHtml + (_schemesBlock || '<div class="es">Немає схем</div>');
+    }
     return `
       <div class="st">${t('trainings_title')} ${canEdit ? '<button class="btn btn-p btn-sm" data-action="new-training">' + t('new_short') + '</button>' : '<span class="note-sm">' + t('planned_and_past') + '</span>'}</div>
+      ${_tabsHtml}
       <div class="fb">
         <input type="search" id="trSearch" placeholder="Пошук..." data-filter="trainings">
         <select id="trStatus" data-filter="trainings">
@@ -1313,16 +1319,33 @@ const Views = {
         '<span class="soc-feed-xp">' + sign + ' XP</span></div>';
     }).join('') || '<div class="note-sm">Прокачка з’явиться після тренувань із відміткою відвідування</div>';
 
-    const peers = list.filter(p => p.id !== me.id).slice(0, 12).map(p => {
+    const peersSorted = list.slice().sort((a, b) => {
+      try {
+        if (typeof CoachTools !== 'undefined' && CoachTools.playerXpTotal)
+          return (CoachTools.playerXpTotal(b.id) || 0) - (CoachTools.playerXpTotal(a.id) || 0);
+        if (typeof PlayerProgress !== 'undefined')
+          return (PlayerProgress.compute(b.id).xp || 0) - (PlayerProgress.compute(a.id).xp || 0);
+      } catch (_) {}
+      return 0;
+    });
+    const peers = peersSorted.map(p => {
+      const isSelf = p.id === me.id;
       const n = [p.firstName, p.lastName].filter(Boolean).join(' ') || ('#' + (p.number || ''));
-      const pr = (typeof PlayerProgress !== 'undefined') ? PlayerProgress.compute(p.id) : { level: 1 };
+      let pr = { level: 1, xp: 0 };
+      try { pr = (typeof PlayerProgress !== 'undefined') ? PlayerProgress.compute(p.id) : pr; } catch(_){}
+      try { if (typeof CoachTools !== 'undefined' && CoachTools.ensureWornGift) CoachTools.ensureWornGift(p.id); } catch(_){}
+      const feat = (typeof CoachTools !== 'undefined' && CoachTools.ensureWornGift) ? CoachTools.ensureWornGift(p.id) : null;
+      const accG = (typeof CoachTools !== 'undefined' && CoachTools.giftAccent) ? CoachTools.giftAccent(feat) : null;
+      const border = accG ? ('border-color:' + accG.border + ';box-shadow:0 0 0 1px ' + accG.border + '44;') : '';
       const av = this._resolvePlayerAvatar ? this._resolvePlayerAvatar(p) : '';
       const inn = this._initials ? this._initials(n) : '?';
       const img = av ? '<img src="' + sanitize(av) + '" alt=""/>' : '<span>' + sanitize(inn) + '</span>';
-      return '<button type="button" class="soc-peer" data-action="open-player-card" data-player-id="' + p.id + '">' +
+      const statusGift = this._giftStatusBadge([], p.id);
+      const act = isSelf ? 'data-action="open-self-profile"' : 'data-action="open-player-card" data-player-id="' + p.id + '"';
+      return '<button type="button" class="soc-peer' + (isSelf ? ' is-me' : '') + '" style="' + border + '" ' + act + '>' +
         '<div class="soc-peer-av">' + img + '</div>' +
-        '<div class="soc-peer-name">' + sanitize(n) + '</div>' +
-        '<div class="soc-peer-lv">LVL ' + pr.level + '</div></button>';
+        '<div class="soc-peer-body"><div class="soc-peer-name">' + sanitize(n) + ' ' + statusGift + '</div>' +
+        '<div class="soc-peer-meta">LVL ' + (pr.level || 1) + ' · ' + (pr.xp != null ? pr.xp : (typeof CoachTools !== 'undefined' && CoachTools.playerXpTotal ? CoachTools.playerXpTotal(p.id) : 0)) + ' XP</div></div></button>';
     }).join('');
 
     return `
@@ -2019,7 +2042,7 @@ const Views = {
       <div class="card"><div class="ct">${t('about_app')}</div>
         <p style="font-size:12px;color:var(--muted);line-height:1.6">
           Тренерська платформа · МЕТАЛІСТ ШТУТГАРТ<br>
-          Schema v${typeof SCHEMA_VERSION !== 'undefined' ? SCHEMA_VERSION : 2} · build 2026.10.28-z<br>
+          Schema v${typeof SCHEMA_VERSION !== 'undefined' ? SCHEMA_VERSION : 2} · build 2026.10.28-z22<br>
           localStorage · Telegram Cloud
         </p>
       </div>`;
