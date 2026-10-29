@@ -2015,10 +2015,46 @@ const App = {
       if (action === 'edit-self-player') {
         e.preventDefault(); e.stopPropagation();
         try {
-          const me = AuthManager.getLinkedPlayer && AuthManager.getLinkedPlayer();
-          if (me && typeof Actions !== 'undefined' && Actions.editPlayer) Actions.editPlayer(me.id);
-          else Toast.show('Профіль не прив\'язано', 'warn');
-        } catch (_) {}
+          const me = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer) ? AuthManager.getLinkedPlayer() : null;
+          if (!me) { Toast.show('Акаунт не прив\'язано', 'warn'); return; }
+          const pr = me.profile || {};
+          const body = '<div class="soc-edit-form player-profile-form">' +
+            '<p class="note-sm">Профіль клубу. Позицію, номер і склад змінює лише тренер.</p>' +
+            '<label class="fld"><span>Ім\'я</span><input id="ppFirst" class="inp" value="' + sanitize(me.firstName || '') + '"/></label>' +
+            '<label class="fld"><span>Прізвище</span><input id="ppLast" class="inp" value="' + sanitize(me.lastName || '') + '"/></label>' +
+            '<label class="fld"><span>Дата народження</span><input id="ppBirth" class="inp" type="date" value="' + sanitize(me.birthDate || pr.birthDate || '') + '"/></label>' +
+            '<label class="fld"><span>Телефон (необов\'язково)</span><input id="ppPhone" class="inp" value="' + sanitize(pr.phone || me.phone || '') + '"/></label>' +
+            '<label class="fld"><span>Соцмережі (посилання)</span><input id="ppSocial" class="inp" placeholder="https://…" value="' + sanitize(pr.social || '') + '"/></label>' +
+            '<label class="fld"><span>Статус</span><input id="ppStatus" class="inp" maxlength="80" value="' + sanitize(pr.status || me.statusText || '') + '"/></label>' +
+            '<label class="fld"><span>Про себе</span><textarea id="ppBio" class="inp" rows="3" maxlength="400">' + sanitize(pr.bio || me.bio || '') + '</textarea></label>' +
+            '<label class="fld"><span>Фото (URL)</span><input id="ppPhoto" class="inp" value="' + sanitize(me.profilePhoto || me.photoUrl || '') + '"/></label>' +
+            '</div>';
+          Modal.open('Мій профіль', body, [
+            { label: 'Скасувати', cls: 'btn-s', action: 'cancel' },
+            { label: 'Зберегти', cls: 'btn-p', action: 'ok' }
+          ]).then(function (r) {
+            if (!r || r.action !== 'ok') return;
+            const s = Store.get();
+            const p = (s.players || []).find(x => x.id === me.id);
+            if (!p) return;
+            if (!p.profile) p.profile = {};
+            p.firstName = (document.getElementById('ppFirst') || {}).value || p.firstName;
+            p.lastName = (document.getElementById('ppLast') || {}).value || p.lastName;
+            const bd = (document.getElementById('ppBirth') || {}).value || '';
+            if (bd) { p.birthDate = bd; p.profile.birthDate = bd; }
+            p.profile.phone = ((document.getElementById('ppPhone') || {}).value || '').slice(0, 40);
+            p.profile.social = ((document.getElementById('ppSocial') || {}).value || '').slice(0, 200);
+            p.profile.status = ((document.getElementById('ppStatus') || {}).value || '').slice(0, 80);
+            p.profile.bio = ((document.getElementById('ppBio') || {}).value || '').slice(0, 400);
+            p.statusText = p.profile.status;
+            p.bio = p.profile.bio;
+            const ph = ((document.getElementById('ppPhoto') || {}).value || '').trim();
+            if (ph) { p.profilePhoto = ph; p.photoUrl = p.photoUrl || ph; }
+            try { StorageManager.save(); } catch (_) {}
+            Toast.show('Профіль збережено', 'ok');
+            try { App.renderCurrent && App.renderCurrent(); } catch (_) {}
+          });
+        } catch (err) { console.warn(err); }
         return;
       }
       
@@ -2270,6 +2306,14 @@ const App = {
           (g.note ? ('<p class="artifact-note">«' + (typeof sanitize === 'function' ? sanitize(g.note) : g.note) + '»</p>') : '') +
           (g.momentHint && !g.note ? ('<p class="artifact-hint">' + (typeof sanitize === 'function' ? sanitize(g.momentHint) : g.momentHint) + '</p>') : '') +
           coachBtns +
+          '<div class="artifact-player-actions">' +
+          '<button type="button" class="btn btn-p btn-sm" data-action="use-gift-status" data-gift-uid="' + (g.uid || g.id || '') + '">✨ Статус біля імені</button>' +
+          '<button type="button" class="btn btn-s btn-sm" data-action="wear-gift" data-gift-uid="' + (g.uid || g.id || '') + '">👕 Надягнути (макс. 10)</button>' +
+          '<button type="button" class="btn btn-s btn-sm" data-action="comment-gift" data-gift-uid="' + (g.uid || g.id || '') + '">💬 Коментар</button>' +
+          '</div>' +
+          ((g.comments && g.comments.length) ? ('<div class="gift-comments">' + g.comments.slice(-5).map(function(c) {
+            return '<div class="gift-comment"><b>' + (typeof sanitize==='function'?sanitize(c.author||'?'):c.author) + '</b>: ' + (typeof sanitize==='function'?sanitize(c.text||''):c.text) + '</div>';
+          }).join('') + '</div>') : '') +
           '</div></div>';
         if (typeof Modal !== 'undefined' && Modal.open) {
           Modal.open('Артефакт клубу', html, [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
@@ -2441,6 +2485,68 @@ const App = {
         e.preventDefault(); e.stopPropagation();
         return this.openStopwatch();
       }
+
+      if (action === 'use-gift-status') {
+        e.preventDefault(); e.stopPropagation();
+        const uid = t.dataset.giftUid;
+        const s = Store.get();
+        const g = (s.gifts || []).find(x => x.id === uid || x.uid === uid);
+        if (!g) return;
+        (s.gifts || []).forEach(x => { if (x.playerId === g.playerId) x.featured = false; });
+        g.featured = true;
+        const p = (s.players || []).find(x => x.id === g.playerId);
+        if (p) {
+          if (!p.profile) p.profile = {};
+          if (g.hue != null) p.profile.themeHue = g.hue;
+        }
+        try { StorageManager.save(); } catch (_) {}
+        Toast.show('Подарунок біля імені + колір профілю', 'ok');
+        try { Modal.close && Modal.close(); App.renderCurrent && App.renderCurrent(); } catch (_) {}
+        return;
+      }
+      if (action === 'wear-gift') {
+        e.preventDefault(); e.stopPropagation();
+        const uid = t.dataset.giftUid;
+        const s = Store.get();
+        const g = (s.gifts || []).find(x => x.id === uid || x.uid === uid);
+        if (!g) return;
+        const worn = (s.gifts || []).filter(x => x.playerId === g.playerId && x.attached !== false);
+        if (g.attached === false) {
+          if (worn.length >= 10) { Toast.show('Максимум 10 на профілі', 'warn'); return; }
+          g.attached = true;
+        } else if (g.attached === true || g.attached == null) {
+          g.attached = false;
+        } else {
+          g.attached = true;
+        }
+        try { StorageManager.save(); } catch (_) {}
+        Toast.show(g.attached !== false ? 'Надягнуто' : 'Знято з профілю', 'ok');
+        try { Modal.close && Modal.close(); App.renderCurrent && App.renderCurrent(); } catch (_) {}
+        return;
+      }
+      if (action === 'comment-gift') {
+        e.preventDefault(); e.stopPropagation();
+        const uid = t.dataset.giftUid;
+        const s = Store.get();
+        const g = (s.gifts || []).find(x => x.id === uid || x.uid === uid);
+        if (!g) return;
+        const text = window.prompt('Коментар до подарунка:');
+        if (!text || !String(text).trim()) return;
+        if (!g.comments) g.comments = [];
+        let author = 'Гість';
+        try {
+          if (AuthManager.isCoach && AuthManager.isCoach()) author = (s.settings && s.settings.coachName) || 'Тренер';
+          else if (AuthManager.getLinkedPlayer) {
+            const me = AuthManager.getLinkedPlayer();
+            if (me) author = [me.firstName, me.lastName].filter(Boolean).join(' ') || 'Гравець';
+          } else if (AuthManager.user) author = AuthManager.user.username || AuthManager.user.first_name || 'Гравець';
+        } catch (_) {}
+        g.comments.push({ author: author, text: String(text).slice(0, 200), at: new Date().toISOString() });
+        try { StorageManager.save(); } catch (_) {}
+        Toast.show('Коментар додано', 'ok');
+        return;
+      }
+
       if (action === 'coach-easter') {
         e.preventDefault(); e.stopPropagation();
         return this.openCoachCard();

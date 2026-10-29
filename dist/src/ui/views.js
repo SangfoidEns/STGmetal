@@ -367,7 +367,7 @@ const Views = {
 
     return `
       <div class="club-profile">
-        <div class="app-build-tag" aria-hidden="true">build 2026.10.28-s · full</div>
+        <div class="app-build-tag" aria-hidden="true">build 2026.10.28-t · full</div>
 
         <!-- Telegram-style profile card (coach/player) -->
         ${(() => {
@@ -615,7 +615,7 @@ const Views = {
         gifts = (CoachTools.playerGifts(p.id) || []).filter(g => g.attached !== false);
       }
     } catch (_) {}
-    const giftOrbit = this._tgGiftCloud(gifts, 1.05, 'right3');
+    const giftOrbit = ''; /* gifts only in artifacts block */
     const giftRow = gifts.length
       ? ('<div class="fifa-gifts">' + gifts.slice(0, 10).map(g => {
           const rar = g.rarity || 'common';
@@ -636,8 +636,9 @@ const Views = {
     const otherId = (typeof window !== 'undefined' && (window.__fifaCompareId || window.__coachCompareId || window.__playerCompareId)) || '';
     const compareHtml = this._compareBlock(p, otherId);
 
+    const clubLogo = (Store.get().settings && (Store.get().settings.logoUrl || Store.get().settings.clubLogo)) || 'assets/metalist-mark.svg';
     return `
-      <div class="fifa-card glass" data-fifa-player="${p.id}" data-compare-host="${p.id}">
+      <div class="fifa-card fifa-card-live" style="--pos-color:'${posColor}'" glass" data-fifa-player="${p.id}" data-compare-host="${p.id}"><img class="fifa-club-logo" src="${sanitize(clubLogo)}" alt="" onerror="this.style.display=\'none\'"/>
         <div class="fifa-shine"></div>
         <div class="fifa-top">
           <div class="fifa-ovr" style="border-color:${posColor}">
@@ -673,12 +674,20 @@ const Views = {
           <div class="fifa-stat"><b>${p.load != null ? p.load : '—'}</b><span>Load</span></div>
           <div class="fifa-stat"><b>${p.age || '—'}</b><span>Вік</span></div>
         </div>
+        ${(() => {
+          try {
+            const pr = (typeof PlayerProgress !== 'undefined') ? PlayerProgress.compute(p.id) : null;
+            if (!pr || !pr.history) return '';
+            const series = pr.history.slice().reverse().map(h => Math.max(0, h.delta || 0));
+            return '<div class="fifa-xp-graph"><div class="fifa-gifts-title">Досвід (XP)</div>' +
+              this._sparkline(series.length > 1 ? series : [0, pr.xp || 0], { w: 200, h: 44, color: '#f5c542', fill: 'rgba(245,197,66,.15)' }) +
+              '<div class="note-sm">LVL ' + (pr.level||1) + ' · ' + (pr.xp||0) + ' XP</div></div>';
+          } catch(_) { return ''; }
+        })()}
         <div class="fifa-gifts-block">
           <div class="fifa-gifts-title">Артефакти клубу</div>
           ${giftRow}
-          ${gifts.length ? ('<div class="fifa-featured-pick"><span class="note-sm">Біля імені:</span> ' + gifts.map(g =>
-            '<button type="button" class="gift-feat-btn' + (g.featured ? ' on' : '') + '" data-action="set-featured-gift" data-player-id="' + p.id + '" data-gift-uid="' + g.id + '" title="Показати біля імені">' + (g.ico || '★') + '</button>'
-          ).join('') + '</div>') : ''}
+          
         </div>
         ${compareHtml}
       </div>`;
@@ -870,14 +879,22 @@ const Views = {
     try {
       const s = Store.get();
       const LM = (typeof LoadModel !== 'undefined') ? LoadModel : null;
+      let cancelled = 0, present = 0, absent = 0;
+      (s.trainings || []).forEach(t => {
+        if (t.status === 'cancelled' || t.status === 'canceled') { cancelled++; return; }
+        const a = t.attendance && t.attendance[playerId];
+        if (!a) return;
+        if (a.present === false) absent++; else present++;
+      });
       return {
         attPct: LM && LM.attendanceRate ? LM.attendanceRate(s.trainings, playerId) : 0,
         avgRpe: LM && LM.avgPlayerRpe ? LM.avgPlayerRpe(s.trainings, playerId) : 0,
-        load28: LM && LM.playerLoad ? LM.playerLoad(s.trainings, playerId, 28) : 0
+        load28: LM && LM.playerLoad ? LM.playerLoad(s.trainings, playerId, 28) : 0,
+        cancelled, present, absent
       };
     } catch (e) {
       console.warn('[playerStats]', e);
-      return { attPct: 0, avgRpe: 0, load28: 0 };
+      return { attPct: 0, avgRpe: 0, load28: 0, cancelled: 0, present: 0, absent: 0 };
     }
   },
 
@@ -888,97 +905,112 @@ const Views = {
     if (!me && AuthManager.user) {
       try { AuthManager._resolveRole(); me = AuthManager.getLinkedPlayer(); } catch (_) {}
     }
-    const stats = me ? this._playerStats(me.id) : { attPct: 0, avgRpe: 0, load28: 0 };
+    const stats = me ? this._playerStats(me.id) : { attPct: 0, avgRpe: 0, load28: 0, cancelled: 0 };
     const next = s.trainings.filter(t => t.status === 'planned' && t.date >= today()).sort((a, b) => a.date.localeCompare(b.date))[0];
-    const nextMatch = s.matches.filter(m => m.date >= today()).sort((a, b) => a.date.localeCompare(b.date))[0];
-    const pastTr = (s.trainings || []).filter(t => t.status === 'done' || (t.date && t.date < today() && t.status !== 'cancelled'))
-      .sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 8);
-    const schemes = (s.boards || s.savedBoards || []).slice(0, 6);
-    const club = (s.settings && s.settings.clubName) || 'Metalist Stuttgart';
+    const todayStr = today();
+    const monthPrefix = todayStr.slice(0, 7);
+    const nextMatch = s.matches.filter(m => m.date >= todayStr && String(m.date).slice(0, 7) === monthPrefix)
+      .sort((a, b) => a.date.localeCompare(b.date))[0];
+    const pastTr = (s.trainings || []).filter(t => t.status === 'done' || t.status === 'cancelled' || t.status === 'canceled' || (t.date && t.date < todayStr))
+      .sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 10);
     const fullName = me ? this._cleanDisplayName([me.firstName, me.lastName].filter(Boolean).join(' ') || me.name || 'Гравець') : '';
     let meGifts = [];
     try {
-      if (me && typeof CoachTools !== 'undefined' && CoachTools.playerGifts) {
+      if (me && typeof CoachTools !== 'undefined' && CoachTools.playerGifts)
         meGifts = CoachTools.playerGifts(me.id) || [];
-      } else if (me) {
-        meGifts = ((Store.get().gifts || []).filter(g => g.playerId === me.id));
-      }
+      else if (me) meGifts = (s.gifts || []).filter(g => g.playerId === me.id);
     } catch (_) {}
-    const pc = me ? {
-      kind: 'player',
-      name: fullName,
-      photo: this._resolvePlayerAvatar(me) || me.photoUrl || '',
-      pos: me.position || '—',
-      accent: this._posAccent(me.position),
-      attPct: stats.attPct || 0,
-      player: me,
-      initials: this._initials(fullName),
-      gifts: meGifts
-    } : null;
-    const photoHtml = pc && pc.photo
-      ? `<img src="${sanitize(pc.photo)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling&&(this.nextElementSibling.style.display='flex')"/><span class="cp-avatar-ph" style="display:none">${sanitize(pc.initials)}</span>`
-      : (pc ? `<span class="cp-avatar-ph">${sanitize(pc.initials)}</span>` : '');
+    const worn = meGifts.filter(g => g.attached !== false).slice(0, 10);
+    const featured = meGifts.find(g => g.featured) || null;
+    const prog = (me && typeof PlayerProgress !== 'undefined') ? PlayerProgress.compute(me.id) : { level: 1, levelProgress: 0, xp: 0, xpToNext: 0 };
+    const profile = (me && me.profile) || {};
+    const statusText = profile.status || me?.statusText || '';
+    const bio = profile.bio || me?.bio || '';
+    const themeHue = featured && featured.hue != null ? featured.hue : (profile.themeHue != null ? profile.themeHue : null);
+    const themeStyle = themeHue != null
+      ? ('--gift-hue:' + themeHue + ';--pos-ring:hsl(' + themeHue + ' 70% 55%);--pos-bg:hsl(' + themeHue + ' 40% 18%)')
+      : (() => { const acc = this._posAccent(me && me.position); return '--pos-bg:' + acc.bg + ';--pos-ring:' + acc.ring; })();
+    const photo = me ? (this._resolvePlayerAvatar(me) || me.photoUrl || me.profilePhoto || '') : '';
+    const initials = this._initials(fullName);
+    const photoHtml = photo
+      ? '<img src="' + sanitize(photo) + '" alt="" referrerpolicy="no-referrer" onerror="this.style.display=\'none\';this.nextElementSibling&&(this.nextElementSibling.style.display=\'flex\')"/><span class="cp-avatar-ph" style="display:none">' + sanitize(initials) + '</span>'
+      : '<span class="cp-avatar-ph">' + sanitize(initials) + '</span>';
+    const featBadge = featured
+      ? '<span class="gift-status-badge rarity-' + (featured.rarity || 'common') + ' anim-' + (featured.anim || 'float') + '" title="' + sanitize(featured.label || '') + '">' + (featured.ico || '★') + '</span>'
+      : '';
+    const nextLoad = next && typeof LoadModel !== 'undefined' && LoadModel.sessionLoad
+      ? LoadModel.sessionLoad(next.duration, next.intensity) : (next ? (next.duration || 0) * (next.intensity || 0) : 0);
+    const nextXp = 18;
 
     return `
-      <div class="st">${t('my_cabinet')} · МЕТАЛІСТ ШТУТГАРТ
+      <div class="st player-cab-head">${t('my_cabinet')} · <span class="cp-brand-a">МЕТАЛІСТ</span> <span class="cp-brand-b">ШТУТГАРТ</span>
         <button type="button" class="btn btn-s btn-sm" data-io="import" data-action="import-trigger">Імпорт JSON</button>
-        <button type="button" class="btn btn-s btn-sm" data-action="edit-self-player">Моя картка</button>
+        <button type="button" class="btn btn-s btn-sm" data-action="edit-self-player">Профіль</button>
       </div>
-      ${pc ? `
-        <div class="cp-hero cp-person cp-clean" style="--pos-bg:${pc.accent.bg};--pos-ring:${pc.accent.ring}">
-          <div class="cp-avatar-wrap">
-            <button type="button" class="cp-avatar" data-action="open-fifa-card" data-player-id="${pc.player.id}"
+      ${me ? `
+        <div class="cp-hero cp-person cp-clean player-profile-hero" style="${themeStyle}">
+          <div class="cp-avatar-wrap" data-stop-nav="1">
+            <button type="button" class="cp-avatar" data-action="open-fifa-card" data-player-id="${me.id}"
               title="FIFA-картка" style="border-color:var(--pos-ring);background:var(--pos-bg)">
               ${photoHtml}
             </button>
-            ${this._tgGiftCloud(pc.gifts, 1.15, 'full')}
+            ${this._tgGiftCloud(worn, 1.2, 'full')}
           </div>
-          ${this._giftStrip(pc.gifts)}
-          <div class="cp-role-line"><span class="cp-role-kind">${pc.kind === 'coach' ? 'Тренер' : 'Гравець'}</span></div>
-          <h1 class="cp-title cp-title-name">${sanitize(pc.name)}${this._giftStatusBadge(pc.gifts)}</h1>
-          <div class="cp-role-badge" style="border-color:var(--pos-ring);color:var(--pos-ring)">${sanitize(pc.pos)}</div>
-          <div class="cp-club-line cp-club-brand"><span class="cp-brand-a">Металіст</span> <span class="cp-brand-b">Штутгарт</span></div>
-          <div class="cp-status"><span class="cp-dot"></span>${(typeof I18n!=='undefined'?I18n.t('attendance','Відвідуваність'):'Відвідуваність')} ${Math.round(pc.attPct)}% · тап по фото → FIFA</div>
+          <div class="cp-role-line"><span class="cp-role-kind">Гравець</span></div>
+          <h1 class="cp-title cp-title-name">${sanitize(fullName)} ${featBadge}</h1>
+          ${statusText ? '<div class="player-status-line">' + sanitize(statusText) + '</div>' : ''}
+          <div class="cp-role-badge" style="border-color:var(--pos-ring);color:var(--pos-ring)">${sanitize(me.position || '—')}</div>
+          <div class="soc-xp-block player-home-xp">
+            <div class="soc-xp-head"><span>LVL ${prog.level}</span><span>${prog.xp || 0} XP</span></div>
+            <div class="soc-xp-bar"><div class="soc-xp-fill" style="width:${prog.levelProgress || 0}%"></div></div>
+            <div class="soc-xp-sub">До LVL ${(prog.level || 1) + 1}: ${prog.xpToNext || 0} XP</div>
+          </div>
+          ${bio ? '<p class="player-bio-home">' + sanitize(bio) + '</p>' : ''}
+          <div class="cp-status"><span class="cp-dot"></span>${(typeof I18n!=='undefined'?I18n.t('attendance','Відвідуваність'):'Відвідуваність')} ${Math.round(stats.attPct || 0)}% · тап по фото → FIFA</div>
         </div>` : this._noPlayerLink()}
 
       <div class="cp-pills player-quick">
         <button type="button" class="cp-pill cp-pill-primary" data-action="open-default-board">⚽ Дошка</button>
-        <button type="button" class="cp-pill" data-view="tactics">📋 Схеми</button>
         <button type="button" class="cp-pill" data-view="trainings">📅 ${t('nav_trainings')}</button>
         <button type="button" class="cp-pill" data-view="players">👥 ${t('nav_squad')}</button>
         <button type="button" class="cp-pill" data-view="analytics">📊 ${t('analytics')}</button>
       </div>
 
-      ${me ? this._myStatsCharts(me, stats) : ''}
-      <!-- порівняння лише у FIFA-картці -->
+      ${nextMatch ? `
+      <div class="card glass next-match-card">
+        <div class="ct">⚽ Наступний матч</div>
+        <div class="vl">${sanitize(nextMatch.opponent || nextMatch.title || 'Матч')}</div>
+        <div class="sb">${sanitize(nextMatch.date || '')}${nextMatch.time ? ' · ' + sanitize(nextMatch.time) : ''}${nextMatch.competition ? ' · ' + sanitize(nextMatch.competition) : ''}</div>
+      </div>` : ''}
 
-      <div class="dg">
-        <div class="sc"><div class="lb">Наступне тренування</div><div class="vl" style="font-size:13px">${next ? sanitize(next.name) : '—'}</div><div class="sb">${next ? next.date + ' ' + (next.time || '') : ''}</div></div>
-        <div class="sc"><div class="lb">Наступний матч</div><div class="vl" style="font-size:13px">${nextMatch ? 'vs ' + sanitize(nextMatch.opponent) : '—'}</div><div class="sb">${nextMatch ? nextMatch.date : ''}</div></div>
+      <div class="card glass next-tr-card">
+        <div class="ct">Наступне тренування</div>
+        ${next ? `
+          <div class="vl">${sanitize(next.name)}</div>
+          <div class="next-tr-metrics">
+            <span>${sanitize(next.date || '')}${next.time ? ' · ' + sanitize(next.time) : ''}</span>
+            <span>${next.duration || 0} хв</span>
+            <span>Load ${nextLoad || '—'}</span>
+            <span>~+${nextXp} XP</span>
+          </div>` : '<div class="note-sm">Немає запланованого тренування</div>'}
       </div>
+
+      ${me ? this._myStatsCharts(me, Object.assign({}, stats, { xp: prog.xp, level: prog.level })) : ''}
 
       <div class="card glass">
         <div class="ct">${t('recent_trainings')}</div>
-        <div class="player-tr-list">${pastTr.length ? pastTr.map(t => {
-          const a = me && t.attendance && t.attendance[me.id];
+        <div class="player-tr-list">${pastTr.length ? pastTr.map(tr => {
+          const a = me && tr.attendance && tr.attendance[me.id];
+          const cancelled = tr.status === 'cancelled' || tr.status === 'canceled';
           const present = a ? (a.present !== false) : null;
-          const badge = present === true ? '✓' : (present === false ? '✗' : '—');
+          const cls = cancelled ? 'ptr-cancel' : (present === true ? 'ptr-ok' : (present === false ? 'ptr-miss' : 'ptr-na'));
+          const badge = cancelled ? '⊘' : (present === true ? '✓' : (present === false ? '✗' : '—'));
           const rpe = a && a.rpe != null ? ('RPE ' + a.rpe) : '';
-          return `<div class="player-tr-row">
-            <span class="ptr-badge">${badge}</span>
-            <span class="ptr-name">${sanitize(t.name || (typeof I18n!=='undefined'?I18n.t('training_word','Тренування'):'Тренування'))}</span>
-            <span class="ptr-meta">${sanitize(t.date || '')} ${rpe}</span>
-          </div>`;
+          return '<div class="player-tr-row ' + cls + '">' +
+            '<span class="ptr-badge">' + badge + '</span>' +
+            '<span class="ptr-name">' + sanitize(tr.name || 'Тренування') + '</span>' +
+            '<span class="ptr-meta">' + sanitize(tr.date || '') + ' ' + rpe + '</span></div>';
         }).join('') : '<p class="note-sm">Немає даних. Імпортуйте JSON від тренера.</p>'}</div>
-      </div>
-
-      <div class="card glass">
-        <div class="ct">${t('schemes')}</div>
-        <div class="player-scheme-list">${schemes.length ? schemes.map(b =>
-          `<button type="button" class="btn btn-s btn-sm" data-load-board="${b.id}" style="margin:4px">${sanitize(b.name || 'Схема')}</button>`
-        ).join('') : '<span class="note-sm">Немає схем</span>'}
-        <button type="button" class="btn btn-p btn-sm" data-action="open-default-board" style="margin:4px">Дошка</button>
-        </div>
       </div>
       ${this._coachPublicCard()}
       `;
@@ -1914,7 +1946,7 @@ const Views = {
       <div class="card"><div class="ct">${t('about_app')}</div>
         <p style="font-size:12px;color:var(--muted);line-height:1.6">
           Тренерська платформа · МЕТАЛІСТ ШТУТГАРТ<br>
-          Schema v${typeof SCHEMA_VERSION !== 'undefined' ? SCHEMA_VERSION : 2} · build 2026.10.28-s<br>
+          Schema v${typeof SCHEMA_VERSION !== 'undefined' ? SCHEMA_VERSION : 2} · build 2026.10.28-t<br>
           localStorage · Telegram Cloud
         </p>
       </div>`;

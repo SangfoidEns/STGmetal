@@ -8934,3 +8934,40 @@ body.board-on .main {
 .pl-reserve .pl-section-h { background: rgba(61,126,255,.12); color: #9ec5ff; }
 .pl-infirmary .pl-section-h { background: rgba(255,100,100,.12); color: #ff8f8f; }
 .pl-row.pl-infirmary, .pl-section.pl-infirmary .pl-row { opacity: .85; }
+
+body.role-player .mni[data-view="calendar"],
+body.role-player .mni[data-view="tactics"],
+body.role-player .mni[data-view="analytics"],
+body.role-player .mni-more,
+body.role-player .mni[data-view="board"] {
+  display: none !important;
+}
+body.role-player .mni[data-view="dashboard"],
+body.role-player .mni[data-view="trainings"],
+body.role-player .mni[data-view="players"],
+body.role-player .mni.mni-coach[data-view="trainings"] {
+  display: flex !important;
+  flex: 1;
+}
+body.role-player .mni.mni-player[data-view="analytics"] { display: none !important; }
+.player-tr-row.ptr-ok { border-left: 3px solid #6dffa8; background: rgba(109,255,168,.06); }
+.player-tr-row.ptr-miss { border-left: 3px solid #ff8f8f; background: rgba(255,143,143,.06); }
+.player-tr-row.ptr-cancel { border-left: 3px solid #888; opacity: .7; }
+.next-tr-metrics { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; font-size: 12px; opacity: .85; }
+.next-tr-metrics span { padding: 4px 8px; border-radius: 8px; background: rgba(255,255,255,.06); }
+.player-status-line { color: #9ec5ff; font-size: 13px; margin: 4px 0; }
+.player-bio-home { font-size: 13px; opacity: .85; margin: 8px 0; line-height: 1.4; }
+.player-home-xp { margin: 12px 16px 0; }
+.fifa-card-live { animation: fifaLiveGlow 3.2s ease-in-out infinite; }
+@keyframes fifaLiveGlow {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(245,197,66,.25), 0 12px 40px rgba(0,0,0,.4); }
+  50% { box-shadow: 0 0 0 1px rgba(245,197,66,.5), 0 16px 48px rgba(245,197,66,.15); }
+}
+.fifa-club-logo {
+  position: absolute; top: 12px; right: 12px; width: 36px; height: 36px;
+  object-fit: contain; opacity: .9; border-radius: 8px;
+}
+.fifa-card { position: relative; }
+.artifact-player-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.gift-comments { margin-top: 10px; font-size: 12px; }
+.gift-comment { padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,.05); margin-top: 4px; }
