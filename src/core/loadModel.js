@@ -46,15 +46,42 @@ const LoadModel = {
   },
 
   /** % відвідувань серед проведених у минулому */
+  _attEntry(trainings, playerId, t) {
+    if (!t || !t.attendance) return null;
+    const a = t.attendance[playerId] != null ? t.attendance[playerId]
+      : (t.attendance[String(playerId)] != null ? t.attendance[String(playerId)] : null);
+    return a;
+  },
+  _isPresent(a) {
+    if (a == null) return null; // no mark
+    if (a === true || a === 1 || a === '1' || a === 'yes') return true;
+    if (a === false || a === 0 || a === '0' || a === 'no') return false;
+    if (typeof a === 'object') {
+      if (a.present === false || a.attended === false || a.status === 'absent' || a.status === 'missed') return false;
+      if (a.present === true || a.present === 1 || a.attended === true || a.status === 'present' || a.status === 'ok') return true;
+      // object exists but no explicit flag — treat as present if rpe/intensity set
+      if (a.intensity != null || a.rpe != null || a.load != null) return true;
+    }
+    return null;
+  },
+  _entryRpe(a, training) {
+    if (a == null || typeof a !== 'object') return (training && training.intensity != null ? +training.intensity : null);
+    if (a.intensity != null && a.intensity !== '') return +a.intensity;
+    if (a.rpe != null && a.rpe !== '') return +a.rpe;
+    if (a.load != null && a.load !== '' && +a.load <= 10) return +a.load;
+    if (training && training.intensity != null) return +training.intensity;
+    return null;
+  },
   attendanceRate(trainings, playerId) {
     const done = this.completedTrainings(trainings);
     if (!done.length) return null;
     let present = 0, total = 0;
     done.forEach(t => {
-      const a = t.attendance && t.attendance[playerId];
-      if (a == null) return;
+      const a = this._attEntry(trainings, playerId, t);
+      const p = this._isPresent(a);
+      if (p == null) return; // не відмічено
       total++;
-      if (a.present) present++;
+      if (p) present++;
     });
     if (!total) return null;
     return Math.round((present / total) * 100);
@@ -63,8 +90,12 @@ const LoadModel = {
   avgPlayerRpe(trainings, playerId) {
     const vals = [];
     this.pastTrainings(trainings).forEach(t => {
-      const a = t.attendance && t.attendance[playerId];
-      if (a && a.present && a.intensity != null) vals.push(+a.intensity);
+      const a = this._attEntry(trainings, playerId, t);
+      const p = this._isPresent(a);
+      if (p === false) return;
+      if (p == null && !(a && typeof a === 'object')) return;
+      const r = this._entryRpe(a, t);
+      if (r != null && !isNaN(r)) vals.push(r);
     });
     if (!vals.length) return null;
     return Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 10) / 10;
@@ -79,11 +110,12 @@ const LoadModel = {
     let sum = 0;
     this.pastTrainings(trainings).forEach(t => {
       if (t.date < from || t.date > today) return;
-      const a = t.attendance && t.attendance[playerId];
-      if (a && a.present) {
-        const rpe = a.intensity != null ? +a.intensity : (+t.intensity || 0);
-        sum += this.sessionLoad(t.duration, rpe);
-      }
+      const a = this._attEntry(trainings, playerId, t);
+      const p = this._isPresent(a);
+      if (p === false) return;
+      if (p == null && !(a && typeof a === 'object')) return;
+      const rpe = this._entryRpe(a, t);
+      sum += this.sessionLoad(t.duration, rpe != null ? rpe : (t.intensity || 0));
     });
     return sum;
   },

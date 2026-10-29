@@ -363,7 +363,7 @@ const Views = {
 
     return `
       <div class="club-profile">
-        <div class="app-build-tag" aria-hidden="true">build 2026.10.28-z22 · full</div>
+        <div class="app-build-tag" aria-hidden="true">build 2026.10.28-z5 · full</div>
 
         <!-- Telegram-style profile card (coach/player) -->
         ${(() => {
@@ -1058,7 +1058,7 @@ const Views = {
       ? '<img src="' + sanitize(photo) + '" alt="" referrerpolicy="no-referrer"/>'
       : '<span class="cp-avatar-ph">AS</span>';
     return `
-      <div class="card glass coach-public-card">
+      <div class="card glass coach-public-card" data-action="open-coach-card" data-coach-card="1" role="button" tabindex="0">
         <div class="ct">${t('head_coach')}</div>
         <button type="button" class="coach-pub-row coach-card-btn" data-action="open-coach-card" data-coach-card="1">
           <div class="coach-pub-av">${ph}</div>
@@ -1121,6 +1121,107 @@ const Views = {
       </div>`;
   },
 
+
+  /** Мініатюра схеми (SVG) з об'єктів дошки */
+  _schemeThumbSvg(board) {
+    try {
+      const objs = (board && board.objects) || [];
+      const W = 160, H = 100;
+      // pitch bg
+      let svg = '<svg class="scheme-thumb-svg" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
+      svg += '<rect width="' + W + '" height="' + H + '" rx="8" fill="#1a5c34"/>';
+      svg += '<rect x="4" y="4" width="' + (W-8) + '" height="' + (H-8) + '" rx="4" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1.2"/>';
+      svg += '<line x1="' + (W/2) + '" y1="4" x2="' + (W/2) + '" y2="' + (H-4) + '" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>';
+      svg += '<circle cx="' + (W/2) + '" cy="' + (H/2) + '" r="10" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>';
+      // objects: x,y often 0..1 or 0..100 or pixels — normalize
+      const pts = objs.filter(o => o && (o.x != null || o.nx != null)).slice(0, 28);
+      pts.forEach(o => {
+        let x = o.nx != null ? o.nx : o.x;
+        let y = o.ny != null ? o.ny : o.y;
+        if (x > 1.5 || y > 1.5) {
+          // assume 0..100 or pixel — map roughly
+          if (x > 100 || y > 100) { x = x / 800; y = y / 500; }
+          else { x = x / 100; y = y / 100; }
+        }
+        x = Math.max(0.02, Math.min(0.98, +x || 0.5));
+        y = Math.max(0.02, Math.min(0.98, +y || 0.5));
+        const px = x * W, py = y * H;
+        const typ = String(o.type || o.kind || 'player');
+        if (typ === 'ball') {
+          svg += '<circle cx="' + px.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="3.2" fill="#fff"/>';
+        } else if (typ === 'opponent') {
+          svg += '<circle cx="' + px.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="4" fill="#e74c3c" stroke="#fff" stroke-width="0.6"/>';
+        } else if (typ === 'arrow' || typ === 'pass' || typ === 'run') {
+          const x2 = (o.x2 != null ? (o.nx2 != null ? o.nx2 : o.x2) : x + 0.08);
+          const y2 = (o.y2 != null ? (o.ny2 != null ? o.ny2 : o.y2) : y);
+          let ax = x2, ay = y2;
+          if (ax > 1.5 || ay > 1.5) { ax = ax > 100 ? ax/800 : ax/100; ay = ay > 100 ? ay/500 : ay/100; }
+          ax = Math.max(0, Math.min(1, +ax || x)); ay = Math.max(0, Math.min(1, +ay || y));
+          svg += '<line x1="' + px.toFixed(1) + '" y1="' + py.toFixed(1) + '" x2="' + (ax*W).toFixed(1) + '" y2="' + (ay*H).toFixed(1) + '" stroke="#f5c542" stroke-width="1.4" marker-end="url(#ah)"/>';
+        } else {
+          const col = (o.team === 'opp' || o.isOpponent) ? '#e74c3c' : (o.color || '#3d7eff');
+          svg += '<circle cx="' + px.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="4.5" fill="' + col + '" stroke="rgba(255,255,255,0.7)" stroke-width="0.7"/>';
+          if (o.number != null) svg += '<text x="' + px.toFixed(1) + '" y="' + (py+1.5).toFixed(1) + '" text-anchor="middle" fill="#fff" font-size="5" font-weight="700">' + String(o.number).slice(0,2) + '</text>';
+        }
+      });
+      if (!pts.length) {
+        svg += '<text x="' + (W/2) + '" y="' + (H/2+2) + '" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="9">порожня</text>';
+      }
+      svg += '</svg>';
+      return svg;
+    } catch (_) {
+      return '<div class="scheme-thumb-ph">📐</div>';
+    }
+  },
+
+  /** Усі схеми, видимі гравцю: boards + boardId з тренувань */
+  _playerVisibleBoards() {
+    const s = Store.get();
+    const byId = new Map();
+    (s.boards || []).forEach(b => {
+      if (b && b.id) byId.set(String(b.id), b);
+    });
+    // схеми, прикріплені до тренувань (навіть якщо board snapshot у training)
+    (s.trainings || []).forEach(tr => {
+      if (!tr) return;
+      const bid = tr.boardId || tr.schemeId || (tr.board && tr.board.id);
+      if (bid && byId.has(String(bid))) return;
+      if (tr.board && tr.board.objects) {
+        const id = String(bid || ('tr-board-' + tr.id));
+        if (!byId.has(id)) {
+          byId.set(id, {
+            id,
+            name: (tr.board.name || tr.name || 'Схема тренування'),
+            type: 'training',
+            objects: tr.board.objects,
+            trainingId: tr.id,
+            trainingName: tr.name,
+            date: tr.date,
+            createdAt: tr.date || tr.createdAt
+          });
+        }
+      } else if (bid) {
+        // boardId є, але boards ще не підвантажені — placeholder
+        const id = String(bid);
+        if (!byId.has(id)) {
+          byId.set(id, {
+            id,
+            name: tr.name ? ('Схема: ' + tr.name) : 'Схема тренування',
+            type: 'training',
+            objects: [],
+            trainingId: tr.id,
+            trainingName: tr.name,
+            date: tr.date,
+            missing: true
+          });
+        }
+      }
+    });
+    return Array.from(byId.values()).sort((a, b) =>
+      String(b.updatedAt || b.createdAt || b.date || '').localeCompare(String(a.updatedAt || a.createdAt || a.date || ''))
+    );
+  },
+
   trainings() {
     const s = Store.get();
     const canEdit = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
@@ -1145,17 +1246,26 @@ const Views = {
     const _isPlayerRole = typeof AuthManager !== 'undefined' && AuthManager.isPlayer && AuthManager.isPlayer();
     let _schemesBlock = '';
     if (_isPlayerRole) {
-      const boards = (s.boards || []).slice().sort((a,b) => String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||'')));
+      const boards = (typeof this._playerVisibleBoards === 'function')
+        ? this._playerVisibleBoards()
+        : (s.boards || []).slice();
       const schemesHtml = boards.length
-        ? boards.slice(0, 40).map(b => {
+        ? boards.slice(0, 60).map(b => {
             const title = sanitize(b.name || b.title || 'Схема');
-            const typ = sanitize(b.type || b.kind || 'тактика');
-            return '<button type="button" class="scheme-row glass" data-action="load-scheme-board" data-board-id="' + (b.id || '') + '">' +
-              '<span class="scheme-row-title">' + title + '</span>' +
-              '<span class="scheme-row-meta">' + typ + '</span></button>';
+            const typ = b.trainingName
+              ? ('Тренування · ' + sanitize(b.trainingName))
+              : sanitize(b.type || b.kind || 'тактика');
+            const date = b.date ? sanitize(String(b.date).slice(0, 10)) : '';
+            const thumb = (typeof this._schemeThumbSvg === 'function') ? this._schemeThumbSvg(b) : '📐';
+            return '<button type="button" class="scheme-card glass" data-action="load-scheme-board" data-board-id="' + sanitize(String(b.id || '')) + '">' +
+              '<div class="scheme-card-thumb">' + thumb + '</div>' +
+              '<div class="scheme-card-body">' +
+                '<div class="scheme-card-title">' + title + '</div>' +
+                '<div class="scheme-card-meta">' + typ + (date ? ' · ' + date : '') + '</div>' +
+              '</div></button>';
           }).join('')
-        : '<div class="es note-sm">Немає збережених схем</div>';
-      _schemesBlock = '<div class="card glass player-schemes-block"><div class="ct">📐 Схеми</div><div class="scheme-list">' + schemesHtml + '</div></div>';
+        : '<div class="es note-sm">Немає схем. Тренер збереже схему на дошці або прикріпить до тренування.</div>';
+      _schemesBlock = '<div class="player-schemes-block"><div class="scheme-cards">' + schemesHtml + '</div></div>';
     }
     const _tab = (s.ui && s.ui.playerTrainTab) || 'trainings';
     const _tabsHtml = _isPlayerRole ? (
@@ -1533,14 +1643,19 @@ const Views = {
         return '<div class="pl-section ' + cls + '"><div class="pl-section-h">' + title + ' · ' + arr.length + '</div>' + rows + '</div>';
       };
       return '<div class="st">' + t('squad_title') +
-        ' <button type="button" class="btn btn-s btn-sm" data-action="toggle-squad-view">Картки</button></div>' +
+        ' <button type="button" class="btn btn-s btn-sm" data-action="squad-cards" data-mode="cards">Картки</button></div>' +
         section('Основа', starters, 'pl-starters') +
         section('Резерв', reserves, 'pl-reserve') +
         section('Лазарет', infirmary, 'pl-infirmary') +
         (!starters.length && !reserves.length && !infirmary.length ? '<div class="es">Немає гравців</div>' : '');
     }
 
-    const viewMode = (Store.get().ui && Store.get().ui.squadViewMode) || (typeof window !== 'undefined' && window.__squadViewMode) || 'list';
+    const viewMode = (() => {
+      try {
+        const u = Store.get().ui || {};
+        return u.squadViewMode || window.__squadViewMode || sessionStorage.getItem('ms_squad_view') || 'list';
+      } catch (_) { return 'list'; }
+    })();
     const cardsCoach = list.map(p => {
       const photo = this._resolvePlayerAvatar ? this._resolvePlayerAvatar(p) : (p.photoUrl || '');
       const name = [p.firstName, p.lastName].filter(Boolean).join(' ') || p.name || ('#' + (p.number || ''));
@@ -1574,9 +1689,9 @@ const Views = {
 
     return `
       <div class="st">Склад
-        <span class="squad-view-toggle">
-          <button type="button" class="btn-s${viewMode==='list'?' on':''}" data-action="squad-view" data-mode="list">Список</button>
-          <button type="button" class="btn-s${viewMode==='cards'?' on':''}" data-action="squad-view" data-mode="cards">Картки</button>
+        <span class="squad-view-toggle" role="group" aria-label="Вигляд складу">
+          <button type="button" class="btn-s squad-mode-btn${viewMode==='list'?' on':''}" data-action="squad-list" data-mode="list" data-squad-mode="list">Список</button>
+          <button type="button" class="btn-s squad-mode-btn${viewMode==='cards'?' on':''}" data-action="squad-cards" data-mode="cards" data-squad-mode="cards">Картки</button>
         </span>
         <button class="btn btn-p btn-sm" data-action="new-player">+ Гравець</button>
       </div>
@@ -1667,6 +1782,25 @@ const Views = {
 
   calendar() {
     const s = Store.get();
+    // Прибираємо «привиди»: deleted + дублікати тренувань у calendar[]
+    try {
+      if (Array.isArray(s.calendar) && s.calendar.length) {
+        const before = s.calendar.length;
+        const trKeys = new Set((s.trainings || []).map(t => String(t.id || '') + '|' + String(t.date || '') + '|' + String(t.name || '').toLowerCase()));
+        s.calendar = s.calendar.filter(e => {
+          if (!e || e.deleted || e.removed || e.status === 'deleted') return false;
+          const typ = String(e.type || e.eventType || '').toLowerCase();
+          if (typ === 'training' || typ === 'train' || typ === 'session') return false;
+          if (e.trainingId) return false;
+          const k = String(e.trainingId || '') + '|' + String(e.date || '') + '|' + String(e.title || e.name || '').toLowerCase();
+          if (trKeys.has(k)) return false;
+          return true;
+        });
+        if (s.calendar.length !== before) {
+          try { StorageManager.save(); } catch (_) {}
+        }
+      }
+    } catch (_) {}
     const mode = s.ui.calView || 'month';
     const d = new Date(s.ui.calDate + 'T12:00:00');
     const year = d.getFullYear(), month = d.getMonth();
@@ -1680,22 +1814,37 @@ const Views = {
     for (let i = 0; i < startDay; i++) grid += '<div class="cd om"></div>';
     for (let day = 1; day <= daysInMonth; day++) {
       const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const dayTr = (s.trainings || []).filter(t => t.date === ds && t.status !== 'cancelled' && t.status !== 'canceled');
-      const dayMatch = (s.matches || []).filter(m => m.date === ds);
+      const dayTrAll = (s.trainings || []).filter(t => t && t.date === ds && !t.deleted);
+      const dayTrCancel = dayTrAll.filter(t => t.status === 'cancelled' || t.status === 'canceled');
+      const dayTr = dayTrAll.filter(t => t.status !== 'cancelled' && t.status !== 'canceled' && t.status !== 'draft');
+      const dayMatch = (s.matches || []).filter(m => m && m.date === ds && !m.deleted);
       const dayCal = (s.calendar || []).filter(e => {
         if (!e || e.date !== ds) return false;
+        if (e.deleted || e.removed || e.status === 'deleted') return false;
         const typ = String(e.type || e.eventType || '').toLowerCase();
-        if (typ === 'training' || typ === 'train' || typ === 'session') return false;
+        if (typ === 'training' || typ === 'train' || typ === 'session' || typ === 'match') return false;
         if (e.trainingId || e.matchId) return false;
+        // skip if same title+time already a training
+        const title = String(e.title || e.name || '').toLowerCase();
+        if (dayTrAll.some(t => String(t.name || '').toLowerCase() === title)) return false;
         return true;
       });
-      const has = dayTr.length || dayMatch.length || dayCal.length;
+      const has = dayTr.length || dayMatch.length || dayCal.length || dayTrCancel.length;
       let badge = '';
       const doneTr = dayTr.find(t => t.status === 'done' || (t.date && t.date < todayStr));
-      if (doneTr) {
+      if (dayTrCancel.length && !dayTr.length) {
+        badge = '<span class="cd-dot cancel" title="Скасовано"></span>';
+      } else if (doneTr) {
         let present = 0, total = 0;
         const att = doneTr.attendance || {};
-        Object.keys(att).forEach(pid => { total++; if (att[pid] && att[pid].present !== false) present++; });
+        Object.keys(att).forEach(pid => {
+          total++;
+          const a = att[pid];
+          const ok = (typeof LoadModel !== 'undefined' && LoadModel._isPresent)
+            ? LoadModel._isPresent(a) !== false
+            : (a && a.present !== false);
+          if (ok) present++;
+        });
         const load = (typeof LoadModel !== 'undefined' && LoadModel.sessionLoad)
           ? LoadModel.sessionLoad(doneTr.duration, doneTr.intensity) : ((doneTr.duration||0)*(doneTr.intensity||0));
         const attPct = total ? Math.round(present/total*100) : null;
@@ -1706,16 +1855,52 @@ const Views = {
         badge = '<span class="cd-dot mt"></span>';
       }
       grid += '<div class="cd ' + (ds === todayStr ? 'today ' : '') + (has ? 'has ' : '') + (s.ui.selectedDay === ds ? 'sel ' : '') +
-        (doneTr ? 'cd-done ' : '') + '" data-day="' + ds + '"><span class="cd-num">' + day + '</span>' + badge + '</div>';
+        (doneTr ? 'cd-done ' : '') + (dayTrCancel.length ? 'cd-cancel ' : '') +
+        '" data-day="' + ds + '"><span class="cd-num">' + day + '</span>' + badge + '</div>';
     }
     grid += '</div>';
 
     const ds = s.ui.selectedDay || todayStr;
-    const events = [
-      ...s.calendar.filter(e => e.date === ds),
-      ...s.trainings.filter(t => t.date === ds).map(t => ({ type: 'TRAINING', title: t.name, time: t.time, id: t.id })),
-      ...s.matches.filter(m => m.date === ds).map(m => ({ type: 'MATCH', title: 'vs ' + m.opponent, time: m.time, id: m.id }))
-    ];
+    const seen = new Set();
+    const events = [];
+    (s.trainings || []).filter(t => t && t.date === ds && !t.deleted).forEach(t => {
+      const key = 'tr:' + (t.id || t.name + t.time);
+      if (seen.has(key)) return;
+      seen.add(key);
+      const cancelled = t.status === 'cancelled' || t.status === 'canceled';
+      events.push({
+        type: cancelled ? 'CANCELLED' : 'TRAINING',
+        title: t.name || 'Тренування',
+        time: t.time || '',
+        id: t.id,
+        status: t.status,
+        cancelled
+      });
+    });
+    (s.matches || []).filter(m => m && m.date === ds && !m.deleted).forEach(m => {
+      const key = 'mt:' + (m.id || m.opponent);
+      if (seen.has(key)) return;
+      seen.add(key);
+      events.push({ type: 'MATCH', title: 'vs ' + (m.opponent || ''), time: m.time || '', id: m.id });
+    });
+    (s.calendar || []).filter(e => {
+      if (!e || e.date !== ds) return false;
+      if (e.deleted || e.removed || e.status === 'deleted') return false;
+      const typ = String(e.type || e.eventType || '').toLowerCase();
+      if (typ === 'training' || typ === 'train' || typ === 'session' || typ === 'match') return false;
+      if (e.trainingId || e.matchId) return false;
+      return true;
+    }).forEach(e => {
+      const key = 'ev:' + (e.id || (e.title || e.name) + (e.time || ''));
+      if (seen.has(key)) return;
+      seen.add(key);
+      events.push({
+        type: e.type || e.eventType || 'EVENT',
+        title: e.title || e.name || 'Подія',
+        time: e.time || '',
+        id: e.id
+      });
+    });
 
     return `
       <div class="st">${t('calendar_title')}
@@ -1729,8 +1914,9 @@ const Views = {
       ${grid}
       <div class="card" style="margin-top:12px"><div class="ct">${t('events')} ${ds}</div>
         ${events.length ? events.map(e => {
-        const openAttr = e.type === 'TRAINING' && e.id ? ` data-edit-training="${e.id}"` : (e.type === 'MATCH' && e.id ? ` data-view-match="${e.id}"` : '');
-        return `<div class="li"${openAttr} style="cursor:pointer"><div class="inf"><div class="ti">${sanitize(e.title || e.name)}</div><div class="me">${e.type || e.eventType} · ${e.time || ''}</div></div></div>`;
+        const openAttr = (e.type === 'TRAINING' || e.type === 'CANCELLED') && e.id ? ` data-edit-training="${e.id}"` : (e.type === 'MATCH' && e.id ? ` data-view-match="${e.id}"` : '');
+        const typeLb = e.cancelled || e.type === 'CANCELLED' ? 'Скасовано' : (e.type === 'TRAINING' ? 'Тренування' : (e.type === 'MATCH' ? 'Матч' : (e.type || 'Подія')));
+        return `<div class="li${e.cancelled || e.type==='CANCELLED' ? ' cal-cancelled' : ''}"${openAttr} style="cursor:pointer"><div class="inf"><div class="ti">${sanitize(e.title || e.name)}</div><div class="me">${typeLb}${e.time ? ' · ' + e.time : ''}</div></div></div>`;
       }).join('') : '<div style="color:var(--muted);font-size:12px">Немає подій</div>'}
       </div>
       <div class="card"><div class="ct">${t('microcycle')}</div>
@@ -1845,21 +2031,24 @@ const Views = {
         let cmp = 0;
         if (sortKey === 'pos') cmp = String(a.position || '').localeCompare(String(b.position || ''), 'uk');
         else if (sortKey === 'group') cmp = ((a.group === 'reserve') ? 1 : 0) - ((b.group === 'reserve') ? 1 : 0);
-        else if (sortKey === 'att') cmp = ((sa.att != null) ? sa.att : -1) - ((sb.att != null) ? sb.att : -1);
-        else if (sortKey === 'rpe') cmp = ((sa.rpe != null) ? sa.rpe : -1) - ((sb.rpe != null) ? sb.rpe : -1);
+        else if (sortKey === 'att') cmp = ((sa.attPct != null) ? sa.attPct : -1) - ((sb.attPct != null) ? sb.attPct : -1);
+        else if (sortKey === 'rpe') cmp = ((sa.avgRpe != null) ? sa.avgRpe : -1) - ((sb.avgRpe != null) ? sb.avgRpe : -1);
         else if (sortKey === 'load28') cmp = ((sa.load28 != null) ? sa.load28 : -1) - ((sb.load28 != null) ? sb.load28 : -1);
         else cmp = String(a.lastName || a.firstName || '').localeCompare(String(b.lastName || b.firstName || ''), 'uk');
         return cmp * sortDir;
       }).map(p => {
         const st = this._playerStats ? this._playerStats(p.id) : {};
         const g = (p.group === 'reserve') ? t('reserve', 'Резерв') : t('starter', 'Основа');
+        const attV = st.attPct != null ? st.attPct : (st.att != null ? st.att : null);
+        const rpeV = st.avgRpe != null ? st.avgRpe : (st.rpe != null ? st.rpe : null);
+        const l28 = st.load28 != null ? st.load28 : null;
         return `<div class="pl-stats-row">
           <span>#${p.number || '—'} ${sanitize(p.lastName || '')}</span>
           <span>${sanitize(p.position || '')}</span>
           <span>${g}</span>
-          <span>${st.att != null ? st.att + '%' : '—'}</span>
-          <span>${st.rpe != null ? st.rpe : '—'}</span>
-          <span>${st.load28 != null ? st.load28 : '—'}</span>
+          <span>${attV != null ? attV + '%' : '—'}</span>
+          <span>${rpeV != null ? rpeV : '—'}</span>
+          <span>${l28 != null ? l28 : '—'}</span>
         </div>`;
       }).join('');
 
@@ -2042,7 +2231,7 @@ const Views = {
       <div class="card"><div class="ct">${t('about_app')}</div>
         <p style="font-size:12px;color:var(--muted);line-height:1.6">
           Тренерська платформа · МЕТАЛІСТ ШТУТГАРТ<br>
-          Schema v${typeof SCHEMA_VERSION !== 'undefined' ? SCHEMA_VERSION : 2} · build 2026.10.28-z22<br>
+          Schema v${typeof SCHEMA_VERSION !== 'undefined' ? SCHEMA_VERSION : 2} · build 2026.10.28-z5<br>
           localStorage · Telegram Cloud
         </p>
       </div>`;

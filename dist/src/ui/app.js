@@ -1220,6 +1220,59 @@ const App = {
       }
     } catch (_) {}
   },
+  bindCoachCardButtons() {
+    try {
+      document.querySelectorAll('[data-action="open-coach-card"],[data-action="coach-easter"],[data-coach-card]').forEach(el => {
+        if (el._msCoachBound) return;
+        el._msCoachBound = true;
+        const open = (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+          try {
+            if (typeof App.openCoachCard === 'function') App.openCoachCard();
+            else if (typeof this.openCoachCard === 'function') this.openCoachCard();
+          } catch (err) {
+            console.error('[coach-card]', err);
+            try { Toast.show('Картка тренера', 'ok'); } catch (_) {}
+          }
+        };
+        el.addEventListener('click', open, true);
+      });
+    } catch (e) { console.warn('[bindCoachCard]', e); }
+  },
+
+  bindSquadViewButtons() {
+    try {
+      document.querySelectorAll('[data-action="squad-view"],[data-action="squad-cards"],[data-action="squad-list"],[data-action="toggle-squad-view"]').forEach(btn => {
+        if (btn._msSquadBound) return;
+        btn._msSquadBound = true;
+        btn.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+          const s = Store.get();
+          if (!s.ui) s.ui = {};
+          let mode = btn.getAttribute('data-mode') || btn.getAttribute('data-squad-mode') || '';
+          const act = btn.getAttribute('data-action') || '';
+          if (act === 'squad-cards') mode = 'cards';
+          if (act === 'squad-list') mode = 'list';
+          if (!mode || act === 'toggle-squad-view') {
+            const cur = s.ui.squadViewMode || window.__squadViewMode || sessionStorage.getItem('ms_squad_view') || 'list';
+            mode = cur === 'cards' ? 'list' : 'cards';
+          }
+          mode = mode === 'cards' ? 'cards' : 'list';
+          s.ui.squadViewMode = mode;
+          try { window.__squadViewMode = mode; } catch (_) {}
+          try { sessionStorage.setItem('ms_squad_view', mode); } catch (_) {}
+          if (s.ui.view !== 'players') s.ui.view = 'players';
+          try { Toast.show(mode === 'cards' ? 'Режим: картки' : 'Режим: список', 'ok'); } catch (_) {}
+          try { App.renderCurrent(); } catch (err) { console.error(err); }
+        }, true);
+      });
+    } catch (e) { console.warn('[bindSquadView]', e); }
+  },
+
   renderCurrent() {
     try { this.startUsageTracker(); } catch (_) {}
     try { this.syncRoleClass(); } catch (_) {}
@@ -1284,6 +1337,8 @@ const App = {
         '</p><button type="button" class="btn btn-s" data-action="import-trigger">Імпорт JSON</button></div>';
     }
     try { this._bindPlayerCompare(); } catch (_) {}
+    try { this.bindSquadViewButtons(); } catch (_) {}
+    try { this.bindCoachCardButtons(); } catch (_) {}
   },
 
   updateClock() {
@@ -1809,17 +1864,45 @@ const App = {
       }
       if (action === 'load-scheme-board') {
         e.preventDefault(); e.stopPropagation();
-        const bid = t.dataset.boardId;
-        if (bid && typeof BoardEngine !== 'undefined') {
-          try {
-            const b = (Store.get().boards || []).find(x => String(x.id) === String(bid));
-            if (b) {
-              if (BoardEngine.loadBoard) BoardEngine.loadBoard(b);
-              else if (BoardEngine.loadScene) BoardEngine.loadScene(b);
-              App.navigate('board');
-              Toast.show('Схему відкрито', 'ok');
-            }
-          } catch (err) { console.warn(err); Toast.show('Не вдалося відкрити схему', 'error'); }
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        const bid = (t.dataset && t.dataset.boardId) || t.getAttribute('data-board-id');
+        if (!bid) { Toast.show('Схему не знайдено', 'warn'); return; }
+        try {
+          const id = String(bid);
+          let b = (Store.get().boards || []).find(x => String(x.id) === id);
+          // snapshot з тренування
+          if (!b && typeof Views !== 'undefined' && Views._playerVisibleBoards) {
+            b = Views._playerVisibleBoards().find(x => String(x.id) === id);
+          }
+          if (!b) { Toast.show('Схему не знайдено', 'warn'); return; }
+          // якщо схеми немає в boards — тимчасово кладемо
+          if (!(Store.get().boards || []).some(x => String(x.id) === id)) {
+            Store.get().boards = Store.get().boards || [];
+            Store.get().boards.push({
+              id: b.id,
+              name: b.name,
+              objects: b.objects || [],
+              type: b.type || 'training',
+              createdAt: b.createdAt || new Date().toISOString()
+            });
+          }
+          if (typeof BoardEngine !== 'undefined' && BoardEngine.loadBoard) {
+            BoardEngine.loadBoard(id); // обов'язково ID, не об'єкт
+          }
+          if (typeof App.allowBoardOnce === 'function') App.allowBoardOnce('scheme');
+          App.navigate('board');
+          // після навігації — fit
+          setTimeout(() => {
+            try {
+              if (BoardEngine._sizeStageToPitch) BoardEngine._sizeStageToPitch();
+              if (BoardEngine.render) BoardEngine.render();
+              if (BoardEngine.renderTokens) BoardEngine.renderTokens();
+            } catch (_) {}
+          }, 120);
+          Toast.show('Схему відкрито на дошці', 'ok');
+        } catch (err) {
+          console.warn('[load-scheme]', err);
+          Toast.show('Не вдалося відкрити схему', 'error');
         }
         return;
       }
@@ -1844,6 +1927,11 @@ const App = {
 
       // data-view навігація: блокуємо, якщо це вкладений клік у кнопці редагування
       if (view && !t.dataset.action) {
+        if (e.target.closest('[data-action="open-coach-card"],[data-action="coach-easter"],[data-coach-card],.coach-public-card,.coach-pub-row')) {
+          e.preventDefault(); e.stopPropagation();
+          try { App.openCoachCard(); } catch (_) {}
+          return;
+        }
         if (e.target.closest('[data-edit-training],[data-attendance-training],[data-del-training],[data-dup-training],[data-edit-player],[data-del-player],[data-modal-action],.card-training,#modal,.mo')) {
           e.preventDefault();
           e.stopPropagation();
@@ -2205,7 +2293,7 @@ const App = {
             try {
               const b = (Store.get().boards || []).find(x => String(x.id) === String(bid));
               if (!b) { Toast.show('Схему не знайдено', 'warn'); return; }
-              if (BoardEngine && BoardEngine.loadBoard) BoardEngine.loadBoard(b);
+              if (BoardEngine && BoardEngine.loadBoard) BoardEngine.loadBoard(String((b && b.id) || bid || b));
               else if (BoardEngine && BoardEngine.loadState && b.state) BoardEngine.loadState(b.state);
               else if (BoardEngine && b.objects) { BoardEngine.objects = b.objects; BoardEngine.render && BoardEngine.render(); }
               Toast.show('Схему відкрито', 'ok');
@@ -2543,18 +2631,29 @@ const App = {
         }
         return;
       }
-      if (action === 'squad-view' || action === 'toggle-squad-view') {
-        e.preventDefault(); e.stopPropagation();
-        const s = Store.get();
-        s.ui = s.ui || {};
-        let mode = t.dataset.mode || '';
-        if (!mode || action === 'toggle-squad-view') {
-          mode = (s.ui.squadViewMode || window.__squadViewMode || 'list') === 'cards' ? 'list' : 'cards';
-        }
-        s.ui.squadViewMode = mode;
-        try { window.__squadViewMode = mode; } catch (_) {}
-        try { StorageManager.save(); } catch (_) {}
-        try { App.renderCurrent(); } catch (_) {}
+      if (action === 'squad-view' || action === 'toggle-squad-view' || action === 'squad-cards' || action === 'squad-list') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        try {
+          const s = Store.get();
+          if (!s.ui) s.ui = {};
+          let mode = (t.dataset && (t.dataset.mode || t.dataset.squadMode)) || '';
+          if (action === 'squad-cards') mode = 'cards';
+          if (action === 'squad-list') mode = 'list';
+          if (!mode || action === 'toggle-squad-view') {
+            const cur = s.ui.squadViewMode || window.__squadViewMode || sessionStorage.getItem('ms_squad_view') || 'list';
+            mode = cur === 'cards' ? 'list' : 'cards';
+          }
+          mode = mode === 'cards' ? 'cards' : 'list';
+          s.ui.squadViewMode = mode;
+          try { window.__squadViewMode = mode; } catch (_) {}
+          try { sessionStorage.setItem('ms_squad_view', mode); } catch (_) {}
+          // лишаємось на players
+          if (s.ui.view !== 'players') s.ui.view = 'players';
+          try { Toast.show(mode === 'cards' ? 'Режим: картки' : 'Режим: список', 'ok'); } catch (_) {}
+          try { App.renderCurrent(); } catch (err) { console.error('[squad-view]', err); }
+        } catch (err) { console.error('[squad-view]', err); }
         return;
       }
       if (action === 'toggle-avatar-chips') {

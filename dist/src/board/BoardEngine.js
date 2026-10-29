@@ -1276,18 +1276,34 @@ const BoardEngine = {
     });
   },
 
-  loadBoard(id) {
+  loadBoard(idOrBoard) {
     const s = Store.get();
-    const b = s.boards.find(x => x.id === id);
-    if (!b) return;
-    s.activeBoard.objects = JSON.parse(JSON.stringify(b.objects));
-    if (b.camera) this.camera = Object.assign({}, b.camera);
+    let b = null;
+    if (idOrBoard && typeof idOrBoard === 'object' && (idOrBoard.objects || idOrBoard.id)) {
+      b = idOrBoard;
+      // ensure in store
+      if (b.id && !(s.boards || []).some(x => String(x.id) === String(b.id))) {
+        s.boards = s.boards || [];
+        s.boards.push(b);
+      }
+    } else {
+      const id = idOrBoard != null ? String(idOrBoard) : '';
+      b = (s.boards || []).find(x => String(x.id) === id);
+    }
+    if (!b) {
+      try { Toast.show('Схему не знайдено', 'warn'); } catch (_) {}
+      return false;
+    }
+    if (!s.activeBoard) s.activeBoard = { objects: [], history: [], historyIdx: -1 };
+    s.activeBoard.objects = JSON.parse(JSON.stringify(b.objects || []));
+    if (b.camera) this.camera = Object.assign({}, this.camera || {}, b.camera);
     this._migratedLeft = false;
-    this.migrateLeftEdgeToBench();
-    this.pushHistory();
-    this.render();
-    try { Toast.show('Сцену завантажено в activeBoard. Відкрийте дошку через логотип.', 'ok'); } catch (_) {}
-    Toast.show('Завантажено: ' + b.name, 'ok');
+    try { this.migrateLeftEdgeToBench && this.migrateLeftEdgeToBench(); } catch (_) {}
+    try { this.pushHistory && this.pushHistory(); } catch (_) {}
+    try { this.render && this.render(); } catch (_) {}
+    try { this.renderTokens && this.renderTokens(); } catch (_) {}
+    try { this.renderDrawings && this.renderDrawings(); } catch (_) {}
+    return true;
   },
 
   /* ═══ Анімація фішок уздовж стрілок / рухів ═══ */
