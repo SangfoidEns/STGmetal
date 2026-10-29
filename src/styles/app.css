@@ -8901,3 +8901,36 @@ body.board-on .main {
   .gift-open-overlay.opening .gift-open-reveal { opacity: 1; transform: none; }
   .gift-open-overlay.opening .gift-open-box { opacity: 0; }
 }
+
+/* Coach home enhanced stats */
+.cp-stats-v2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cp-stat-chart .cp-stat-spark { margin-top: 8px; width: 100%; }
+.cp-stat-spark svg { width: 100%; height: 36px; display: block; }
+.cp-stat-split { display: flex; gap: 8px; align-items: center; }
+.cp-stat-left { flex: 1; min-width: 0; }
+.cp-stat-right { text-align: right; }
+.cp-stat-action { cursor: pointer; text-align: left; border: none; color: inherit; width: 100%; }
+.cp-stat-hint { display: block; font-size: 10px; opacity: .5; margin-top: 4px; }
+.cp-stat-wide { grid-column: 1 / -1; }
+/* Calendar badges */
+.cd { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 44px; }
+.cd-num { font-weight: 600; }
+.cd-badge { font-size: 8px; line-height: 1.1; color: #7cf0c0; margin-top: 2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 2px; }
+.cd-dot.tr { background: #f5c542; }
+.cd-dot.mt { background: #3d7eff; }
+.cd.cd-done { background: rgba(124,240,192,.08); }
+/* Analytics charts */
+.an-charts { display: grid; gap: 10px; padding: 12px; margin-bottom: 12px; border-radius: 16px; }
+.an-chart-card { padding: 8px 0; }
+.an-chart-h { font-size: 12px; opacity: .7; margin-bottom: 4px; }
+/* Squad sections */
+.pl-section { margin-bottom: 14px; }
+.pl-section-h {
+  font-size: 13px; font-weight: 800; letter-spacing: .02em;
+  padding: 8px 12px; border-radius: 12px; margin-bottom: 6px;
+}
+.pl-starters .pl-section-h { background: rgba(124,240,192,.12); color: #7cf0c0; }
+.pl-reserve .pl-section-h { background: rgba(61,126,255,.12); color: #9ec5ff; }
+.pl-infirmary .pl-section-h { background: rgba(255,100,100,.12); color: #ff8f8f; }
+.pl-row.pl-infirmary, .pl-section.pl-infirmary .pl-row { opacity: .85; }

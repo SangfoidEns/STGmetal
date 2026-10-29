@@ -2058,6 +2058,59 @@ const App = {
       }
 
 
+
+      if (action === 'open-lineup-board') {
+        e.preventDefault(); e.stopPropagation();
+        try {
+          if (typeof App.allowBoardOnce === 'function') App.allowBoardOnce('lineup');
+          App.navigate('board');
+          setTimeout(function () {
+            try {
+              if (typeof BoardEngine === 'undefined') return;
+              // Formation 3-1-2-2-1-1 (GK + 3CB + CDM + 2CM + 2W + AM + ST)
+              const FORM = [
+                { role: 'GK', x: 0.5, y: 0.92 },
+                { role: 'CB', x: 0.28, y: 0.78 }, { role: 'CB', x: 0.5, y: 0.80 }, { role: 'CB', x: 0.72, y: 0.78 },
+                { role: 'CDM', x: 0.5, y: 0.62 },
+                { role: 'CM', x: 0.32, y: 0.48 }, { role: 'CM', x: 0.68, y: 0.48 },
+                { role: 'LW', x: 0.15, y: 0.32 }, { role: 'RW', x: 0.85, y: 0.32 },
+                { role: 'CAM', x: 0.5, y: 0.28 },
+                { role: 'ST', x: 0.5, y: 0.14 }
+              ];
+              const s = Store.get();
+              const starters = (s.players || []).filter(p => {
+                const g = String(p.group || p.squadRole || '').toLowerCase();
+                const inj = p.status === 'injured' || p.status === 'rehab' || p.status === 'recovery';
+                return !inj && g !== 'reserve' && g !== 'bench';
+              }).sort((a, b) => (a.number || 99) - (b.number || 99)).slice(0, 11);
+              if (BoardEngine.clearBoard) BoardEngine.clearBoard();
+              else if (BoardEngine.objects) BoardEngine.objects = [];
+              FORM.forEach(function (slot, i) {
+                const p = starters[i];
+                const obj = {
+                  id: 'lp_' + i + '_' + Date.now(),
+                  type: 'player',
+                  team: 'home',
+                  x: slot.x, y: slot.y,
+                  nx: slot.x, ny: slot.y,
+                  number: p ? p.number : (i + 1),
+                  label: p ? ((p.lastName || p.firstName || '').slice(0, 8)) : slot.role,
+                  position: p ? p.position : slot.role,
+                  playerId: p ? p.id : null,
+                  color: (s.settings && s.settings.homeColor) || '#c8a84b'
+                };
+                if (BoardEngine.addObject) BoardEngine.addObject(obj);
+                else if (BoardEngine.objects) BoardEngine.objects.push(obj);
+              });
+              if (BoardEngine.render) BoardEngine.render();
+              if (BoardEngine.persist) BoardEngine.persist();
+              Toast.show('Основа на схемі 3-1-2-2-1-1', 'ok');
+            } catch (err) { console.warn(err); Toast.show('Не вдалося розставити основу', 'warn'); }
+          }, 200);
+        } catch (_) {}
+        return;
+      }
+
       if (action === 'edit-my-profile') {
         e.preventDefault(); e.stopPropagation();
         const me = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer) ? AuthManager.getLinkedPlayer() : null;

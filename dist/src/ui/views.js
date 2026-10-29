@@ -272,6 +272,33 @@ const Views = {
     return null;
   },
 
+
+  /** SVG sparkline for dashboard / analytics */
+  _sparkline(values, opts) {
+    opts = opts || {};
+    const w = opts.w || 120, h = opts.h || 36;
+    const vals = (values || []).map(Number).filter(v => !isNaN(v));
+    if (vals.length < 2) {
+      return '<svg class="spark" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '"><text x="4" y="' + (h/2+4) + '" fill="rgba(255,255,255,.35)" font-size="10">—</text></svg>';
+    }
+    const min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+    const span = (max - min) || 1;
+    const pts = vals.map(function (v, i) {
+      const x = (i / (vals.length - 1)) * (w - 4) + 2;
+      const y = h - 4 - ((v - min) / span) * (h - 8);
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    }).join(' ');
+    const stroke = opts.color || '#f5c542';
+    const fill = opts.fill || 'rgba(245,197,66,.15)';
+    const last = pts.split(' ').pop().split(',');
+    const area = '2,' + h + ' ' + pts + ' ' + (w - 2) + ',' + h;
+    return '<svg class="spark" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
+      '<polygon points="' + area + '" fill="' + fill + '"/>' +
+      '<polyline points="' + pts + '" fill="none" stroke="' + stroke + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<circle cx="' + last[0] + '" cy="' + last[1] + '" r="2.5" fill="' + stroke + '"/>' +
+      '</svg>';
+  },
+
   _coachHome() {
     const s = Store.get();
     const avail = s.players.filter(p => p.status === 'available' || p.status === 'healthy' || !p.status).length;
@@ -286,6 +313,36 @@ const Views = {
     const recent = s.trainings.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 6);
     const drafts = s.trainings.filter(t => t.status === 'draft' || t.status === 'pinned');
     const boardCount = (s.boards || []).length;
+    // Graphs for coach home cards
+    const pastSorted = pastForStats.slice().sort((a, b) => String(a.date||'').localeCompare(String(b.date||'')));
+    const last14 = pastSorted.slice(-14);
+    const minByDay = last14.map(t => t.duration || 0);
+    const loadBySession = pastSorted.slice(-8).map(t => {
+      try { return (typeof LoadModel !== 'undefined' && LoadModel.sessionLoad) ? LoadModel.sessionLoad(t.duration, t.intensity) : ((t.duration||0)*(t.intensity||0)); } catch(_) { return 0; }
+    });
+    const last3Load = loadBySession.slice(-3);
+    const avg3 = last3Load.length ? Math.round(last3Load.reduce((a,b)=>a+b,0)/last3Load.length) : 0;
+    const recentBoards = (s.boards || []).slice().sort((a,b)=>String(b.createdAt||b.updatedAt||'').localeCompare(String(a.createdAt||a.updatedAt||''))).slice(0, 3);
+    const teamXpByDay = (() => {
+      const map = {};
+      pastSorted.slice(-14).forEach(tr => {
+        const d = tr.date || '';
+        if (!d) return;
+        let xp = 0;
+        const att = tr.attendance || {};
+        Object.keys(att).forEach(pid => {
+          const a = att[pid];
+          if (a && a.present !== false) xp += 18; else if (a) xp += -6;
+        });
+        map[d] = (map[d] || 0) + Math.max(0, xp);
+      });
+      return Object.keys(map).sort().map(k => map[k]);
+    })();
+    const startersCount = (s.players||[]).filter(p => {
+      const g = String(p.group||p.squadRole||'').toLowerCase();
+      return !(g === 'reserve' || g === 'bench') && p.status !== 'injured' && p.status !== 'rehab';
+    }).length;
+
     const club = (s.settings && s.settings.clubName) || 'МЕТАЛІСТ ШТУТГАРТ';
     const short = (s.settings && s.settings.clubShort) || 'МШ';
     const logo = (s.settings && s.settings.logoData) || '';
@@ -310,7 +367,7 @@ const Views = {
 
     return `
       <div class="club-profile">
-        <div class="app-build-tag" aria-hidden="true">build 2026.10.28-r · full</div>
+        <div class="app-build-tag" aria-hidden="true">build 2026.10.28-s · full</div>
 
         <!-- Telegram-style profile card (coach/player) -->
         ${(() => {
@@ -355,42 +412,50 @@ const Views = {
         </div>
 
         <!-- Stats glass grid -->
-        <div class="cp-stats">
-          <button type="button" class="cp-stat sc-tap" data-view="players">
+        <div class="cp-stats cp-stats-v2">
+          <button type="button" class="cp-stat sc-tap cp-stat-action" data-action="open-lineup-board" title="Дошка · основа 3-1-2-2-1-1">
             <span class="cp-stat-ic">👥</span>
             <span class="cp-stat-val">${avail}</span>
             <span class="cp-stat-lb">${t('players_available')}</span>
-            <span class="cp-stat-sub">${tf('of_total_injury',{total:s.players.length,inj:injured})}</span>
+            <span class="cp-stat-sub">${startersCount} в строю · ${injured} лазарет</span>
+            <span class="cp-stat-hint">тап → дошка основи</span>
           </button>
-          <div class="cp-stat">
+          <div class="cp-stat cp-stat-chart">
             <span class="cp-stat-ic">⏱</span>
             <span class="cp-stat-val">${totalMin || totalHours}</span>
-            <span class="cp-stat-lb">${totalMin ? t('min_total') : (typeof I18n!=='undefined'&&I18n.getLang()==='de'?'Std.':'год')}</span>
+            <span class="cp-stat-lb">${totalMin ? t('min_total') : 'год'}</span>
             <span class="cp-stat-sub">${tf('trainings_n',{n:pastForStats.length})}</span>
+            <div class="cp-stat-spark">${this._sparkline(minByDay, { color: '#7cf0c0', fill: 'rgba(124,240,192,.12)' })}</div>
           </div>
-          <div class="cp-stat">
-            <span class="cp-stat-ic">📊</span>
-            <span class="cp-stat-val">${weekLoad || 0}</span>
-            <span class="cp-stat-lb">${t('weekly_load')}</span>
-            <span class="cp-stat-sub">Duration × RPE</span>
+          <div class="cp-stat cp-stat-chart cp-stat-split">
+            <div class="cp-stat-left">
+              <div class="cp-stat-spark">${this._sparkline(loadBySession, { color: '#3d7eff', fill: 'rgba(61,126,255,.12)' })}</div>
+              <span class="cp-stat-sub">сер. 3: ${avg3}</span>
+            </div>
+            <div class="cp-stat-right">
+              <span class="cp-stat-ic">📊</span>
+              <span class="cp-stat-val">${weekLoad || 0}</span>
+              <span class="cp-stat-lb">${t('weekly_load')}</span>
+            </div>
           </div>
-          <div class="cp-stat">
-            <span class="cp-stat-ic">🕐</span>
-            <span class="cp-stat-val">${totalHours}</span>
-            <span class="cp-stat-lb">${t('hours_training')}</span>
-            <span class="cp-stat-sub">${t('past_only')}</span>
+          <div class="cp-stat cp-stat-chart">
+            <span class="cp-stat-ic">✨</span>
+            <span class="cp-stat-val">${teamXpByDay.length ? teamXpByDay[teamXpByDay.length-1] : 0}</span>
+            <span class="cp-stat-lb">XP команди</span>
+            <span class="cp-stat-sub">за останні дні</span>
+            <div class="cp-stat-spark">${this._sparkline(teamXpByDay, { color: '#f5c542', fill: 'rgba(245,197,66,.15)' })}</div>
           </div>
           <div class="cp-stat cp-stat-wide">
             <span class="cp-stat-ic">📅</span>
             <span class="cp-stat-lb">${t('next_match')}</span>
             ${matchHtml}
           </div>
-          <div class="cp-stat">
+          <button type="button" class="cp-stat sc-tap cp-stat-action" data-view="tactics">
             <span class="cp-stat-ic">🗂</span>
             <span class="cp-stat-val">${boardCount}</span>
             <span class="cp-stat-lb">${t('schemes')}</span>
-            <span class="cp-stat-sub">${t('saved_boards')}</span>
-          </div>
+            <span class="cp-stat-sub">${recentBoards.map(b => sanitize((b.name||'Схема').slice(0,18))).join(' · ') || t('saved_boards')}</span>
+          </button>
         </div>
 
         <!-- Coach tools (collapse) -->
@@ -1344,6 +1409,33 @@ const Views = {
       <div class="pl-cards">${this._coachSquadCard()}${cards || '<div class="es">Немає гравців</div>'}</div>`;
     }
 
+
+    // Coach squad: основа / резерв / лазарет
+    if (isCoach) {
+      const starters = list.filter(p => isStarter(p) && !['injured','rehab','recovery'].includes(p.status));
+      const reserves = list.filter(p => !isStarter(p) && !['injured','rehab','recovery'].includes(p.status));
+      const infirmary = list.filter(p => ['injured','rehab','recovery'].includes(p.status));
+      const section = (title, arr, cls) => {
+        if (!arr.length) return '';
+        const rows = arr.map(p => {
+          const att = attPct(p.id);
+          const isMe = (typeof AuthManager !== 'undefined' && AuthManager.isLinkedPlayer && AuthManager.isLinkedPlayer(p));
+          return '<div class="pl-row tg-row ' + cls + (isMe ? ' is-me' : '') + '" data-player-id="' + p.id + '" data-action="open-player-card" role="button">' +
+            '<span class="pl-num">#' + (p.number || '—') + '</span>' +
+            '<span class="pl-name">' + sanitize(p.lastName || '') + ' ' + sanitize((p.firstName||'')[0]||'') + '.</span>' +
+            '<span class="pl-pos">' + sanitize(p.position || '') + '</span>' +
+            '<span class="pl-att">' + att + '%</span></div>';
+        }).join('');
+        return '<div class="pl-section ' + cls + '"><div class="pl-section-h">' + title + ' · ' + arr.length + '</div>' + rows + '</div>';
+      };
+      return '<div class="st">' + t('squad_title') +
+        ' <button type="button" class="btn btn-s btn-sm" data-action="toggle-squad-view">Картки</button></div>' +
+        section('Основа', starters, 'pl-starters') +
+        section('Резерв', reserves, 'pl-reserve') +
+        section('Лазарет', infirmary, 'pl-infirmary') +
+        (!starters.length && !reserves.length && !infirmary.length ? '<div class="es">Немає гравців</div>' : '');
+    }
+
     const viewMode = (typeof window !== 'undefined' && window.__squadViewMode) || 'list';
     const cardsCoach = list.map(p => {
       const photo = this._resolvePlayerAvatar ? this._resolvePlayerAvatar(p) : (p.photoUrl || '');
@@ -1484,8 +1576,27 @@ const Views = {
     for (let i = 0; i < startDay; i++) grid += '<div class="cd om"></div>';
     for (let day = 1; day <= daysInMonth; day++) {
       const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const has = s.calendar.some(e => e.date === ds) || s.trainings.some(t => t.date === ds) || s.matches.some(m => m.date === ds);
-      grid += `<div class="cd ${ds === todayStr ? 'today' : ''} ${has ? 'has' : ''} ${s.ui.selectedDay === ds ? 'sel' : ''}" data-day="${ds}">${day}</div>`;
+      const dayTr = (s.trainings || []).filter(t => t.date === ds && t.status !== 'cancelled' && t.status !== 'canceled');
+      const dayMatch = (s.matches || []).filter(m => m.date === ds);
+      const dayCal = (s.calendar || []).filter(e => e.date === ds && e.type !== 'TRAINING' && e.type !== 'training');
+      const has = dayTr.length || dayMatch.length || dayCal.length;
+      let badge = '';
+      const doneTr = dayTr.find(t => t.status === 'done' || (t.date && t.date < todayStr));
+      if (doneTr) {
+        let present = 0, total = 0;
+        const att = doneTr.attendance || {};
+        Object.keys(att).forEach(pid => { total++; if (att[pid] && att[pid].present !== false) present++; });
+        const load = (typeof LoadModel !== 'undefined' && LoadModel.sessionLoad)
+          ? LoadModel.sessionLoad(doneTr.duration, doneTr.intensity) : ((doneTr.duration||0)*(doneTr.intensity||0));
+        const attPct = total ? Math.round(present/total*100) : null;
+        badge = '<span class="cd-badge">' + (attPct != null ? attPct + '%' : '✓') + (load ? ' · L' + load : '') + '</span>';
+      } else if (dayTr.length) {
+        badge = '<span class="cd-dot tr"></span>';
+      } else if (dayMatch.length) {
+        badge = '<span class="cd-dot mt"></span>';
+      }
+      grid += '<div class="cd ' + (ds === todayStr ? 'today ' : '') + (has ? 'has ' : '') + (s.ui.selectedDay === ds ? 'sel ' : '') +
+        (doneTr ? 'cd-done ' : '') + '" data-day="' + ds + '"><span class="cd-num">' + day + '</span>' + badge + '</div>';
     }
     grid += '</div>';
 
@@ -1642,11 +1753,26 @@ const Views = {
         ).join('');
       })();
 
+
+      const pastAn = (typeof LoadModel !== 'undefined' && LoadModel.pastTrainings)
+        ? LoadModel.pastTrainings(s.trainings) : (s.trainings||[]).filter(t => t.date && t.date <= today() && t.status !== 'cancelled');
+      const loadSeries = pastAn.slice(-12).map(t => (typeof LoadModel !== 'undefined' && LoadModel.sessionLoad) ? LoadModel.sessionLoad(t.duration, t.intensity) : 0);
+      const attSeries = pastAn.slice(-12).map(t => {
+        const att = t.attendance || {}; const ids = Object.keys(att);
+        if (!ids.length) return 0;
+        return Math.round(ids.filter(id => att[id] && att[id].present !== false).length / ids.length * 100);
+      });
+      const durSeries = pastAn.slice(-12).map(t => t.duration || 0);
       return `
       <div class="st">${t('analytics')}
         <button type="button" class="btn btn-s btn-sm" data-io="export" data-action="export">Експорт</button>
       </div>
       <p class="note-sm">Ураховуються лише тренування з датою ≤ сьогодні (без майбутніх і без скасованих). Навантаження = Тривалість × RPE.</p>
+      <div class="an-charts glass">
+        <div class="an-chart-card"><div class="an-chart-h">Навантаження (12)</div>${this._sparkline(loadSeries, { w: 200, h: 48, color: '#3d7eff', fill: 'rgba(61,126,255,.15)' })}</div>
+        <div class="an-chart-card"><div class="an-chart-h">Відвідуваність % (12)</div>${this._sparkline(attSeries, { w: 200, h: 48, color: '#7cf0c0', fill: 'rgba(124,240,192,.12)' })}</div>
+        <div class="an-chart-card"><div class="an-chart-h">Хвилини (12)</div>${this._sparkline(durSeries, { w: 200, h: 48, color: '#f5c542', fill: 'rgba(245,197,66,.12)' })}</div>
+      </div>
       <div class="dg">
         <div class="sc"><div class="lb">${(typeof I18n!=='undefined'?I18n.t('past_only','Минулих'):'Минулих')}</div><div class="vl">${summary.count || 0}</div></div>
         <div class="sc"><div class="lb">${(typeof I18n!=='undefined'?I18n.t('min_total','Загальний час'):'Загальний час')}</div><div class="vl">${summary.totalMin || 0}<span style="font-size:13px"> хв</span></div></div>
@@ -1788,7 +1914,7 @@ const Views = {
       <div class="card"><div class="ct">${t('about_app')}</div>
         <p style="font-size:12px;color:var(--muted);line-height:1.6">
           Тренерська платформа · МЕТАЛІСТ ШТУТГАРТ<br>
-          Schema v${typeof SCHEMA_VERSION !== 'undefined' ? SCHEMA_VERSION : 2} · build 2026.10.28-r<br>
+          Schema v${typeof SCHEMA_VERSION !== 'undefined' ? SCHEMA_VERSION : 2} · build 2026.10.28-s<br>
           localStorage · Telegram Cloud
         </p>
       </div>`;
