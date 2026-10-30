@@ -1812,6 +1812,18 @@ const App = {
   },
 
   bindEvents() {
+    try {
+      document.addEventListener('click', function(ev) {
+        var el = ev.target.closest && ev.target.closest('[data-action="open-coach-card"],[data-action="coach-easter"],[data-coach-card],.coach-public-card,.coach-pub-row,#coachPublicCard');
+        if (!el) return;
+        if (ev.target.closest('input,select,textarea')) return;
+        if (el.getAttribute('data-view') === 'trainings') return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+        try { if (typeof App.openCoachCard === 'function') App.openCoachCard(); } catch (err) { console.error(err); }
+      }, true);
+    } catch (_) {}
     // Прямі прив'язки (iOS / Telegram): логотип і імпорт не залежать від делегації
     try { this.bindLogoAndImport(); } catch (e) { console.warn(e); }
     try { this.bindEdgeSwipeDrawer(); } catch (e) { console.warn(e); }
@@ -1847,6 +1859,14 @@ const App = {
       if (action === 'close-coach-card') {
         e.preventDefault(); e.stopPropagation();
         try { App.closeCoachCard && App.closeCoachCard(); } catch (_) {}
+        return;
+      }
+      if (action === 'open-training') {
+        e.preventDefault(); e.stopPropagation();
+        if (this._lpSuppressClick) return;
+        const tid = t.dataset.trainingId || (t.closest && t.closest('[data-training-id]') && t.closest('[data-training-id]').dataset.trainingId);
+        if (tid) return this.openTrainingActionSheet(tid);
+        Toast.show('Тренування не знайдено', 'warn');
         return;
       }
       if (action === 'player-train-tab') {
@@ -2130,7 +2150,13 @@ const App = {
       return;
     }
 
-    if (action === 'save-settings') return Actions.saveSettings();
+    if (action === 'lang-uk' || action === 'lang-de') {
+        e.preventDefault(); e.stopPropagation();
+        var code = action === 'lang-de' ? 'de' : 'uk';
+        try { if (typeof I18n !== 'undefined' && I18n.setLang) I18n.setLang(code); Toast.show(code === 'de' ? 'Deutsch' : 'Українська', 'ok'); } catch (_) {}
+        return;
+      }
+      if (action === 'save-settings') return Actions.saveSettings();
       if (action === 'save-rbac') {
         const coachesRaw = (document.getElementById('setCoaches')?.value || '').split(',').map(x => x.trim()).filter(Boolean);
         let links = {};
@@ -2908,17 +2934,29 @@ const App = {
         ab.toolsTrayOpen = !ab.toolsTrayOpen;
         if (ab.toolsTrayOpen) ab.paletteOpen = false;
         document.body.classList.toggle('tools-tray-open', !!ab.toolsTrayOpen);
-        // Re-render toolbar so tray HTML matches state, then force-open portal
         try { BoardEngine.renderToolbar && BoardEngine.renderToolbar(); } catch (_) {}
-        const tray = document.getElementById('btbToolsTray');
-        if (tray) {
-          tray.classList.toggle('open', !!ab.toolsTrayOpen);
-          tray.setAttribute('aria-hidden', ab.toolsTrayOpen ? 'false' : 'true');
-          // Portal to body so overflow:hidden parents cannot clip it (iOS Telegram)
-          if (ab.toolsTrayOpen && tray.parentElement !== document.body) {
-            document.body.appendChild(tray);
+        const forceTray = () => {
+          const tray = document.getElementById('btbToolsTray');
+          if (!tray) return;
+          if (ab.toolsTrayOpen) {
+            if (tray.parentElement !== document.body) document.body.appendChild(tray);
+            tray.classList.add('open');
+            tray.setAttribute('aria-hidden', 'false');
+            tray.style.cssText = 'transform:translateY(0)!important;opacity:1!important;visibility:visible!important;pointer-events:auto!important;display:block!important;z-index:99990!important;';
+          } else {
+            tray.classList.remove('open');
+            tray.setAttribute('aria-hidden', 'true');
+            tray.style.cssText = '';
+            // return tray to toolbar if needed
+            const host = document.getElementById('boardToolbarBottom');
+            if (host && tray.parentElement === document.body) {
+              try { host.appendChild(tray); } catch (_) {}
+            }
           }
-        }
+        };
+        forceTray();
+        requestAnimationFrame(forceTray);
+        setTimeout(forceTray, 50);
         try { TelegramManager.haptic && TelegramManager.haptic('light'); } catch (_) {}
         return;
       }
@@ -3038,7 +3076,7 @@ const App = {
         if (this._lpSuppressClick) return;
         return this.openTrainingActionSheet(t.dataset.trainingId);
       }
-      if (t.closest && t.closest('.card-training[data-training-id]') && !t.dataset.action) {
+      if (t.closest && t.closest('.card-training[data-training-id]') && (!t.dataset.action || t.dataset.action === 'open-training')) {
         const row = t.closest('.card-training[data-training-id]');
         if (row && !e.target.closest('button, a, input')) {
           e.preventDefault();

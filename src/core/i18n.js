@@ -277,7 +277,7 @@ const I18n = (() => {
     de: {
       lang_name: 'Deutsch',
       lang_label: 'Sprache',
-      nav_home: 'Start',
+      nav_home: 'Startseite',
       nav_trainings: 'Training',
       nav_stats: 'Statistik',
       nav_calendar: 'Kalender',
@@ -611,12 +611,18 @@ const I18n = (() => {
       if (ls) code = ls;
     } catch (_) {}
     try {
+      // За замовчуванням uk для клубу; de лише після явного вибору в Налаштуваннях
       const tg = window.Telegram && window.Telegram.WebApp;
-      if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code) {
-        const lc = String(tg.initDataUnsafe.user.language_code).toLowerCase();
-        let chosen = false;
-        try { chosen = !!localStorage.getItem('metalist_lang'); } catch (_) {}
-        if (!chosen && (lc === 'de' || lc.indexOf('de') === 0)) code = 'de';
+      let explicit = false;
+      try { explicit = !!localStorage.getItem('metalist_lang'); } catch (_) {}
+      try {
+        if (typeof Store !== 'undefined' && Store.get && Store.get() && Store.get().settings && Store.get().settings.lang) {
+          explicit = true;
+          code = Store.get().settings.lang;
+        }
+      } catch (_) {}
+      if (!explicit) {
+        code = 'uk';
       }
     } catch (_) {}
     setLang(code, { skipSave: true, silent: true });
@@ -653,6 +659,9 @@ const I18n = (() => {
       if (nav) nav.setAttribute('aria-label', t('nav_main'));
       const nbtn = document.getElementById('nextTrBtn');
       if (nbtn) nbtn.setAttribute('title', t('next_training'));
+    } catch (_) {}
+    try {
+      if (typeof App !== 'undefined' && App.syncRoleClass) App.syncRoleClass();
     } catch (_) {}
   }
 

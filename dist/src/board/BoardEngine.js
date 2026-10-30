@@ -492,6 +492,14 @@ const BoardEngine = {
 
   /* ── POINTER DOWN ── */
   onPointerDown(e) {
+    try {
+      var _ab = (typeof Store !== 'undefined' && Store.get) ? Store.get().activeBoard : null;
+      if (_ab && _ab.toolsTrayOpen) {
+        var tEl = e.target;
+        var onTray = tEl && tEl.closest && tEl.closest('#btbToolsTray, .btb-tray, .btb-dock, .tb, [data-action="toggle-tools-tray"]');
+        if (!onTray && typeof this.closeToolsTray === 'function') this.closeToolsTray();
+      }
+    } catch (_) {}
     // Будь-яка робота на полі ховає лоток інструментів
     try {
       const ab = Store.get() && Store.get().activeBoard;

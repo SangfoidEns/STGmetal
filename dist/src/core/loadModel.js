@@ -42,7 +42,21 @@ const LoadModel = {
     // тільки минулі/сьогоднішні, не майбутні
     return this.pastTrainings(trainings, d)
       .filter(t => t.date >= from && t.date <= to)
-      .reduce((a, t) => a + this.sessionLoad(t.duration, t.intensity), 0);
+      .reduce((a, t) => {
+        let intensity = t.intensity;
+        if (intensity == null || intensity === 0) {
+          // fallback: середній RPE з attendance, інакше 5
+          const att = t.attendance || {};
+          const rpes = Object.keys(att).map(k => {
+            const e = att[k];
+            if (e == null) return null;
+            if (typeof e === 'number') return e;
+            return e.intensity != null ? e.intensity : (e.rpe != null ? e.rpe : null);
+          }).filter(v => v != null && !isNaN(+v)).map(Number);
+          intensity = rpes.length ? (rpes.reduce((s, v) => s + v, 0) / rpes.length) : 5;
+        }
+        return a + this.sessionLoad(t.duration, intensity);
+      }, 0);
   },
 
   /** % відвідувань серед проведених у минулому */
