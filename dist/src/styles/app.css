@@ -9794,12 +9794,12 @@ body.tg-mini-app .main, body.tg-mini-app #main {
   color: #e74c3c;
 }
 
-/* scheme-cards-z5 */
+/* scheme-cards-z5 vertical tactical */
 .scheme-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
   gap: 12px;
-  padding: 4px 0 20px;
+  padding: 4px 0 24px;
 }
 .scheme-card {
   display: flex;
@@ -9813,12 +9813,11 @@ body.tg-mini-app .main, body.tg-mini-app #main {
   background: rgba(255,255,255,0.04);
   color: inherit;
   cursor: pointer;
-  min-height: 150px;
 }
 .scheme-card:active { transform: scale(0.98); }
 .scheme-card-thumb {
   width: 100%;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 5 / 8;
   background: #0d2818;
   display: flex;
   align-items: center;
@@ -9830,21 +9829,272 @@ body.tg-mini-app .main, body.tg-mini-app #main {
   height: 100%;
   display: block;
 }
-.scheme-thumb-ph {
-  font-size: 28px;
-  opacity: 0.5;
-}
-.scheme-card-body {
-  padding: 10px 12px 12px;
-}
+.scheme-thumb-ph { font-size: 28px; opacity: 0.5; }
+.scheme-card-body { padding: 8px 10px 10px; }
 .scheme-card-title {
   font-weight: 700;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.25;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
-.scheme-card-meta {
-  font-size: 11px;
-  color: var(--muted);
-}
+.scheme-card-meta { font-size: 10px; color: var(--muted); }
 .player-schemes-block { margin-top: 4px; }
+
+/* fifa-profile-z7 */
+.fifa-top-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.fifa-left {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+}
+.fifa-right-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  gap: 6px;
+  max-width: 46%;
+}
+.fifa-logo-side .fifa-club-logo,
+.fifa-logo-side img {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  border-radius: 12px;
+}
+.fifa-club-name {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+.fifa-club-m { color: #f5c542; }
+.fifa-club-s { color: #fff; }
+.fifa-anim-in, .fifa-modal-anim {
+  animation: fifaCardIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes fifaCardIn {
+  from { opacity: 0; transform: scale(0.88) translateY(18px); filter: blur(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+}
+.fifa-modal-wrap.fifa-modal-in .fifa-card {
+  animation: fifaCardIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.pl-card-tint {
+  border-width: 1.5px;
+  border-style: solid;
+}
+.pl-card-av {
+  border: 2px solid transparent;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.pps-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 12px;
+}
+.pps-stories-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  margin: 8px 0 6px;
+}
+.stories-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 6px 2px 12px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.stories-strip::-webkit-scrollbar { display: none; }
+.stories-strip.empty { opacity: 0.7; }
+.story-ring {
+  flex: 0 0 auto;
+  width: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+.story-ring-inner {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  background: rgba(0,0,0,0.35);
+  border: 2.5px solid #f5c542;
+  box-shadow: 0 0 0 2px rgba(245,197,66,0.25);
+}
+.story-ring.rarity-legendary .story-ring-inner { border-color: #c9a227; }
+.story-ring.rarity-epic .story-ring-inner { border-color: #a855f7; }
+.story-ring.rarity-rare .story-ring-inner { border-color: #3b82f6; }
+.story-ring-label {
+  font-size: 10px;
+  font-weight: 600;
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+.story-ring-note {
+  display: none;
+}
+.gifts-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.gift-list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+}
+.glr-ico { font-size: 22px; }
+.glr-body { display: flex; flex-direction: column; gap: 2px; }
+.compare-card .compare-body[hidden] { display: none !important; }
+.compare-toggle { margin-bottom: 8px; }
+.profile-tinted { border-width: 1.5px; border-style: solid; }
+
+/* tg-gift-backdrop-z8 — Telegram-style unique pattern backgrounds */
+.tg-gift-art {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 30% 25%, hsla(var(--art-hue, 42), 85%, 62%, 0.55), transparent 55%),
+    radial-gradient(circle at 70% 75%, hsla(var(--art-hue, 42), 70%, 35%, 0.5), transparent 50%),
+    linear-gradient(145deg,
+      hsla(var(--art-hue, 42), 55%, 22%, 1),
+      hsla(var(--art-hue, 42), 45%, 12%, 1));
+  box-shadow:
+    inset 0 0 0 1.5px hsla(var(--art-hue, 42), 80%, 70%, 0.35),
+    0 4px 14px hsla(var(--art-hue, 42), 60%, 20%, 0.45);
+}
+.tg-gift-art.size-sm { width: 28px; height: 28px; }
+.tg-gift-art.size-md { width: 44px; height: 44px; }
+.tg-gift-art.size-lg { width: 96px; height: 96px; }
+.tg-gift-art-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.tg-gift-bg-sym {
+  position: absolute;
+  line-height: 1;
+  user-select: none;
+  filter: saturate(1.1);
+  color: hsla(var(--art-hue, 42), 90%, 85%, 1);
+  text-shadow: 0 0 6px hsla(var(--art-hue, 42), 80%, 60%, 0.5);
+}
+.tg-gift-art-glow {
+  position: absolute;
+  inset: -20%;
+  z-index: 0;
+  background: radial-gradient(circle, hsla(var(--art-hue, 42), 90%, 60%, 0.25), transparent 65%);
+  animation: tgGiftGlow 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes tgGiftGlow {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+.tg-gift-art-ico {
+  position: relative;
+  z-index: 2;
+  font-size: 1.15em;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.45));
+}
+.tg-gift-art.size-sm .tg-gift-art-ico { font-size: 13px; }
+.tg-gift-art.size-md .tg-gift-art-ico { font-size: 20px; }
+.tg-gift-art.size-lg .tg-gift-art-ico { font-size: 42px; }
+.tg-gift-art .tg-emoji-media {
+  width: 70%;
+  height: 70%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+/* rarity rim */
+.tg-gift-art.rarity-common { box-shadow: inset 0 0 0 1.5px rgba(255,255,255,0.25), 0 4px 12px rgba(0,0,0,0.35); }
+.tg-gift-art.rarity-rare { box-shadow: inset 0 0 0 1.5px #3b82f6, 0 0 12px rgba(59,130,246,0.35); }
+.tg-gift-art.rarity-epic { box-shadow: inset 0 0 0 1.5px #a855f7, 0 0 14px rgba(168,85,247,0.4); }
+.tg-gift-art.rarity-legendary { box-shadow: inset 0 0 0 1.5px #f5c542, 0 0 16px rgba(245,197,66,0.45); }
+
+.tg-gift-item.nft-art {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+}
+.gift-status-badge {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 6px;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+}
+.story-ring-art {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 0 !important;
+}
+.story-ring-inner.story-ring-art {
+  width: auto;
+  height: auto;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+.fifa-gift-chip {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 6px !important;
+}
+.fifa-gift-art { flex: 0 0 auto; }
+.fifa-gift-txt { display: flex; flex-direction: column; font-size: 12px; font-weight: 600; }
+.fifa-gift-txt small { font-weight: 500; opacity: 0.7; font-size: 10px; }
+.glr-art { flex: 0 0 auto; }
+.gift-list-row { align-items: center; }

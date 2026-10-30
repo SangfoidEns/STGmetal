@@ -288,9 +288,73 @@ CoachTools.GIFT_CATALOG = [
     momentHint: 'Перший Золотий М’яч клубу 2025/2026: легендарний старт великої історії!' }
 ];
 
+
 CoachTools.giftById = function (id) {
   return (CoachTools.GIFT_CATALOG || []).find(g => g.id === id) || null;
 };
+
+/** Унікальні фонові символи подарунка (як у Telegram Gifts) */
+CoachTools.GIFT_PATTERN_SYMBOLS = {
+  1:  ['✦', '✧', '⋆', '·', '✦'],
+  2:  ['◆', '◇', '◈', '·', '◆'],
+  3:  ['▴', '·', '✦', '▴', '·'],
+  4:  ['⚡', '·', '✧', '⚡', '·'],
+  5:  ['♥', '♡', '·', '♥', '·'],
+  6:  ['❖', '·', '✦', '❖', '·'],
+  7:  ['●', '○', '·', '◎', '·'],
+  8:  ['♛', '·', '✦', '✧', '·'],
+  9:  ['►', '·', '✧', '►', '·'],
+  10: ['🧤', '·', '✦', '·', '✧'],
+  11: ['◎', '·', '✦', '◎', '·'],
+  12: ['⬡', '·', '✧', '⬢', '·']
+};
+CoachTools.giftPatternSymbols = function (g) {
+  try {
+    const def = (g && g.giftId && CoachTools.giftById(g.giftId)) || g || {};
+    const pid = def.pattern != null ? def.pattern : (g && g.pattern != null ? g.pattern : 1);
+    const base = CoachTools.GIFT_PATTERN_SYMBOLS[pid] || CoachTools.GIFT_PATTERN_SYMBOLS[1];
+    const ico = (g && g.ico) || def.ico || '★';
+    // унікальний набір: ico + pattern symbols
+    return [ico, base[0], base[1], ico, base[2], base[3], base[0], base[4] || base[1]];
+  } catch (_) {
+    return ['★', '✦', '·', '✧', '★', '·'];
+  }
+};
+CoachTools.giftBackdropHtml = function (g, size) {
+  // size: 'sm' | 'md' | 'lg'
+  const hue = (g && g.hue != null) ? g.hue : 42;
+  const rar = (g && g.rarity) || 'common';
+  const pid = (g && g.pattern != null) ? g.pattern : 1;
+  const syms = CoachTools.giftPatternSymbols(g);
+  // positions around the badge (Telegram-like scatter)
+  const slots = [
+    { x: 12, y: 18, s: 0.55, o: 0.22 },
+    { x: 78, y: 14, s: 0.5, o: 0.18 },
+    { x: 18, y: 72, s: 0.48, o: 0.2 },
+    { x: 82, y: 68, s: 0.52, o: 0.16 },
+    { x: 50, y: 8, s: 0.4, o: 0.14 },
+    { x: 8, y: 48, s: 0.42, o: 0.15 },
+    { x: 90, y: 42, s: 0.38, o: 0.12 },
+    { x: 48, y: 88, s: 0.45, o: 0.14 }
+  ];
+  const bgSyms = slots.map((sl, i) => {
+    const sy = syms[i % syms.length];
+    return '<span class="tg-gift-bg-sym" style="left:' + sl.x + '%;top:' + sl.y + '%;font-size:' +
+      (sl.s * 100) + '%;opacity:' + sl.o + ';transform:translate(-50%,-50%) rotate(' + ((i * 37) % 60 - 30) + 'deg)">' +
+      sy + '</span>';
+  }).join('');
+  const ico = (g && g.ico) || '★';
+  const media = (g && g.mediaUrl)
+    ? ('<img class="tg-emoji-media" src="' + String(g.mediaUrl).replace(/"/g, '') + '" alt="">')
+    : ico;
+  return '<span class="tg-gift-art size-' + (size || 'md') + ' rarity-' + rar +
+    '" style="--art-hue:' + hue + ';--art-pattern:' + pid + '">' +
+    '<span class="tg-gift-art-bg" aria-hidden="true">' + bgSyms + '</span>' +
+    '<span class="tg-gift-art-glow" aria-hidden="true"></span>' +
+    '<span class="tg-gift-art-ico">' + media + '</span>' +
+    '</span>';
+};
+
 
 CoachTools.coachAttendanceRate = function () {
   try {

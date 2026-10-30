@@ -2419,22 +2419,66 @@ const App = {
         }
         return;
       }
-      if (action === 'open-fifa-card') {
+      if (action === 'toggle-compare') {
+        e.preventDefault(); e.stopPropagation();
+        const root = t.closest('.compare-card');
+        if (root) {
+          const body = root.querySelector('.compare-body');
+          if (body) body.hidden = !body.hidden;
+          root.classList.toggle('compare-collapsed', body && body.hidden);
+        }
+        return;
+      }
+      if (action === 'open-player-gifts') {
         e.preventDefault(); e.stopPropagation();
         const pid = (t.dataset && t.dataset.playerId) || t.getAttribute('data-player-id');
         if (!pid) return;
         const p = (Store.get().players || []).find(x => String(x.id) === String(pid));
         if (!p) return;
+        let gifts = [];
+        try {
+          if (typeof CoachTools !== 'undefined' && CoachTools.playerGifts)
+            gifts = CoachTools.playerGifts(pid) || [];
+        } catch (_) {}
+        const name = [p.firstName, p.lastName].filter(Boolean).join(' ') || 'Гравець';
+        const stories = (typeof Views._playerStoriesStrip === 'function') ? Views._playerStoriesStrip(pid) : '';
+        const list = gifts.length
+          ? gifts.map(g => {
+              const rar = g.rarity || 'common';
+              const art = (typeof CoachTools !== 'undefined' && CoachTools.giftBackdropHtml)
+                ? CoachTools.giftBackdropHtml(g, 'md')
+                : ('<span class="glr-ico">' + (g.ico || '★') + '</span>');
+              return '<div class="gift-list-row rarity-' + rar + '" data-action="inspect-artifact" data-gift-uid="' + (g.uid || g.id || '') + '">' +
+                '<span class="glr-art">' + art + '</span>' +
+                '<div class="glr-body"><b>' + sanitize(g.label || 'Подарунок') + '</b>' +
+                '<span class="note-sm">' + sanitize(g.note || g.momentHint || rar) + '</span></div></div>';
+            }).join('')
+          : '<div class="es">Подарунків ще немає</div>';
+        Modal.open('🎁 ' + name, '<div class="gifts-modal">' + stories + '<div class="gifts-list">' + list + '</div></div>',
+          [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
+        return;
+      }
+      if (action === 'open-fifa-card') {
+        e.preventDefault(); e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        const pid = (t.dataset && t.dataset.playerId) || t.getAttribute('data-player-id');
+        if (!pid) return;
+        const p = (Store.get().players || []).find(x => String(x.id) === String(pid));
+        if (!p) { Toast.show('Гравця не знайдено', 'warn'); return; }
         try { TelegramManager.haptic && TelegramManager.haptic('light'); } catch (_) {}
         try { if (CoachTools && CoachTools.ensureWornGift) CoachTools.ensureWornGift(p.id); } catch (_) {}
         window.__coachCardPlayerId = p.id;
+        // не підставляти compare за замовчуванням
+        try { window.__fifaCompareId = ''; window.__playerCompareId = ''; } catch (_) {}
         const st = Views._playerStats ? Views._playerStats(p.id) : {};
         const html = Views._fifaCard(p, st);
         Modal.open('FIFA-картка · ' + (p.lastName || p.firstName || ''),
-          '<div class="fifa-modal-wrap" data-compare-host="' + p.id + '">' + html + '</div>',
+          '<div class="fifa-modal-wrap fifa-modal-anim" data-compare-host="' + p.id + '">' + html + '</div>',
           [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
         setTimeout(() => {
           try {
+            const wrap = document.querySelector('.fifa-modal-wrap');
+            if (wrap) wrap.classList.add('fifa-modal-in');
             const s2 = document.getElementById('playerCompareSel');
             if (s2) { s2._msCmpBound = false; App._bindPlayerCompare(); }
           } catch (_) {}
