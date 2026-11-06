@@ -896,12 +896,38 @@ const StorageManager = {
     }
   },
 
-  _openExportChooser(text, filename) {
+  exportPlayerForCoach(player) {
+    this.beginIoLock(3000);
+    try {
+      const me = player || (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer && AuthManager.getLinkedPlayer());
+      if (!me || typeof PlayerUpdate === 'undefined') {
+        Toast.show('Анкета не привʼязана', 'warn');
+        return;
+      }
+      const packet = PlayerUpdate.build(Store.get(), me);
+      if (!packet) { Toast.show('Немає анкети для передачі', 'warn'); return; }
+      const text = JSON.stringify(packet, null, 2);
+      const day = typeof today === 'function' ? today() : new Date().toISOString().slice(0, 10);
+      const who = String(me.lastName || me.firstName || 'гравець').replace(/[^\w\u0400-\u04FF-]+/g, '_');
+      const filename = 'metalist_anketa_' + who + '_' + day + '.json';
+      const n = (packet.stamps || []).length;
+      this._openExportChooser(text, filename, {
+        title: 'Експорт для тренера',
+        lead: 'Анкета і печатки «Я тут» · <strong>' + n + '</strong>. Надішліть файл тренеру: він відкриє його через Імпорт JSON.'
+      });
+    } catch (e) {
+      try { ErrorManager.log('export-player', e); } catch (_) {}
+      Toast.show('Помилка експорту: ' + (e.message || e), 'err');
+    }
+  },
+
+  _openExportChooser(text, filename, opts) {
+    opts = opts || {};
     const sizeKb = Math.round(new Blob([text]).size / 1024);
+    const lead = opts.lead || ('Експорт даних МЕТАЛІСТ ШТУТТГАРТ · <strong>' + sizeKb + ' КБ</strong><br>У Telegram найнадійніше — <strong>скопіювати</strong> і зберегти в «Вибране» або надіслати собі в Saved Messages.');
     const body = `
       <p style="font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.45">
-        Експорт даних МЕТАЛІСТ ШТУТТГАРТ · <strong>${sizeKb} КБ</strong><br>
-        У Telegram найнадійніше — <strong>скопіювати</strong> і зберегти в «Вибране» або надіслати собі в Saved Messages.
+        ${lead}
       </p>
       <div class="export-actions" style="display:flex;flex-direction:column;gap:8px">
         <button type="button" class="btn btn-p" data-export-act="copy" style="min-height:48px;width:100%">📋 Скопіювати JSON у буфер</button>
@@ -914,7 +940,7 @@ const StorageManager = {
         background:rgba(0,0,0,0.35);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px;box-sizing:border-box"></textarea>
       <p class="note-sm" style="margin-top:10px">Після копіювання: відкрийте Saved Messages у Telegram → вставте → збережіть як файл, або вставте назад через «Імпорт JSON».</p>
     `;
-    Modal.open('Експорт JSON', body, [
+    Modal.open(opts.title || 'Експорт JSON', body, [
       { label: 'Закрити', cls: 'btn-s', action: 'cancel' }
     ]);
     const ta = () => document.getElementById('exportJsonTa');
@@ -1175,6 +1201,31 @@ const StorageManager = {
       try {
         let data = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (!data || typeof data !== 'object') throw new Error('Невірний формат JSON');
+        const playerPacket = (data.type === 'metalist_player_update')
+          ? data
+          : (data.payload && data.payload.type === 'metalist_player_update' ? data.payload : null);
+        if (playerPacket) {
+          if (typeof PlayerUpdate === 'undefined') throw new Error('Немає модуля анкети');
+          this.createBackup();
+          const res = PlayerUpdate.apply(Store.get(), playerPacket);
+          if (!res.ok) {
+            this._holdRemote = false;
+            Toast.show(res.reason === 'missing'
+              ? 'Гравця немає в складі. Перевірте Telegram-нік в анкеті.'
+              : 'У файлі немає анкети гравця', 'warn');
+            return true;
+          }
+          this.save(coachWriter ? undefined : { localOnly: true });
+          try { if (typeof AuthManager !== 'undefined') AuthManager.afterDataImport(); } catch (_) {}
+          try { App.applyBranding && App.applyBranding(); } catch (_) {}
+          try { App.renderCurrent(); } catch (_) {}
+          try { App.updateHeader && App.updateHeader(); } catch (_) {}
+          publishImport();
+          const missed = res.missed ? (' · без тренування ' + res.missed) : '';
+          Toast.show('Анкета ' + res.name + ' · печаток «Я тут»: ' + res.stamps + missed, 'ok');
+          return true;
+        }
+
         if (data.payload && typeof data.payload === 'object' && (data.payload.players || data.payload.trainings || data.payload.schemaVersion)) {
           data = data.payload;
         }

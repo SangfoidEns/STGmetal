@@ -11984,6 +11984,9 @@ body.role-guest .team-chat { display: none !important; }
   pointer-events: none;
 }
 .settings-crest { margin: 0 0 8px; }
+.pp-export { margin-top: 10px; }
+.pp-export .btn { width: 100%; min-height: 44px; }
+.player-cab-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .pitch-meter { margin: 8px 0 12px; padding: 8px 10px; border-radius: 12px; background: rgba(18,22,32,.94); border: 1px solid rgba(232,197,71,.28); }
 .pitch-meter-label { font-size: 12px; font-weight: 700; margin-bottom: 6px; }
 .pitch-meter-track { height: 8px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; }

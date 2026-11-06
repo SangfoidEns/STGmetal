@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z60',
+  APP_BUILD: 'z61',
   APP_UPDATED: '06.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -1129,6 +1129,7 @@ const Views = {
       <div class="st player-cab-head">${t('my_cabinet')} · <span class="cp-brand-a">МЕТАЛІСТ</span> <span class="cp-brand-b">ШТУТТГАРТ</span>
         <button type="button" class="btn btn-s btn-sm" data-io="import" data-action="import-trigger">Імпорт JSON</button>
         <button type="button" class="btn btn-s btn-sm" data-action="edit-self-player">Профіль</button>
+        <button type="button" class="btn btn-s btn-sm" data-action="export-for-coach">Для тренера</button>
       </div>
       ${me ? `
         <div class="cp-hero cp-person cp-clean player-profile-hero ${this._playerBackdrop(me).className}" style="${themeStyle};${this._playerBackdrop(me).style}">
@@ -2421,6 +2422,7 @@ trainings() {
       <div class="card glass settings-card">
         <div class="ct">Дані клубу</div>
         <p class="note-sm">Спільні дані — файл club.json. Експортуйте JSON, замініть ним club.json у репозиторії й запуште. Усі в Telegram отримають цей файл.</p>
+        <p class="note-sm">Імпорт також приймає файл з анкети гравця: його поля і печатки «Я тут».</p>
         <p class="note-sm" id="clubSyncLine">${sanitize((typeof StorageManager !== 'undefined' && StorageManager._clubSyncText) || 'Клубний обмін: підключення…')}</p>
         <div class="settings-actions">
           <button type="button" class="btn btn-s" data-action="export-json">Експорт JSON</button>

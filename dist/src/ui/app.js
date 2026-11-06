@@ -741,6 +741,53 @@ const App = {
     }
   },
 
+  _writeSelfProfile(p, values) {
+    if (!p) return false;
+    const field = function (id) {
+      if (values && values[id] != null) return values[id];
+      const el = document.getElementById(id);
+      return el ? el.value : null;
+    };
+    if (field('ppFirst') == null) return false;
+    if (!p.profile) p.profile = {};
+    const first = String(field('ppFirst') || '').trim();
+    const last = String(field('ppLast') || '').trim();
+    if (first) p.firstName = first.slice(0, 80);
+    if (last) p.lastName = last.slice(0, 80);
+    const bd = String(field('ppBirth') || '').trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(bd)) {
+      p.birthDate = bd;
+      p.profile.birthDate = bd;
+    }
+    p.profile.phone = String(field('ppPhone') || '').slice(0, 40);
+    p.profile.social = String(field('ppSocial') || '').slice(0, 200);
+    p.profile.status = String(field('ppStatus') || '').slice(0, 80);
+    p.profile.bio = String(field('ppBio') || '').slice(0, 400);
+    p.statusText = p.profile.status;
+    p.bio = p.profile.bio;
+    p.phone = p.profile.phone;
+    const photo = String(field('ppPhotoPicked') || '');
+    if (photo.indexOf('data:image/') === 0 && photo.length <= 400000) {
+      p.profilePhoto = photo;
+      p.photoUrl = photo;
+    }
+    const picked = document.querySelector('#modalBody input[name="ppFeatured"]:checked');
+    if (picked && picked.value) {
+      const s = Store.get();
+      (s.gifts || []).forEach(function (g) {
+        if (!g || String(g.playerId) !== String(p.id)) return;
+        g.featured = String(g.uid || g.id || '') === picked.value;
+        if (g.featured) {
+          const gh = (typeof CoachTools !== 'undefined' && CoachTools.giftHue) ? CoachTools.giftHue(g) : g.hue;
+          p.themeHue = gh;
+          p.profile.themeHue = gh;
+          p.featuredGiftId = g.giftId || '';
+        }
+      });
+    }
+    return true;
+  },
+
   applyBranding() {
     try {
       const me = document.getElementById('rbacMe');
@@ -785,7 +832,7 @@ const App = {
     if (build) {
       const letter = (typeof Views !== 'undefined' && Views.versionLetter) ? Views.versionLetter() : 'А';
       const when = (typeof Views !== 'undefined' && Views.APP_UPDATED) || '06.11.2026';
-      build.textContent = letter + ' / ' + when;
+      build.textContent = letter + ' | ' + when;
     }
     const parts = (s.clubName || 'МЕТАЛІСТ ШТУТТГАРТ').split(' ');
     const cn = document.getElementById('clubName');
@@ -2543,6 +2590,25 @@ const App = {
       if (action === 'new-event') return Actions.newEvent();
       if (action === 'toggle-rp') return document.getElementById('rightPanel').classList.toggle('force');
       // export / import — обробляються лише в capture (bindLogoAndImport), тут ігнор
+      if (action === 'export-for-coach') {
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+          const me = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer) ? AuthManager.getLinkedPlayer() : null;
+          if (!me) { Toast.show('Анкета не привʼязана', 'warn'); return; }
+          const s = Store.get();
+          const p = (s.players || []).find(x => x.id === me.id) || me;
+          this._writeSelfProfile(p);
+          try {
+            const canWrite = AuthManager._canWriteClub && AuthManager._canWriteClub();
+            StorageManager.save({ localOnly: !canWrite });
+          } catch (_) { try { StorageManager.save(); } catch (e2) {} }
+          StorageManager.exportPlayerForCoach(p);
+        } catch (err) {
+          Toast.show('Експорт: ' + (err.message || err), 'err');
+        }
+        return;
+      }
       if (action === 'export' || action === 'export-json' || action === 'import-trigger') {
         e.preventDefault();
         e.stopPropagation();
@@ -2801,6 +2867,9 @@ const App = {
             }).join('')
             : '<p class="note-sm">Поки немає подарунків, які можна поставити біля імені.</p>';
           const currentPhoto = me.profilePhoto || me.photoUrl || '';
+          const stampCount = ((Store.get().trainings) || []).filter(function (tr) {
+            return tr && tr.attendance && tr.attendance[me.id] && tr.attendance[me.id].claimed;
+          }).length;
           const body = '<div class="soc-edit-form player-profile-form">' +
             '<p class="note-sm">Профіль клубу. Позицію, номер і склад змінює лише тренер.</p>' +
             '<label class="fld"><span>Ім\'я</span><input id="ppFirst" class="inp" value="' + sanitize(me.firstName || '') + '"/></label>' +
@@ -2814,6 +2883,9 @@ const App = {
             (currentPhoto ? '<img class="pp-photo-preview" alt="" src="' + sanitize(currentPhoto) + '">' : '<img class="pp-photo-preview" alt="" hidden>') +
             '</label>' +
             '<div class="fld"><span>Подарунок біля імені</span><div class="pp-gift-picks">' + giftPicks + '</div></div>' +
+            '<div class="fld pp-export"><span>Передача тренеру</span>' +
+            '<p class="note-sm">У файлі буде ця анкета і печатки «Я тут»: ' + stampCount + '. Тренер відкриває його через Імпорт JSON.</p>' +
+            '<button type="button" class="btn btn-p" data-action="export-for-coach">Експорт для тренера</button></div>' +
             '</div>';
           Modal.open('Мій профіль', body, [
             { label: 'Скасувати', cls: 'btn-s', action: 'cancel' },
@@ -2823,44 +2895,7 @@ const App = {
             const s = Store.get();
             const p = (s.players || []).find(x => x.id === me.id);
             if (!p) return;
-            if (!p.profile) p.profile = {};
-            const field = function (id) {
-              if (r.values && r.values[id] != null) return r.values[id];
-              const el = document.getElementById(id);
-              return el ? el.value : '';
-            };
-            p.firstName = field('ppFirst') || p.firstName;
-            p.lastName = field('ppLast') || p.lastName;
-            const bd = String(field('ppBirth') || '').trim();
-            if (/^\d{4}-\d{2}-\d{2}$/.test(bd)) {
-              p.birthDate = bd;
-              p.profile.birthDate = bd;
-            }
-            p.profile.phone = String(field('ppPhone') || '').slice(0, 40);
-            p.profile.social = String(field('ppSocial') || '').slice(0, 200);
-            p.profile.status = String(field('ppStatus') || '').slice(0, 80);
-            p.profile.bio = String(field('ppBio') || '').slice(0, 400);
-            p.statusText = p.profile.status;
-            p.bio = p.profile.bio;
-            p.phone = p.profile.phone;
-            const photo = String(field('ppPhotoPicked') || '');
-            if (photo.indexOf('data:image/') === 0 && photo.length <= 400000) {
-              p.profilePhoto = photo;
-              p.photoUrl = photo;
-            }
-            const picked = document.querySelector('#modalBody input[name="ppFeatured"]:checked');
-            if (picked && picked.value) {
-              (s.gifts || []).forEach(function (g) {
-                if (!g || String(g.playerId) !== String(p.id)) return;
-                g.featured = String(g.uid || g.id || '') === picked.value;
-                if (g.featured) {
-                  const gh = (typeof CoachTools !== 'undefined' && CoachTools.giftHue) ? CoachTools.giftHue(g) : g.hue;
-                  p.themeHue = gh;
-                  p.profile.themeHue = gh;
-                  p.featuredGiftId = g.giftId || '';
-                }
-              });
-            }
+            App._writeSelfProfile(p, r.values || {});
             try { StorageManager.save(); } catch (_) {}
             Toast.show('Профіль збережено', 'ok');
             try { App.renderCurrent && App.renderCurrent(); } catch (_) {}
