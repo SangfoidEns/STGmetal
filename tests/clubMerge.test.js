@@ -85,4 +85,25 @@ describe('club snapshot merge', () => {
     assert.equal(merged.settings.coachStats.appMs, 50);
     assert.equal(merged.settings.coachStats.boardMs, 80);
   });
+
+  it('folds training copies and zero-padded twins into the real session', () => {
+    const merged = mergePayload({
+      trainings: [
+        { id: 'real22', name: 'Тренування 22/10', date: '2026-10-22', status: 'cancelled', duration: 119, attendance: { p1: { present: false, updatedAt: '2026-10-22T12:00:00.000Z' } } },
+        { id: 'copy22', name: 'Тренування 22/10 (копія)', date: '2026-10-23', status: 'planned', duration: 119 },
+        { id: 'done5', name: 'Тренування 5/11', date: '2026-11-05', status: 'done', duration: 119, attendance: { p1: { present: true, updatedAt: '2026-11-05T18:00:00.000Z' } } },
+        { id: 'plan5', name: 'Тренування 05/11', date: '2026-11-05', status: 'planned', duration: 90 },
+        { id: 'other', name: 'Тренування 12', date: '2026-11-08', status: 'planned', duration: 100 }
+      ],
+      calendar: [
+        { id: 'c1', trainingId: 'copy22', date: '2026-10-23', title: 'Тренування 22/10 (копія)' }
+      ]
+    }, { trainings: [] });
+    const names = merged.trainings.map(t => String(t.name)).sort();
+    assert.equal(names.join('|'), ['Тренування 12', 'Тренування 22/10', 'Тренування 5/11'].join('|'));
+    const nov = merged.trainings.find(t => t.id === 'done5');
+    assert.equal(nov.status, 'done');
+    assert.equal(nov.attendance.p1.present, true);
+    assert.equal(merged.calendar[0].trainingId, 'real22');
+  });
 });

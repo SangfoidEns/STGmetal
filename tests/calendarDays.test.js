@@ -29,6 +29,6 @@ describe('calendar weekday letters', () => {
     assert.match(html, /title="Субота">Д</);
     assert.match(html, /title="Неділя">Е</);
     assert.equal(html.includes('>Пн<'), false);
-    assert.equal(context.Views.APP_BUILD, 'z52');
+    assert.equal(context.Views.APP_BUILD, 'z53');
   });
 });

@@ -1719,11 +1719,14 @@ const App = {
     backdrop.addEventListener('click', e => {
       if (e.target === backdrop) close();
     });
+    let sheetArmed = false;
+    sheet.addEventListener('pointerdown', () => { sheetArmed = true; }, true);
     sheet.addEventListener('click', e => {
       const btn = e.target.closest('[data-sheet-act]');
       if (!btn) return;
       e.preventDefault();
       e.stopPropagation();
+      if (!sheetArmed) return;
       const act = btn.dataset.sheetAct;
       const tid = btn.dataset.tid;
       close();

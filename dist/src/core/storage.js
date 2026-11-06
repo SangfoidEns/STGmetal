@@ -497,7 +497,14 @@ const StorageManager = {
       if (!data || typeof data !== 'object') throw new Error('Invalid data');
       const version = data.schemaVersion || 1;
       const migrated = this.migrate(data, version);
+      let folded = { removed: 0 };
+      try {
+        if (typeof ClubMerge !== 'undefined' && ClubMerge.collapseTrainings) folded = ClubMerge.collapseTrainings(migrated) || folded;
+      } catch (_) {}
       Store.set(migrated, { keepStamp: true });
+      if (folded.removed) {
+        try { this.save({ localOnly: true }); } catch (_) {}
+      }
       return true;
     } catch (e) {
       ErrorManager.log('Storage.load', e);

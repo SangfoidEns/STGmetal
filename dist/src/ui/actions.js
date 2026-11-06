@@ -491,13 +491,24 @@ const Actions = {
   dupTraining(id) {
     const t = Store.get().trainings.find(x => x.id === id);
     if (!t) return;
-    const c = JSON.parse(JSON.stringify(t));
-    c.id = uid(); c.name = t.name + ' (копія)'; c.status = 'draft';
-    if (c.structure) c.structure.forEach(b => b.id = uid());
-    Store.get().trainings.push(c);
-    StorageManager.save();
-    Toast.show('Скопійовано', 'ok');
-    App.renderCurrent();
+    const base = String(t.name || 'Тренування').replace(/\s*\(копія\)/gi, '').trim();
+    const exists = (Store.get().trainings || []).some(x => x && x.id !== t.id && String(x.name || '').replace(/\s*\(копія\)/gi, '').trim().toLowerCase() === base.toLowerCase() && /\(копія\)/i.test(x.name || ''));
+    if (exists) {
+      Toast.show('Копія цього тренування вже є', 'warn');
+      return;
+    }
+    Modal.confirm('Зробити окрему копію «' + base + '»? У списку лишиться і оригінал.', () => {
+      const c = JSON.parse(JSON.stringify(t));
+      c.id = uid();
+      c.name = base + ' (копія)';
+      c.status = 'draft';
+      c.attendance = {};
+      if (c.structure) c.structure.forEach(b => b.id = uid());
+      Store.get().trainings.push(c);
+      StorageManager.save();
+      Toast.show('Скопійовано', 'ok');
+      App.renderCurrent();
+    });
   },
 
   newPlayer() {

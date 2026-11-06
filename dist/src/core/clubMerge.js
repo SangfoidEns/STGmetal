@@ -104,12 +104,71 @@
     return out;
   }
 
+  function trainingNameKey(name) {
+    return String(name || '')
+      .replace(/\s*\(копія\)/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase()
+      .replace(/\d+/g, function (n) { return String(parseInt(n, 10)); });
+  }
+
+  function trainingRank(item) {
+    const name = String((item && item.name) || '');
+    const copy = /\(копія\)/i.test(name) ? 0 : 80;
+    const st = String((item && item.status) || '');
+    const statusScore = st === 'done' ? 50 : (st === 'planned' || st === 'pinned' ? 30 : (st === 'cancelled' || st === 'canceled' ? 20 : 10));
+    const att = item && item.attendance ? Object.keys(item.attendance).length : 0;
+    return copy + statusScore + att * 4;
+  }
+
+  /** Одна назва — одне тренування. «(копія)» і «05/11» поруч із «5/11» зливаються в оригінал. */
+  function collapseTrainings(payload) {
+    if (!payload || !Array.isArray(payload.trainings)) return { removed: 0, idMap: {} };
+    const groups = new Map();
+    payload.trainings.forEach(function (item) {
+      if (!item) return;
+      const key = trainingNameKey(item.name) || ('id:' + (item.id || ''));
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(item);
+    });
+    const idMap = {};
+    const kept = [];
+    groups.forEach(function (items) {
+      if (items.length === 1) {
+        kept.push(items[0]);
+        return;
+      }
+      const ranked = items.slice().sort(function (a, b) { return trainingRank(b) - trainingRank(a); });
+      const winner = Object.assign({}, ranked[0]);
+      ranked.slice(1).forEach(function (loser) {
+        if (loser && loser.id) idMap[loser.id] = winner.id;
+        winner.attendance = mergeAttendance(winner.attendance, loser && loser.attendance);
+      });
+      kept.push(winner);
+    });
+    payload.trainings = kept;
+    if (Array.isArray(payload.calendar)) {
+      payload.calendar = payload.calendar.map(function (ev) {
+        if (!ev || !ev.trainingId || !idMap[ev.trainingId]) return ev;
+        return Object.assign({}, ev, { trainingId: idMap[ev.trainingId] });
+      });
+    }
+    if (Array.isArray(payload.boards)) {
+      payload.boards.forEach(function (board) {
+        if (board && board.trainingId && idMap[board.trainingId]) board.trainingId = idMap[board.trainingId];
+      });
+    }
+    return { removed: Object.keys(idMap).length, idMap: idMap };
+  }
+
   function mergePayload(base, extra) {
     const out = Object.assign({}, base || {});
     LISTS.forEach(function (key) {
       out[key] = mergeList(base && base[key], extra && extra[key]);
     });
     out.settings = mergeSettings(base && base.settings, extra && extra.settings);
+    collapseTrainings(out);
     return out;
   }
 
@@ -117,6 +176,8 @@
     mergePayload: mergePayload,
     mergeAttendance: mergeAttendance,
     mergeCoachStats: mergeCoachStats,
-    recordStamp: recordStamp
+    recordStamp: recordStamp,
+    collapseTrainings: collapseTrainings,
+    trainingNameKey: trainingNameKey
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z52',
+  APP_BUILD: 'z53',
   APP_UPDATED: '06.11.2026',
 
   _buildLine() {
