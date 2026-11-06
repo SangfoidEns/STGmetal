@@ -905,9 +905,10 @@ const Actions = {
       const present = a.present !== false; // default present
       const hasRecord = t.attendance[p.id] != null;
       const checked = hasRecord ? !!a.present : true;
+      const stamp = a.claimed && a.present !== true ? ' · печатка' : '';
       const intv = a.intensity != null ? a.intensity : (t.intensity || 6);
       return `<div class="att-row" data-pid="${p.id}">
-        <label class="att-check"><input type="checkbox" class="att-present" ${checked ? 'checked' : ''}> <span>${p.number}. ${sanitize(p.lastName || p.firstName || '')}</span></label>
+        <label class="att-check"><input type="checkbox" class="att-present" ${checked ? 'checked' : ''}> <span>${p.number}. ${sanitize(p.lastName || p.firstName || '')}${stamp}</span></label>
         <span class="att-pos">${sanitize(p.position || '')}</span>
         <input type="number" class="att-rpe" min="1" max="10" value="${intv}" title="Індивідуальний RPE" ${checked ? '' : 'disabled'}>
       </div>`;
@@ -961,6 +962,50 @@ const Actions = {
     });
   },
 
+  editBeats(trainingId) {
+    const t = Store.get().trainings.find(x => x.id === trainingId);
+    if (!t) { Toast.show('Тренування не знайдено', 'warn'); return; }
+    const beats = Array.isArray(t.beats) ? t.beats : [];
+    const row = (b) => '<div class="beat-edit">' +
+      '<input class="beat-phrase-in fl-input" placeholder="Фраза команді" value="' + sanitize((b && b.phrase) || '') + '">' +
+      '<input class="beat-goal-in fl-input" placeholder="Мета" value="' + sanitize((b && b.goal) || '') + '">' +
+      '<input class="beat-mistake-in fl-input" placeholder="Помилка" value="' + sanitize((b && b.mistake) || '') + '">' +
+      '<input class="beat-signal-in fl-input" placeholder="Сигнал" value="' + sanitize((b && b.signal) || '') + '">' +
+      '</div>';
+    Modal.open('Кадри пояснення', (beats.map(row).join('') || row({})) +
+      '<button type="button" class="btn btn-s btn-sm" id="addBeatRow">+ Кадр</button>' +
+      '<p class="note-sm">Команда бачить один кадр. «Далі» на картці тренування перемикає його в усіх.</p>', [
+      { label: 'Скасувати', cls: 'btn-s', action: 'cancel' },
+      { label: 'Зберегти', cls: 'btn-p', action: 'save-beats' }
+    ]);
+    const save = document.querySelector('[data-modal-action="save-beats"]');
+    if (save) save.dataset.tid = trainingId;
+    document.getElementById('addBeatRow')?.addEventListener('click', () => {
+      const holder = document.createElement('div');
+      holder.innerHTML = row({});
+      document.getElementById('addBeatRow').before(holder.firstChild);
+    });
+  },
+
+  saveBeats(trainingId) {
+    const t = Store.get().trainings.find(x => x.id === trainingId);
+    if (!t) return;
+    const beats = [];
+    document.querySelectorAll('.beat-edit').forEach(row => {
+      const phrase = (row.querySelector('.beat-phrase-in')?.value || '').trim();
+      const goal = (row.querySelector('.beat-goal-in')?.value || '').trim();
+      const mistake = (row.querySelector('.beat-mistake-in')?.value || '').trim();
+      const signal = (row.querySelector('.beat-signal-in')?.value || '').trim();
+      if (phrase || goal || mistake || signal) beats.push({ phrase, goal, mistake, signal });
+    });
+    t.beats = beats;
+    if ((Number(t.beatIndex) || 0) >= beats.length) t.beatIndex = 0;
+    StorageManager.save();
+    Modal.close();
+    App.renderCurrent();
+    Toast.show(beats.length ? 'Кадри збережено' : 'Кадри прибрано', 'ok');
+  },
+
   saveAttendance(trainingId) {
     const t = Store.get().trainings.find(x => x.id === trainingId);
     if (!t) return;
@@ -973,7 +1018,11 @@ const Actions = {
       if (!pid) return;
       const present = !!row.querySelector('.att-present')?.checked;
       const intensity = Math.max(1, Math.min(10, +row.querySelector('.att-rpe')?.value || t.intensity || 6));
-      t.attendance[pid] = { present, intensity, updatedAt: new Date().toISOString() };
+      const prev = t.attendance[pid] || {};
+      t.attendance[pid] = {
+        present, intensity, rpe: intensity, updatedAt: new Date().toISOString(),
+        claimed: !!prev.claimed, claimedAt: prev.claimedAt || ''
+      };
     });
     t.updatedAt = new Date().toISOString();
     if (t.status === 'planned') t.status = 'done';

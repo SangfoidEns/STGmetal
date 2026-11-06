@@ -242,7 +242,7 @@ const App = {
     if (!document._msIoCapture) {
       document._msIoCapture = true;
       document.addEventListener('click', (e) => {
-        const exp = e.target.closest('#btnExportJson, [data-io="export"], [data-action="export"]');
+        const exp = e.target.closest('#btnExportJson, [data-io="export"], [data-action="export"], [data-action="export-json"]');
         const imp = e.target.closest('#btnImportJson, [data-io="import"], [data-action="import-trigger"]');
         if (!exp && !imp) return;
 
@@ -785,7 +785,7 @@ const App = {
     if (build) {
       const letter = (typeof Views !== 'undefined' && Views.versionLetter) ? Views.versionLetter() : 'А';
       const when = (typeof Views !== 'undefined' && Views.APP_UPDATED) || '06.11.2026';
-      build.textContent = letter + ' › ' + when;
+      build.textContent = letter + ' / ' + when;
     }
     const parts = (s.clubName || 'МЕТАЛІСТ ШТУТТГАРТ').split(' ');
     const cn = document.getElementById('clubName');
@@ -1545,6 +1545,7 @@ const App = {
     }
     try {
       el.innerHTML = Views[view]();
+      try { if (typeof SessionPlay !== 'undefined') SessionPlay.maybePack(); } catch (_) {}
       if (view === 'players') {
         const log = document.getElementById('teamChatLog');
         const inp = document.getElementById('teamChatInput');
@@ -1749,6 +1750,7 @@ const App = {
       </div>`;
     const coachActions = isCoach ? `
       <button type="button" class="tg-sheet-btn" data-sheet-act="edit" data-tid="${t.id}">✏️ ${typeof I18n!=='undefined'?I18n.t('sheet_edit','Редагувати'):'Редагувати'}</button>
+      <button type="button" class="tg-sheet-btn" data-sheet-act="beats" data-tid="${t.id}">▸ Кадри пояснення</button>
       <button type="button" class="tg-sheet-btn" data-sheet-act="attendance" data-tid="${t.id}">✓ ${(typeof I18n!=='undefined'?I18n.t('sheet_attendance','Відвідування'):'Відвідування')}</button>
       <button type="button" class="tg-sheet-btn" data-sheet-act="dup" data-tid="${t.id}">⧉ ${(typeof I18n!=='undefined'?I18n.t('sheet_dup','Дубль / копія'):'Дубль / копія')}</button>
       <button type="button" class="tg-sheet-btn" data-sheet-act="open-board" data-tid="${t.id}">⚽ ${(typeof I18n!=='undefined'?I18n.t('open_board','Відкрити дошку'):'Відкрити дошку')}</button>
@@ -1796,6 +1798,7 @@ const App = {
         return;
       }
       if (act === 'edit') return Actions.editTraining(tid);
+      if (act === 'beats') return Actions.editBeats(tid);
       if (act === 'attendance') return Actions.openAttendance(tid);
       if (act === 'dup') return Actions.dupTraining(tid);
       if (act === 'open-board') return Actions.openTrainingBoard(tid);
@@ -2163,8 +2166,11 @@ const App = {
       this._navGuardBound = true;
       document.addEventListener('click', (e) => {
         const node = e.target;
-        if (node && node.closest && node.closest('.tg-sheet, #modal .md, .md')) return;
-        const btn = App._navButtonAt(e.clientX, e.clientY);
+        if (!node || !node.closest) return;
+        if (node.closest('.tg-sheet, #modal .md, .md, .mo')) return;
+        const inNav = node.closest('#mobileNav, .mn');
+        if (!inNav && typeof ClickGuard !== 'undefined' && !ClickGuard.stealNav(node, e.clientX, e.clientY)) return;
+        const btn = (inNav && node.closest('.mni')) || App._navButtonAt(e.clientX, e.clientY);
         if (!btn) return;
         e.preventDefault();
         e.stopPropagation();
@@ -2175,7 +2181,8 @@ const App = {
         const node = e.target;
         if (!node || !node.closest) return;
         if (node.closest('#mobileNav, .mn, .tg-sheet, #teamChat, #teamChatForm, .team-chat, .team-chat-form')) return;
-        const openBtn = node.closest('[data-edit-training], [data-action="open-training"], [data-action="preview-next-training"], [data-next-training]');
+        if (typeof ClickGuard !== 'undefined' && !ClickGuard.trainingOpensSheet(node)) return;
+        const openBtn = node.closest('[data-action="open-training"], [data-action="preview-next-training"], [data-next-training]');
         if (!openBtn) return;
         const tid = openBtn.getAttribute('data-edit-training')
           || openBtn.getAttribute('data-training-id')
@@ -2210,9 +2217,8 @@ const App = {
           try { App.openPlayerFifa(pid); } catch (err) { console.error('[fifa]', err); }
           return;
         }
-        if (node.closest('#modal, .coach-card-overlay, [data-action="open-photo"], [data-action="close-coach-card"]')) return;
-        const coach = node.closest('.coach-public-card, .coach-squad-card, [data-coach-card="1"]');
-        if (!coach || node.closest('a.mni, input, select, textarea')) return;
+        if (typeof ClickGuard !== 'undefined' && !ClickGuard.coachCardClick(node)) return;
+        if (node.closest('a.mni')) return;
         ev.preventDefault();
         ev.stopPropagation();
         if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
@@ -2242,6 +2248,10 @@ const App = {
         if (App._navButtonAt && App._navButtonAt(e.clientX, e.clientY)) return;
         const closestOk = t && t.closest && t.closest('#teamChat, #teamChatForm, #teamChatInput, .team-chat, .team-chat-form');
         const inBox = inChatBox(e);
+        if (closestOk) {
+          const own = t.closest('button, a, [data-action]');
+          if (own && !own.closest('[data-action="team-chat-send"]') && own.id !== 'teamChatInput') return;
+        }
         if (!closestOk && !inBox) {
           if ((App._chatPointerDown || (App._chatBlocksTraining && App._chatBlocksTraining())) && App._chatHitOpensTraining && App._chatHitOpensTraining(t)) {
             e.preventDefault();
@@ -2276,9 +2286,10 @@ const App = {
     }
     try {
       document.addEventListener('click', function(ev) {
+        if (typeof ClickGuard !== 'undefined' && !ClickGuard.coachCardClick(ev.target)) return;
         var el = ev.target.closest && ev.target.closest('[data-action="open-coach-card"],[data-action="coach-easter"],[data-coach-card],.coach-public-card,.coach-pub-row,#coachPublicCard');
         if (!el) return;
-        if (ev.target.closest('input,select,textarea,#modal,.mo,.coach-card-overlay,[data-action="open-photo"],[data-action="open-fifa-card"],[data-action="close-coach-card"],a.mni')) return;
+        if (ev.target.closest('a.mni')) return;
         if (el.getAttribute('data-view') === 'trainings') return;
         ev.preventDefault();
         ev.stopPropagation();
@@ -2305,8 +2316,8 @@ const App = {
         }
         return;
       }
-      const coachHit = e.target.closest && e.target.closest('[data-coach-card], .coach-public-card, .coach-squad-card, [data-action="open-coach-card"], [data-action="coach-easter"]');
-      if (coachHit && !e.target.closest('input, select, textarea, a[href], [data-action="open-photo"]')) {
+      const coachHit = typeof ClickGuard !== 'undefined' && ClickGuard.coachCardClick(e.target);
+      if (coachHit && !e.target.closest('a[href], [data-action="open-photo"]')) {
         e.preventDefault();
         e.stopPropagation();
         if (e.stopImmediatePropagation) e.stopImmediatePropagation();
@@ -2532,9 +2543,50 @@ const App = {
       if (action === 'new-event') return Actions.newEvent();
       if (action === 'toggle-rp') return document.getElementById('rightPanel').classList.toggle('force');
       // export / import — обробляються лише в capture (bindLogoAndImport), тут ігнор
-      if (action === 'export' || action === 'import-trigger') {
+      if (action === 'export' || action === 'export-json' || action === 'import-trigger') {
         e.preventDefault();
         e.stopPropagation();
+        try { StorageManager.beginIoLock(5000); } catch (_) {}
+        try {
+          if (action === 'import-trigger') StorageManager.pickAndImportJSON();
+          else StorageManager.exportJSON();
+        } catch (err) {
+          Toast.show((action === 'import-trigger' ? 'Імпорт: ' : 'Експорт: ') + (err.message || err), 'err');
+        }
+        return;
+      }
+      if (action === 'claim-session') {
+        e.preventDefault(); e.stopPropagation();
+        const me = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer) ? AuthManager.getLinkedPlayer() : null;
+        const tr = (Store.get().trainings || []).find(x => String(x.id) === String(t.dataset.trainingId));
+        if (!me || !tr || typeof SessionPlay === 'undefined') { Toast.show('Печатку ставить гравець зі своєї картки', 'warn'); return; }
+        const res = SessionPlay.claim(tr, me.id);
+        if (res.ok && res.state === 'claimed') {
+          try { StorageManager.save({ localOnly: !(AuthManager._canWriteClub && AuthManager._canWriteClub()) }); } catch (_) { try { StorageManager.save(); } catch (e2) {} }
+          try { TelegramManager.haptic && TelegramManager.haptic('medium'); } catch (_) {}
+          Toast.show('Печатка стоїть. Залік після підтвердження тренера', 'ok');
+          App.renderCurrent();
+        } else if (res.state === 'confirmed') {
+          Toast.show('Тренер уже підтвердив явку', 'ok');
+        }
+        return;
+      }
+      if (action === 'session-beat-next') {
+        e.preventDefault(); e.stopPropagation();
+        const tr = (Store.get().trainings || []).find(x => String(x.id) === String(t.dataset.trainingId));
+        if (!tr || typeof SessionPlay === 'undefined') return;
+        SessionPlay.nextBeat(tr);
+        try { StorageManager.save(); } catch (_) {}
+        App.renderCurrent();
+        return;
+      }
+      if (action === 'edit-beats') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.editBeats(t.dataset.trainingId);
+      }
+      if (action === 'close-session-pack') {
+        e.preventDefault(); e.stopPropagation();
+        if (typeof SessionPlay !== 'undefined') SessionPlay.closePack(t.dataset.trainingId);
         return;
       }
       if (action === 'open-default-board' && !e.target.closest('.auth-role-btn, [data-action="coach-easter"]')) {
@@ -3963,6 +4015,7 @@ const App = {
       if (t.dataset.modalAction === 'save-training') return Actions.saveTraining(t.dataset.tid);
       if (t.dataset.modalAction === 'open-attendance') return Actions.openAttendance(t.dataset.tid);
       if (t.dataset.modalAction === 'save-attendance') return Actions.saveAttendance(t.dataset.tid);
+      if (t.dataset.modalAction === 'save-beats') return Actions.saveBeats(t.dataset.tid);
       if (t.dataset.modalAction === 'create-player') return Actions.createPlayer();
       if (t.dataset.modalAction === 'save-player') return Actions.savePlayer(t.dataset.pid);
       if (t.dataset.modalAction === 'create-exercise') return Actions.createExercise();

@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z59',
+  APP_BUILD: 'z60',
   APP_UPDATED: '06.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -19,6 +19,11 @@ const Views = {
 
   _buildLine() {
     return '<div class="app-build-tag">Оновлено ' + this.APP_UPDATED + ' · ' + this.versionLetter() + '</div>';
+  },
+
+  _pitchBar() {
+    try { return (typeof SessionPlay !== 'undefined' && SessionPlay.meterHtml) ? SessionPlay.meterHtml() : ''; }
+    catch (_) { return ''; }
   },
 
   isHeadCoach() {
@@ -440,6 +445,7 @@ const Views = {
     return `
       <div class="club-profile">
         ${this._buildLine()}
+        ${this._pitchBar()}
 
         <!-- Telegram-style profile card (coach/player) -->
         ${(() => {
@@ -834,6 +840,7 @@ const Views = {
         </div>
         <div class="cpc-name">${sanitize(p.firstName || '')} <strong>${sanitize(p.lastName || '')}</strong> ${this._giftStatusBadge(gifts, p.id)}</div>
         <div class="cpc-meta">${sanitize(stLabel)}${tg ? ' · ' + tg : ''}</div>
+        ${(typeof SessionPlay !== 'undefined') ? SessionPlay.sealHtml(p.id) : ''}
         <div class="fifa-stats">
           <div class="fifa-stat"><b>${cond}%</b><span>Готовність</span></div>
           <div class="fifa-stat"><b>${att}</b><span>${typeof t==='function'?t('longpress_attendance'):'Відвідування'}</span></div>
@@ -1118,6 +1125,7 @@ const Views = {
     return `
       <div class="player-home">
       ${this._buildLine()}
+      ${this._pitchBar()}
       <div class="st player-cab-head">${t('my_cabinet')} · <span class="cp-brand-a">МЕТАЛІСТ</span> <span class="cp-brand-b">ШТУТТГАРТ</span>
         <button type="button" class="btn btn-s btn-sm" data-io="import" data-action="import-trigger">Імпорт JSON</button>
         <button type="button" class="btn btn-s btn-sm" data-action="edit-self-player">Профіль</button>
@@ -1141,6 +1149,7 @@ const Views = {
             <div class="soc-xp-bar"><div class="soc-xp-fill" style="width:${prog.levelProgress || 0}%"></div></div>
             <div class="soc-xp-sub">До LVL ${(prog.level || 1) + 1}: ${prog.xpToNext || 0} XP</div>
           </div>
+          ${(typeof SessionPlay !== 'undefined') ? SessionPlay.weekHtml(me.id) + SessionPlay.sealHtml(me.id) : ''}
           ${this._accountProgress(me.id)}
           ${bio ? '<p class="player-bio-home">' + sanitize(bio) + '</p>' : ''}
           <div class="cp-status"><span class="cp-dot"></span>${(typeof I18n!=='undefined'?I18n.t('attendance','Відвідуваність'):'Відвідуваність')} ${Math.round(stats.attPct || 0)}% · тап по фото — на весь екран</div>
@@ -1160,7 +1169,7 @@ const Views = {
       </div>` : ''}
 
       ${next
-        ? ('<button type="button" class="card glass next-tr-card" data-action="preview-next-training" data-training-id="' + next.id + '">' +
+        ? ('<div class="next-tr-wrap"><button type="button" class="card glass next-tr-card" data-action="preview-next-training" data-training-id="' + next.id + '">' +
           '<div class="ct">Наступне тренування</div>' +
           '<div class="vl">' + sanitize(next.name) + '</div>' +
           '<div class="next-tr-metrics">' +
@@ -1168,7 +1177,9 @@ const Views = {
             '<span>' + (next.duration || 0) + ' хв</span>' +
             '<span>Load ' + (nextLoad || '—') + '</span>' +
             '<span>~+' + nextXp + ' XP</span>' +
-          '</div></button>')
+          '</div></button>' +
+          ((typeof SessionPlay !== 'undefined') ? (SessionPlay.claimHtml(next) + SessionPlay.beatHtml(next)) : '') +
+          '</div>')
         : '<div class="card glass next-tr-card"><div class="ct">Наступне тренування</div><div class="note-sm">Немає запланованого тренування</div></div>'}
 
       ${me ? this._myStatsCharts(me, Object.assign({}, stats, { xp: prog.xp, level: prog.level })) : ''}
@@ -1518,10 +1529,12 @@ trainings() {
       const dur = tr.duration != null ? (tr.duration + ' хв') : '';
       const title = sanitize(tr.name || 'Тренування');
       const date = sanitize(tr.date || '');
+      const bits = (typeof SessionPlay !== 'undefined') ? (SessionPlay.beatHtml(tr) + SessionPlay.claimHtml(tr)) : '';
       return '<div class="card glass card-training tg-row ' + statusCls(st) + '" data-training-id="' + (tr.id || '') + '" data-action="open-training">' +
         '<div class="tr-top"><div class="tr-title">' + title + '</div><span class="tr-badge ' + statusCls(st) + '">' + statusLabel(st) + '</span></div>' +
         '<div class="tr-meta"><span>' + date + '</span>' + (dur ? '<span class="tr-dot">·</span><span>' + dur + '</span>' : '') +
         (load !== '—' ? '<span class="tr-dot">·</span><span>навантаження ' + load + '</span>' : '') + '</div>' +
+        bits +
         '</div>';
     }).join('');
 
