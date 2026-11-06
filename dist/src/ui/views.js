@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z62',
+  APP_BUILD: 'z63',
   APP_UPDATED: '06.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -408,7 +408,8 @@ const Views = {
         const att = tr.attendance || {};
         Object.keys(att).forEach(pid => {
           const a = att[pid];
-          if (a && a.present !== false) xp += 18; else if (a) xp += -6;
+          const mark = (typeof PlayerProgress !== 'undefined' && PlayerProgress.attendanceMark) ? PlayerProgress.attendanceMark(a) : (a && a.present === true ? true : false);
+          if (mark === true) xp += 18; else if (mark === false) xp += -6;
         });
         map[d] = (map[d] || 0) + Math.max(0, xp);
       });
@@ -838,7 +839,7 @@ const Views = {
           </div>
           ${logoTag}
         </div>
-        <div class="cpc-name">${sanitize(p.firstName || '')} <strong>${sanitize(p.lastName || '')}</strong> ${this._giftStatusBadge(gifts, p.id)}</div>
+        <div class="cpc-name">${sanitize(p.firstName || '')} <strong>${sanitize(p.lastName || '')}</strong> ${this.appointmentHtml(p)} ${this._giftStatusBadge(gifts, p.id)}</div>
         <div class="cpc-meta">${sanitize(stLabel)}${tg ? ' · ' + tg : ''}</div>
         ${(typeof SessionPlay !== 'undefined') ? SessionPlay.sealHtml(p.id) : ''}
         <div class="fifa-stats">
@@ -1068,9 +1069,12 @@ const Views = {
           : t.status === 'done';
         if (!counts) return;
         const a = t.attendance && t.attendance[playerId];
-        if (!a || a.present == null) return;
-        if (a.present === false || a.present === 0) absent++;
-        else if (a.present === true) present++;
+        const mark = (typeof PlayerProgress !== 'undefined' && PlayerProgress.attendanceMark)
+          ? PlayerProgress.attendanceMark(a)
+          : (a && a.present === true ? true : (a && a.present === false ? false : null));
+        if (mark == null) return;
+        if (mark === false) absent++;
+        else present++;
       });
       return {
         attPct: LM && LM.attendanceRate ? LM.attendanceRate(s.trainings, playerId) : null,
@@ -1198,11 +1202,14 @@ const Views = {
           const held = !cancelled && ((typeof PlayerProgress !== 'undefined' && PlayerProgress.sessionCounts)
             ? PlayerProgress.sessionCounts(tr)
             : tr.status === 'done');
-          const present = (held && a && a.present != null) ? (a.present === true) : null;
+          const mark = (held && typeof PlayerProgress !== 'undefined' && PlayerProgress.attendanceMark)
+            ? PlayerProgress.attendanceMark(a)
+            : ((held && a && a.present === true) ? true : ((held && a && a.present === false) ? false : null));
+          const present = mark;
           const cls = cancelled ? 'ptr-cancel' : (present === true ? 'ptr-ok' : (present === false ? 'ptr-miss' : 'ptr-na'));
           const badge = cancelled ? 'скас.' : (present === true ? '✓' : (present === false ? '✗' : '—'));
           const rpe = held && a && a.rpe != null ? ('RPE ' + a.rpe) : '';
-          const note = cancelled ? ' · скасовано, не пропуск' : (!held ? ' · не відбулось' : '');
+          const note = cancelled ? ' · скасовано, не пропуск' : (!held ? ' · не відбулось' : (tr.coachPresent === false ? ' · без тренера' : ''));
           return '<div class="player-tr-row ' + cls + '">' +
             '<span class="ptr-badge">' + badge + '</span>' +
             '<span class="ptr-name">' + sanitize(tr.name || 'Тренування') + '</span>' +
@@ -1252,6 +1259,23 @@ const Views = {
       </div>`;
   },
 
+  appointments(p) {
+    if (!p) return [];
+    const staff = ((Store.get().settings || {}).staff) || {};
+    const id = String(p.id);
+    const out = [];
+    if (p.isCaptain || String(staff.captainId || '') === id) out.push({ short: 'C', label: 'Капітан', cls: 'role-captain' });
+    if ((staff.assistants || []).map(String).indexOf(id) >= 0) out.push({ short: 'П', label: 'Помічник', cls: 'role-assistant' });
+    if (String(staff.presidentId || '') === id) out.push({ short: 'ПР', label: 'Президент', cls: 'role-president' });
+    return out;
+  },
+
+  appointmentHtml(p) {
+    return this.appointments(p).map(a =>
+      '<span class="role-mark ' + a.cls + '" title="' + a.label + '">' + a.short + '</span>'
+    ).join('');
+  },
+
   _rankTitle(level) {
     const n = Number(level) || 1;
     if (n >= 12) return 'Капітан ритму';
@@ -1271,12 +1295,19 @@ const Views = {
         '<div class="prog-track"><div class="prog-fill" style="width:' + Math.min(100, pct) + '%"></div></div></div>';
     };
     const maxPart = Math.max(pr.xpAttend || 0, pr.xpIntensity || 0, pr.xpGifts || 0, 1);
-    const events = (pr.history || []).slice(0, 5).map(h => {
+    const all = pr.history || [];
+    const sessions = all.filter(h => h.kind === 'present' || h.kind === 'absent')
+      .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+    const streakLine = all.filter(h => h.kind === 'streak');
+    const events = sessions.slice(0, 4).concat(streakLine).slice(0, 5).map(h => {
       const sign = (h.delta || 0) >= 0 ? '+' : '';
-      return '<li><span>' + sanitize(h.date || '') + ' · ' + sanitize(h.name || '') + '</span><b>' + sign + (h.delta || 0) + ' XP</b></li>';
+      const note = h.withoutCoach ? ' · без тренера' : '';
+      return '<li><span>' + sanitize(h.date || '') + ' · ' + sanitize(h.name || '') + note + '</span><b>' + sign + (h.delta || 0) + ' XP</b></li>';
     }).join('');
     return '<div class="prog-panel">' +
-      '<div class="prog-rank">' + sanitize(rank) + ' · серія ' + (pr.streak || 0) + '</div>' +
+      '<div class="prog-rank">' + sanitize(rank) + ' · серія ' + (pr.streak || 0) +
+        (this.appointmentHtml ? this.appointmentHtml((Store.get().players || []).find(x => String(x.id) === String(playerId))) : '') +
+      '</div>' +
       bar('Відвідування', pr.xpAttend || 0, maxPart) +
       bar('Інтенсивність', pr.xpIntensity || 0, maxPart) +
       bar('Подарунки', pr.xpGifts || 0, maxPart) +
@@ -1623,7 +1654,7 @@ trainings() {
         ? ('<button type="button" class="pl-card-av" data-action="open-fifa-card" data-player-id="' + p.id + '">' + ph + '</button>')
         : ('<div class="pl-card-av">' + ph + '</div>')) +
       cloud + '</div>' +
-      '<div class="pl-card-body"><div class="pl-card-name"><span class="pl-card-name-txt">#' + (p.number || '—') + ' ' + sanitize(name) + '</span>' + badge + '</div>' +
+      '<div class="pl-card-body"><div class="pl-card-name"><span class="pl-card-name-txt">#' + (p.number || '—') + ' ' + sanitize(name) + '</span>' + this.appointmentHtml(p) + badge + '</div>' +
       '<div class="pl-card-meta">' + sanitize(p.position || '') + (roleText ? (' · ' + roleText) : '') + '</div>' +
       '<div class="pl-card-att">Відвідуваність ' + att + '%</div></div></div>';
   },
@@ -1838,7 +1869,7 @@ trainings() {
         const att = attPct(p.id);
         return '<div class="pl-row tg-row ' + cls + '" data-player-id="' + p.id + '" data-action="open-player-card" role="button">' +
           '<span class="pl-num">#' + (p.number || '—') + '</span>' +
-          '<span class="pl-name">' + sanitize(p.lastName || '') + ' ' + sanitize((p.firstName || '')[0] || '') + '.</span>' +
+          '<span class="pl-name">' + sanitize(p.lastName || '') + ' ' + sanitize((p.firstName || '')[0] || '') + '.' + this.appointmentHtml(p) + '</span>' +
           '<span class="pl-pos">' + sanitize(p.position || '') + '</span>' +
           '<span class="pl-att">' + att + '%</span></div>';
       }).join('');

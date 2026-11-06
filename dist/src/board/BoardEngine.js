@@ -1369,21 +1369,18 @@ const BoardEngine = {
     const b = (s.boards || []).find(x => String(x.id) === String(ab.sourceBoardId));
     if (!b) return '';
     const name = (typeof sanitize === 'function') ? sanitize(b.name || 'Схема') : (b.name || 'Схема');
-    const descRaw = String(b.description || b.notes || '').trim();
-    const desc = (typeof sanitize === 'function') ? sanitize(descRaw) : descRaw;
     const id = (typeof sanitize === 'function') ? sanitize(String(b.id)) : String(b.id);
     const coach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
     const actions = coach
       ? '<div class="bsb-actions">' +
-          '<button type="button" class="tb" data-action="edit-scheme" data-board-id="' + id + '">Редагувати</button>' +
+          '<button type="button" class="tb" data-action="edit-scheme" data-board-id="' + id + '">Змінити</button>' +
           '<button type="button" class="tb" data-action="save-scheme-drawing" data-board-id="' + id + '">Зберегти</button>' +
-          '<button type="button" class="tb" data-action="save-scheme-as-new" data-board-id="' + id + '">Як нову</button>' +
+          '<button type="button" class="tb" data-action="save-scheme-as-new" data-board-id="' + id + '">Копія</button>' +
           '<button type="button" class="tb tb-del-opp" data-action="delete-scheme" data-board-id="' + id + '">Видалити</button>' +
         '</div>'
       : '';
     return '<div class="board-scheme-bar">' +
-      '<div class="bsb-text"><div class="bsb-name">' + name + '</div>' +
-      '<p class="bsb-desc">' + (desc || 'Опису ще немає.') + '</p></div>' +
+      '<div class="bsb-name">' + name + '</div>' +
       actions + '</div>';
   },
 
@@ -2184,9 +2181,14 @@ const BoardEngine = {
       const isRehab = status === 'rehab' || status === 'recovery';
       const isReserve = status === 'reserve' || (pl && pl.group === 'reserve');
       const isCaptain = !!(o.isCaptain || (pl && pl.isCaptain));
+      const posts = (pl && typeof Views !== 'undefined' && Views.appointments) ? Views.appointments(pl) : [];
+      const isAssistant = posts.some(a => a.cls === 'role-assistant');
+      const isPresident = posts.some(a => a.cls === 'role-president');
       // Бейджі ТІЛЬКИ зверху фішки (не перекривають ім'я знизу)
       const radialItems = [];
-      if (isCaptain) radialItems.push({ cls: 'pt-cap', text: 'C', title: 'Капітан' });
+      if (isCaptain || posts.some(a => a.cls === 'role-captain')) radialItems.push({ cls: 'pt-cap', text: 'C', title: 'Капітан' });
+      if (isAssistant) radialItems.push({ cls: 'pt-assist', text: 'П', title: 'Помічник' });
+      if (isPresident) radialItems.push({ cls: 'pt-pres', text: 'ПР', title: 'Президент' });
       if (isInjured) radialItems.push({ cls: 'pt-inj', text: '✚', title: 'Травмований' });
       else if (isRehab) radialItems.push({ cls: 'pt-rehab', text: '↻', title: 'Відновлення' });
       else if (isReserve) radialItems.push({ cls: 'pt-res', text: 'R', title: 'Резерв' });
@@ -2211,10 +2213,12 @@ const BoardEngine = {
       const titleName = (nameText || ('#' + (o.number || ''))) + (posCode ? ' · ' + posCode : '');
       const titleExtra = (readiness != null ? ` · готовність ${readiness}%` : '')
         + (isCaptain ? ' · КАПІТАН' : '')
+        + (isAssistant ? ' · ПОМІЧНИК' : '')
+        + (isPresident ? ' · ПРЕЗИДЕНТ' : '')
         + (isInjured ? ' · ТРАВМА' : '')
         + (isRehab ? ' · ВІДНОВЛЕННЯ' : '')
         + (isReserve ? ' · резерв' : '');
-      const extraCls = (isInjured ? ' injured' : '') + (isRehab ? ' rehab' : '') + (isReserve ? ' reserve' : '') + (isCaptain ? ' captain' : '');
+      const extraCls = (isInjured ? ' injured' : '') + (isRehab ? ' rehab' : '') + (isReserve ? ' reserve' : '') + (isCaptain ? ' captain' : '') + (isAssistant ? ' assistant' : '') + (isPresident ? ' president' : '');
       const readyAttr = readiness != null ? ` data-ready="${Math.round(readiness)}"` : '';
       // Ідентично лавці: wrap 40px + ring SVG + avatar 28px
       const loadPct = loadNum != null && !isNaN(loadNum)
@@ -2603,7 +2607,7 @@ const BoardEngine = {
         <button type="button" class="tb" data-action="zoom-out" title="${typeof t==='function'?t('board_zoom_out','Зменшити'):'Зменшити'}">−</button>
         <button type="button" class="tb" data-action="zoom-fit" title="${typeof t==='function'?t('board_zoom_fit','Вписати поле'):'Вписати поле'}">⊡</button>
         <button type="button" class="tb" data-action="zoom-in" title="${typeof t==='function'?t('board_zoom_in','Збільшити'):'Збільшити'}">+</button>
-        <button class="tb" data-action="toggle-present" title="${typeof t==='function'?t('board_present','Режим показу'):'Режим показу'}">▶ ${typeof t==='function'?t('board_present','Показ'):'Показ'}</button>
+        <button class="tb tb-icon" data-action="toggle-present" title="Режим показу">▶</button>
         <span class="btb-spacer"></span>
         <button class="tb" data-action="board-undo" title="${typeof t==='function'?t('board_undo','Скасувати'):'Скасувати'}">↩</button>
         <button class="tb" data-action="board-redo" title="${typeof t==='function'?t('board_redo','Повторити'):'Повторити'}">↪</button>

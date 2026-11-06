@@ -902,9 +902,11 @@ const Actions = {
     const players = (Store.get().players || []).slice().sort((a, b) => (a.number || 0) - (b.number || 0));
     const rows = players.map(p => {
       const a = t.attendance[p.id] || {};
-      const present = a.present !== false; // default present
       const hasRecord = t.attendance[p.id] != null;
-      const checked = hasRecord ? !!a.present : true;
+      const mark = (typeof PlayerProgress !== 'undefined' && PlayerProgress.attendanceMark)
+        ? PlayerProgress.attendanceMark(hasRecord ? a : null)
+        : (a.present === false || a.present === 0 ? false : (a.present === true ? true : null));
+      const checked = hasRecord ? mark === true : true;
       const stamp = a.claimed && a.present !== true ? ' · печатка' : '';
       const intv = a.intensity != null ? a.intensity : (t.intensity || 6);
       return `<div class="att-row" data-pid="${p.id}">
@@ -915,7 +917,7 @@ const Actions = {
     }).join('');
     const coachPresent = t.coachPresent !== false;
     Modal.open('Відвідування · ' + sanitize(t.name), `
-      <p class="note-sm">Позначте присутніх і RPE (1–10). <strong>Рядок «Тренер»</strong> — ваша особиста відмітка (присутній / пропуск).</p>
+      <p class="note-sm">Позначте присутніх і RPE (1–10). Пропуск тренера не скасовує явку гравців: сесію з помічником теж зараховуємо.</p>
       <div class="att-coach-row">
         <label><input type="checkbox" id="attCoachPresent" ${coachPresent ? 'checked' : ''}> ★ Тренер на тренуванні</label>
         <p class="note-sm" style="margin:6px 0 0">Зніміть галочку = пропуск тренера (впливає на % відвідування на золотій картці).</p>

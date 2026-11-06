@@ -99,6 +99,34 @@ describe('z50 club rules', () => {
     assert.equal(streaked.xpStreak, 30);
   });
 
+  it('counts 5/11 when the coach was away and shows it ahead of gifts', () => {
+    const ctx = boot();
+    ctx.sanitize = (v) => String(v == null ? '' : v);
+    ctx.__store.players[1].isCaptain = false;
+    ctx.__store.settings.staff = { assistants: ['p2'], captainId: 'p1', presidentId: 'p1' };
+    ctx.__store.gifts.push({ playerId: 'p2', label: 'Вогонь', createdAt: '2026-11-06' });
+    ctx.__store.trainings.push({
+      id: 'nov5b', status: 'done', date: '2026-11-05', name: 'Тренування 5/11',
+      coachPresent: false,
+      attendance: { p2: { rpe: 7 }, p1: { claimed: true } }
+    });
+    const stats = ctx.PlayerProgress.compute('p2');
+    assert.equal(stats.present, 2);
+    assert.equal(ctx.PlayerProgress.attendanceMark({ claimed: true }), null);
+    assert.equal(ctx.PlayerProgress.attendanceMark({ present: false }), false);
+    const html = ctx.Views._accountProgress('p2');
+    const sessionAt = html.indexOf('Тренування 5/11');
+    const giftAt = html.indexOf('Вогонь');
+    assert.ok(sessionAt >= 0, '5/11 missing from the account');
+    assert.ok(html.includes('без тренера'));
+    assert.ok(giftAt < 0 || sessionAt < giftAt);
+    const posts = ctx.Views.appointments(ctx.__store.players[1]).map(a => a.short).join(',');
+    const captain = ctx.Views.appointments({ id: 'p1', isCaptain: true }).map(a => a.short).join(',');
+    assert.equal(posts, 'П');
+    assert.ok(captain.includes('C') && captain.includes('ПР'));
+    assert.equal(ctx.Views.appointments({ id: 'p3' }).length, 0);
+  });
+
   it('scheme thumbnail draws every arrow and every opponent', () => {
     const ctx = boot();
     const objects = [];

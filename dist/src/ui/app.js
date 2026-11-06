@@ -483,7 +483,7 @@ const App = {
       const att = t.attendance || {};
       Object.keys(att).forEach(pid => {
         attTotal++;
-        if (att[pid] && att[pid].present !== false) attPresent++;
+        if (att[pid] && typeof PlayerProgress !== 'undefined' && PlayerProgress.attendanceMark(att[pid]) === true) attPresent++;
       });
     });
     const attPct = (typeof CoachTools !== 'undefined' && CoachTools.coachAttendanceRate) ? CoachTools.coachAttendanceRate() : 100;
@@ -832,7 +832,7 @@ const App = {
     if (build) {
       const letter = (typeof Views !== 'undefined' && Views.versionLetter) ? Views.versionLetter() : 'А';
       const when = (typeof Views !== 'undefined' && Views.APP_UPDATED) || '06.11.2026';
-      build.textContent = letter + ' ~ ' + when;
+      build.textContent = letter + ' + ' + when;
     }
     const parts = (s.clubName || 'МЕТАЛІСТ ШТУТТГАРТ').split(' ');
     const cn = document.getElementById('clubName');
@@ -1773,7 +1773,7 @@ const App = {
       const att = t.attendance || {};
       Object.keys(att).forEach(pid => {
         attTotal++;
-        if (att[pid] && att[pid].present !== false) attPresent++;
+        if (att[pid] && typeof PlayerProgress !== 'undefined' && PlayerProgress.attendanceMark(att[pid]) === true) attPresent++;
         if (att[pid] && att[pid].rpe != null) { avgRpe += +att[pid].rpe; rpeN++; }
       });
       if (rpeN) avgRpe = Math.round((avgRpe / rpeN) * 10) / 10;

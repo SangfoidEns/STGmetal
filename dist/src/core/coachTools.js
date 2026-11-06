@@ -1045,6 +1045,19 @@ const PlayerProgress = {
     streakBonus: { 3: 30, 5: 50, 8: 80 }
   },
 
+  /** true / false / null. Пропуск тренера сюди не входить. Печатка «Я тут» сама не є явкою. */
+  attendanceMark(att) {
+    if (att === true || att === 1 || att === '1' || att === 'yes') return true;
+    if (att === false || att === 0 || att === '0' || att === 'no') return false;
+    if (!att || typeof att !== 'object') return null;
+    if (att.present === true || att.present === 1 || att.attended === true || att.status === 'present' || att.status === 'ok') return true;
+    if (att.present === false || att.present === 0 || att.attended === false || att.status === 'absent' || att.status === 'missed') return false;
+    if (att.claimed && att.present == null && att.rpe == null && att.intensity == null && att.attended == null) return null;
+    if (att.present === 'true' || att.present === 'yes' || att.present === '1') return true;
+    if (att.rpe != null || att.intensity != null) return true;
+    return true;
+  },
+
   /** Проведена сесія, або минула, де тренер уже поставив явку. Чернетка теж рахується. */
   sessionCounts(t) {
     if (!t) return false;
@@ -1084,27 +1097,28 @@ const PlayerProgress = {
     const history = [];
     trainings.forEach(t => {
       const att = (t.attendance || {})[playerId];
-      if (!att) return;
+      const mark = this.attendanceMark(att);
+      if (mark == null) return;
       sessions++;
-      const was = att.present === true;
-      if (was) {
+      const withoutCoach = t.coachPresent === false;
+      if (mark === true) {
         present++;
         let gain = this.RULES.present;
-        const rpe = att.rpe != null ? +att.rpe : (att.intensity != null ? +att.intensity : 0);
+        const rpe = att && att.rpe != null ? +att.rpe : (att && att.intensity != null ? +att.intensity : 0);
         if (rpe > 0) gain += Math.min(this.RULES.intensityBonusMax, Math.round(rpe * 1.2));
         xp += gain;
-        history.push({ date: t.date, name: t.name, delta: gain, kind: 'present' });
-      } else if (att.present === false || att.present === 0) {
+        history.push({ date: t.date, name: t.name, delta: gain, kind: 'present', withoutCoach: withoutCoach });
+      } else {
         absent++;
         xp += this.RULES.absent;
-        history.push({ date: t.date, name: t.name, delta: this.RULES.absent, kind: 'absent' });
+        history.push({ date: t.date, name: t.name, delta: this.RULES.absent, kind: 'absent', withoutCoach: withoutCoach });
       }
     });
     let xpAttend = 0;
     let xpIntensity = 0;
     trainings.forEach(t => {
       const att = (t.attendance || {})[playerId];
-      if (!att || att.present !== true) return;
+      if (this.attendanceMark(att) !== true) return;
       xpAttend += this.RULES.present;
       const rpe = att.rpe != null ? +att.rpe : (att.intensity != null ? +att.intensity : 0);
       if (rpe > 0) xpIntensity += Math.min(this.RULES.intensityBonusMax, Math.round(rpe * 1.2));
@@ -1117,10 +1131,10 @@ const PlayerProgress = {
     const doneDesc = trainings.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
     let streak = 0;
     for (let i = 0; i < doneDesc.length; i++) {
-      const att = (doneDesc[i].attendance || {})[playerId];
-      if (!att || att.present == null) continue;
-      if (att.present === false || att.present === 0) break;
-      if (att.present === true) streak++;
+      const mark = this.attendanceMark((doneDesc[i].attendance || {})[playerId]);
+      if (mark == null) continue;
+      if (mark === false) break;
+      streak++;
     }
     const xpStreak = this.streakBonusXp(streak);
     if (xpStreak) {
