@@ -12,9 +12,42 @@ const StorageManager = {
     }
     // Фонова синхронізація з Telegram Cloud Storage і спільним JSON клубу
     setTimeout(() => {
-      this.syncFromCloud().catch(() => {});
+      if (!this._staticClubOnly()) this.syncFromCloud().catch(() => {});
       this.bootstrapClubSync().catch(() => {});
     }, 400);
+  },
+
+  /** У Telegram сесія живе в localStorage. Порожній кеш — ще не було збереження. */
+  _sessionIsCached() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      const data = JSON.parse(raw);
+      return !!(data && typeof data === 'object' && (data.schemaVersion || data.players || data.trainings || data.settings));
+    } catch (_) { return false; }
+  },
+
+  _writeLocalPayload(payload) {
+    const text = JSON.stringify(payload);
+    try {
+      localStorage.setItem(STORAGE_KEY, text);
+      return true;
+    } catch (err) {
+      const slim = JSON.parse(text);
+      const keepUrl = (url) => (typeof url === 'string' && url.indexOf('data:') === 0) ? '' : (url || '');
+      (slim.players || []).forEach(p => {
+        if (!p) return;
+        ['photo', 'photoUrl', 'profilePhoto', 'telegramPhotoUrl'].forEach(key => {
+          if (p[key]) p[key] = keepUrl(p[key]);
+        });
+      });
+      if (slim.settings) {
+        slim.settings.coachPhoto = keepUrl(slim.settings.coachPhoto);
+        slim.settings.coachPhotoUrl = keepUrl(slim.settings.coachPhotoUrl);
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(slim));
+      return true;
+    }
   },
 
   _isCoachWriter() {
@@ -180,7 +213,7 @@ const StorageManager = {
       const cur = Store.get();
       if (cur) cur.updatedAt = remote.updatedAt;
       const payload = this._buildLocalPayload();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      this._writeLocalPayload(payload);
     } finally {
       this._suppressClubPush = false;
     }
@@ -209,6 +242,7 @@ const StorageManager = {
 
   async pullClub() {
     if (this._holdRemote) return false;
+    if (this._staticClubOnly() && this._sessionIsCached()) return false;
     const remote = await this.fetchClub();
     if (!remote || remote.error || remote.empty || !remote.payload || !remote.updatedAt) return false;
     if (this._clubUpdatedAt && remote.updatedAt === this._clubUpdatedAt) return false;
@@ -238,20 +272,26 @@ const StorageManager = {
   },
 
   async bootstrapClubSync() {
+    if (this._staticClubOnly() && this._sessionIsCached()) {
+      clearTimeout(this._clubPushTimer);
+      if (this._clubPoll) clearInterval(this._clubPoll);
+      this._clubReady = true;
+      this._freshInstall = false;
+      this._setClubSyncLine('Сесія з цього Telegram');
+      return;
+    }
     let remote = null;
     try { remote = await this.fetchClub(); } catch (_) { remote = { error: true }; }
     const offline = !remote || remote.error;
     if (this._staticClubOnly()) {
-      if (!offline && remote.payload && remote.updatedAt) {
+      if (!offline && remote.payload && remote.updatedAt && !this._sessionIsCached()) {
         this.applyClubPayload(remote, { quiet: true });
-        this._setClubSyncLine('Клуб порівняно: новіші зміни без повторів');
+        this._setClubSyncLine('Сесію збережено в цьому Telegram');
       }
       clearTimeout(this._clubPushTimer);
+      if (this._clubPoll) clearInterval(this._clubPoll);
       this._clubReady = true;
       this._freshInstall = false;
-      if (this._clubPoll) clearInterval(this._clubPoll);
-      this._clubPoll = setInterval(() => { this.pullClub().catch(() => {}); }, 20000);
-      this._bindClubWatchers();
       return;
     }
     if (!offline && remote.payload && remote.updatedAt) {
@@ -283,14 +323,14 @@ const StorageManager = {
 
   save(opts) {
     /* DATA INTEGRITY: never wipe keys on error */
-    /* Файл club.json — джерело правди. Автозбереження не зсуває updatedAt, інакше файл виглядає старішим. */
+    /* Кеш Telegram тримає останню сесію. club.json лише для першого запуску. */
     const localOnly = !!(opts && opts.localOnly) || this._staticClubOnly();
     try {
       const s = Store.get();
       if (!s) return;
-      if (!localOnly) s.updatedAt = new Date().toISOString();
+      s.updatedAt = new Date().toISOString();
       const payload = this._buildLocalPayload();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      this._writeLocalPayload(payload);
       if (!localOnly) {
         this._scheduleCloudPush(payload);
         this._clubDirty = true;

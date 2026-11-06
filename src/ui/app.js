@@ -774,7 +774,7 @@ const App = {
     if (build) {
       const letter = (typeof Views !== 'undefined' && Views.versionLetter) ? Views.versionLetter() : 'А';
       const when = (typeof Views !== 'undefined' && Views.APP_UPDATED) || '06.11.2026';
-      build.textContent = letter + ' · ' + when;
+      build.textContent = letter + ' — ' + when;
     }
     const parts = (s.clubName || 'МЕТАЛІСТ ШТУТТГАРТ').split(' ');
     const cn = document.getElementById('clubName');
