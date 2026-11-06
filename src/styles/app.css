@@ -11275,6 +11275,8 @@ body.role-guest .team-chat { display: none !important; }
 .pl-card-av-wrap .pl-card-av {
   overflow: hidden !important;
   font-size: 22px !important;
+  position: relative;
+  z-index: 5;
 }
 .pl-card-av-wrap .cp-avatar-ph,
 .pl-card-av-wrap .pl-card-av span {
@@ -11686,6 +11688,22 @@ body.role-guest .team-chat { display: none !important; }
   font-size: 11px;
   color: var(--muted);
 }
+.player-home,
+.club-public { padding-bottom: 36px; }
+.player-home .coach-public-card { position: relative; z-index: 5; }
+.player-home .next-tr-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+.pps-account img,
+.pps-avatar img,
+.pl-card-av img,
+.cpc-photo img,
+.coach-pub-av img { pointer-events: none; }
 
 /* z43 — топові подарунки не губити символ. filter на плитці ховає емодзі в Telegram */
 .tg-gift-item.rarity-legendary,

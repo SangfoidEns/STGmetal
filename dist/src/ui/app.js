@@ -265,10 +265,6 @@ const App = {
         }
 
         if (imp) {
-          if (typeof AuthManager !== 'undefined' && AuthManager._canWriteClub && !AuthManager._canWriteClub()) {
-            Toast.show('Імпорт лише для тренера', 'warn');
-            return;
-          }
           try {
             StorageManager.pickAndImportJSON();
           } catch (err) {
@@ -415,6 +411,38 @@ const App = {
       a.click();
       a.remove();
     }
+  },
+
+  openPlayerFifa(playerId) {
+    const p = (Store.get().players || []).find(x => String(x.id) === String(playerId));
+    if (!p) {
+      try { Toast.show('Гравця не знайдено', 'warn'); } catch (_) {}
+      return;
+    }
+    try { window.__coachCardPlayerId = p.id; } catch (_) {}
+    try { window.__fifaCompareId = ''; window.__playerCompareId = ''; window.__coachCompareId = ''; } catch (_) {}
+    const st = (typeof Views !== 'undefined' && Views._playerStats) ? Views._playerStats(p.id) : {};
+    let html = '';
+    try {
+      const asCoach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+      html = (asCoach && Views.coachPlayerDetail) ? Views.coachPlayerDetail(p.id) : (Views._fifaCard ? Views._fifaCard(p, st) : '');
+    } catch (err) {
+      console.error('[fifa]', err);
+      try { html = Views._fifaCard ? Views._fifaCard(p, st) : ''; } catch (_) { html = ''; }
+    }
+    if (!html) return;
+    try { TelegramManager.haptic && TelegramManager.haptic('light'); } catch (_) {}
+    Modal.open('Картка гравця · ' + (p.lastName || p.firstName || ''),
+      '<div class="fifa-modal-wrap fifa-modal-anim" data-compare-host="' + p.id + '">' + html + '</div>',
+      [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
+    setTimeout(() => {
+      try {
+        const wrap = document.querySelector('.fifa-modal-wrap');
+        if (wrap) wrap.classList.add('fifa-modal-in');
+        const s2 = document.getElementById('playerCompareSel');
+        if (s2) { s2._msCmpBound = false; App._bindPlayerCompare(); }
+      } catch (_) {}
+    }, 40);
   },
 
   openCoachCard() {
@@ -2054,6 +2082,31 @@ const App = {
   },
 
   bindEvents() {
+    if (!this._cardCaptureBound) {
+      this._cardCaptureBound = true;
+      document.addEventListener('click', (ev) => {
+        const node = ev.target;
+        if (!node || !node.closest) return;
+        const fifa = node.closest('[data-action="open-fifa-card"], .pps-account, button.pps-avatar, button.pl-card-av[data-action="open-fifa-card"]');
+        if (fifa) {
+          const host = fifa.getAttribute('data-player-id') ? fifa : fifa.closest('[data-player-id]');
+          const pid = host && host.getAttribute('data-player-id');
+          if (!pid) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+          try { App.openPlayerFifa(pid); } catch (err) { console.error('[fifa]', err); }
+          return;
+        }
+        if (node.closest('#modal, .coach-card-overlay, [data-action="open-photo"], [data-action="close-coach-card"]')) return;
+        const coach = node.closest('.coach-public-card, .coach-squad-card, [data-coach-card="1"]');
+        if (!coach || node.closest('a.mni, input, select, textarea')) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+        try { App.openCoachCard(); } catch (err) { console.error('[coach-card]', err); }
+      }, true);
+    }
     if (!this._chatCaptureBound) {
       this._chatCaptureBound = true;
       const inChatBox = (e) => {
@@ -2073,6 +2126,7 @@ const App = {
       };
       const onChatCapture = (e) => {
         const t = e.target;
+        if (t && t.closest && t.closest('#modal, .mo, .coach-public-card, .coach-squad-card, .coach-card-overlay, .pps-account, [data-action="open-fifa-card"]')) return;
         const closestOk = t && t.closest && t.closest('#teamChat, #teamChatForm, #teamChatInput, .team-chat, .team-chat-form');
         const inBox = inChatBox(e);
         if (!closestOk && !inBox) {
@@ -2111,7 +2165,7 @@ const App = {
       document.addEventListener('click', function(ev) {
         var el = ev.target.closest && ev.target.closest('[data-action="open-coach-card"],[data-action="coach-easter"],[data-coach-card],.coach-public-card,.coach-pub-row,#coachPublicCard');
         if (!el) return;
-        if (ev.target.closest('input,select,textarea')) return;
+        if (ev.target.closest('input,select,textarea,#modal,.mo,.coach-card-overlay,[data-action="open-photo"],[data-action="open-fifa-card"],[data-action="close-coach-card"],a.mni')) return;
         if (el.getAttribute('data-view') === 'trainings') return;
         ev.preventDefault();
         ev.stopPropagation();
@@ -2877,26 +2931,16 @@ const App = {
         if (e.stopImmediatePropagation) e.stopImmediatePropagation();
         const pid = (t.dataset && t.dataset.playerId) || t.getAttribute('data-player-id');
         if (!pid) return;
-        const p = (Store.get().players || []).find(x => String(x.id) === String(pid));
-        if (!p) { Toast.show('Гравця не знайдено', 'warn'); return; }
-        try { TelegramManager.haptic && TelegramManager.haptic('light'); } catch (_) {}
-        window.__coachCardPlayerId = p.id;
-        // не підставляти compare за замовчуванням
-        try { window.__fifaCompareId = ''; window.__playerCompareId = ''; } catch (_) {}
-        const st = Views._playerStats ? Views._playerStats(p.id) : {};
-        const asCoach = (typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach());
-        const html = (asCoach && Views.coachPlayerDetail) ? Views.coachPlayerDetail(p.id) : Views._fifaCard(p, st);
-        Modal.open('Картка гравця · ' + (p.lastName || p.firstName || ''),
-          '<div class="fifa-modal-wrap fifa-modal-anim" data-compare-host="' + p.id + '">' + html + '</div>',
-          [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
-        setTimeout(() => {
-          try {
-            const wrap = document.querySelector('.fifa-modal-wrap');
-            if (wrap) wrap.classList.add('fifa-modal-in');
-            const s2 = document.getElementById('playerCompareSel');
-            if (s2) { s2._msCmpBound = false; App._bindPlayerCompare(); }
-          } catch (_) {}
-        }, 40);
+        return this.openPlayerFifa(pid);
+      }
+      if (action === 'preview-next-training') {
+        e.preventDefault(); e.stopPropagation();
+        if (e.target.closest('.coach-public-card, .coach-squad-card, [data-coach-card]')) {
+          try { App.openCoachCard(); } catch (_) {}
+          return;
+        }
+        const tid = t.dataset.trainingId || t.getAttribute('data-training-id');
+        if (tid) return this.openNextTrainingPreview(tid);
         return;
       }
       if (action === 'player-compare') {

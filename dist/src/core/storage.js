@@ -1032,7 +1032,7 @@ const StorageManager = {
     inp.accept = '.json,.txt,application/json,text/plain,text/json,*/*';
     inp.setAttribute('aria-hidden', 'true');
     inp.tabIndex = -1;
-    inp.style.cssText = 'position:fixed;left:8px;bottom:8px;width:44px;height:44px;opacity:0.02;z-index:2147483000;border:0;padding:0;margin:0;';
+    inp.style.cssText = 'position:fixed;left:-160px;top:0;width:80px;height:40px;opacity:0;z-index:0;border:0;padding:0;margin:0;';
     document.body.appendChild(inp);
     inp.addEventListener('change', (event) => {
       try {
@@ -1098,16 +1098,28 @@ const StorageManager = {
   },
 
   importJSON(fileOrText) {
-    if (!this._isCoachWriter()) {
-      try { Toast.show('Імпорт лише для тренера', 'warn'); } catch (_) {}
-      return;
-    }
+    const coachWriter = this._isCoachWriter();
     this._holdRemote = true;
     const publishImport = () => {
+      if (!coachWriter) {
+        this._holdRemote = false;
+        return;
+      }
       this._clubDirty = true;
       this._clubReady = true;
       const finish = () => { this._holdRemote = false; };
       this.pushClub({ force: true }).then(finish, finish);
+    };
+    const applyMerged = (payload) => {
+      const current = Store.get() || {};
+      const ui = current.ui;
+      let next = payload;
+      if (typeof ClubMerge !== 'undefined' && ClubMerge.mergePayload) {
+        next = ClubMerge.mergePayload(current, payload);
+      }
+      if (ui) next.ui = Object.assign({}, next.ui || {}, ui);
+      Store.set(next, { keepStamp: true });
+      this.save(coachWriter ? undefined : { localOnly: true });
     };
 
     const applyData = (raw) => {
@@ -1122,7 +1134,6 @@ const StorageManager = {
         if (data.type === 'metalist_full_migration' || data.type === 'metalist_roster_migration') {
           this.createBackup();
           const s = Store.get() || {};
-          const isFull = data.type === 'metalist_full_migration' || data.players && data.boards;
 
           const mergeById = (localArr, remoteArr, idKey) => {
             idKey = idKey || 'id';
@@ -1140,36 +1151,38 @@ const StorageManager = {
             return Object.keys(map).map(k => map[k]);
           };
 
-          s.players = mergeById(s.players, data.players);
-          s.trainings = mergeById(s.trainings, data.trainings);
-          if (data.matches) s.matches = mergeById(s.matches, data.matches);
-          if (data.boards) s.boards = mergeById(s.boards, data.boards);
-          if (data.schemes) s.schemes = mergeById(s.schemes, data.schemes);
-          if (data.diary) s.diary = mergeById(s.diary, data.diary);
-          if (data.gifts) s.gifts = mergeById(s.gifts, data.gifts);
-          if (data.exercises) s.exercises = mergeById(s.exercises, data.exercises);
-          if (data.myExercises) s.myExercises = mergeById(s.myExercises, data.myExercises);
-          if (data.animations) s.animations = mergeById(s.animations, data.animations);
-          if (data.media) s.media = mergeById(s.media, data.media);
-          if (data.activeBoard && data.activeBoard.objects) {
-            // не затираємо поточну роботу на дошці, якщо локально вже є об'єкти
-            if (!s.activeBoard || !(s.activeBoard.objects || []).length) {
-              s.activeBoard = data.activeBoard;
+          let packed = s;
+          if (typeof ClubMerge !== 'undefined' && ClubMerge.mergePayload) {
+            packed = ClubMerge.mergePayload(s, data);
+          } else {
+            packed.players = mergeById(s.players, data.players);
+            packed.trainings = mergeById(s.trainings, data.trainings);
+            if (data.matches) packed.matches = mergeById(s.matches, data.matches);
+            if (data.boards) packed.boards = mergeById(s.boards, data.boards);
+            if (data.schemes) packed.schemes = mergeById(s.schemes, data.schemes);
+            if (data.diary) packed.diary = mergeById(s.diary, data.diary);
+            if (data.gifts) packed.gifts = mergeById(s.gifts, data.gifts);
+            if (data.exercises) packed.exercises = mergeById(s.exercises, data.exercises);
+            if (data.myExercises) packed.myExercises = mergeById(s.myExercises, data.myExercises);
+            if (data.animations) packed.animations = mergeById(s.animations, data.animations);
+            if (data.media) packed.media = mergeById(s.media, data.media);
+            if (data.settings && typeof data.settings === 'object') {
+              packed.settings = Object.assign({}, s.settings || {}, data.settings);
             }
           }
-          if (data.settings && typeof data.settings === 'object') {
-            s.settings = Object.assign({}, s.settings || {}, data.settings);
+          if (data.activeBoard && data.activeBoard.objects) {
+            if (!packed.activeBoard || !(packed.activeBoard.objects || []).length) {
+              packed.activeBoard = data.activeBoard;
+            }
           }
-          if (data.coachStats) s.coachStats = Object.assign({}, s.coachStats || {}, data.coachStats);
-          if (data.club && s.settings) s.settings.clubName = s.settings.clubName || data.club;
+          if (data.club && packed.settings) packed.settings.clubName = packed.settings.clubName || data.club;
 
           try {
             localStorage.setItem('metalist_full_migration', JSON.stringify(data));
             localStorage.setItem('metalist_roster_migration', JSON.stringify(data));
           } catch (_) {}
 
-          Store.set(s);
-          this.save();
+          applyMerged(packed);
           try { if (typeof AuthManager !== 'undefined') AuthManager.afterDataImport(); } catch (_) {}
           try { if (typeof CoachTools !== 'undefined' && CoachTools.loadCustomArtifacts) CoachTools.loadCustomArtifacts(); } catch (_) {}
           try { App.applyBranding && App.applyBranding(); } catch (_) {}
@@ -1197,8 +1210,7 @@ const StorageManager = {
         }
         this.createBackup();
         const migrated = this.migrate(data, data.schemaVersion || 1);
-        Store.set(migrated);
-        this.save();
+        applyMerged(migrated);
         // Telegram CloudStorage (якщо є)
         try {
           if (typeof TelegramManager !== 'undefined' && TelegramManager.tg && TelegramManager.tg.CloudStorage) {
@@ -1225,7 +1237,7 @@ const StorageManager = {
             }
           }
         } catch (_) {}
-        Toast.show('Імпорт успішний' + roleMsg, 'ok');
+        Toast.show((coachWriter ? 'Імпорт успішний' : 'Імпорт на цьому телефоні') + roleMsg, 'ok');
         return true;
       } catch (e) {
         try { ErrorManager.log('import', e); } catch (_) {}

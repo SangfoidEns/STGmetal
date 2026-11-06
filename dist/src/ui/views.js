@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z48',
+  APP_BUILD: 'z49',
   APP_UPDATED: '06.11.2026',
 
   _buildLine() {
@@ -720,7 +720,7 @@ const Views = {
     const pat = this._playerPatternStyle ? this._playerPatternStyle(p) : '';
     return '<div class="player-profile-sheet home-pattern profile-tinted" style="' + pat + '--sheet-bg:' + (gs.bg || acc.bg) + ';border-color:' + (gs.ring || acc.ring) + '">' +
       '<button type="button" class="pps-account" data-action="open-fifa-card" data-player-id="' + p.id + '">' +
-      '<span class="pps-avatar" style="border-color:' + (gs.ring || acc.ring) + ';background:' + (gs.bg || acc.bg) + '">' + ph + '</span>' +
+      '<span class="pps-avatar" data-action="open-fifa-card" data-player-id="' + p.id + '" style="border-color:' + (gs.ring || acc.ring) + ';background:' + (gs.bg || acc.bg) + '">' + ph + '</span>' +
       '<span class="pps-name">#' + (p.number||'—') + ' ' + sanitize(name) + ' ' + badge + '</span>' +
       '<span class="pps-meta">' + sanitize(p.position||'') + ' · LVL ' + lvl + ' · ' + xp + ' XP</span>' +
       '<span class="pps-tap-hint">Тап — картка гравця</span>' +
@@ -1133,17 +1133,17 @@ const Views = {
         <div class="sb">${sanitize(nextMatch.date || '')}${nextMatch.time ? ' · ' + sanitize(nextMatch.time) : ''}${nextMatch.competition ? ' · ' + sanitize(nextMatch.competition) : ''}</div>
       </div>` : ''}
 
-      <div class="card glass next-tr-card"${next ? ` data-next-training="${next.id}"` : ''}>
-        <div class="ct">Наступне тренування</div>
-        ${next ? `
-          <div class="vl">${sanitize(next.name)}</div>
-          <div class="next-tr-metrics">
-            <span>${sanitize(next.date || '')}${next.time ? ' · ' + sanitize(next.time) : ''}</span>
-            <span>${next.duration || 0} хв</span>
-            <span>Load ${nextLoad || '—'}</span>
-            <span>~+${nextXp} XP</span>
-          </div>` : '<div class="note-sm">Немає запланованого тренування</div>'}
-      </div>
+      ${next
+        ? ('<button type="button" class="card glass next-tr-card" data-action="preview-next-training" data-training-id="' + next.id + '">' +
+          '<div class="ct">Наступне тренування</div>' +
+          '<div class="vl">' + sanitize(next.name) + '</div>' +
+          '<div class="next-tr-metrics">' +
+            '<span>' + sanitize(next.date || '') + (next.time ? ' · ' + sanitize(next.time) : '') + '</span>' +
+            '<span>' + (next.duration || 0) + ' хв</span>' +
+            '<span>Load ' + (nextLoad || '—') + '</span>' +
+            '<span>~+' + nextXp + ' XP</span>' +
+          '</div></button>')
+        : '<div class="card glass next-tr-card"><div class="ct">Наступне тренування</div><div class="note-sm">Немає запланованого тренування</div></div>'}
 
       ${me ? this._myStatsCharts(me, Object.assign({}, stats, { xp: prog.xp, level: prog.level })) : ''}
 
@@ -1305,7 +1305,8 @@ const Views = {
         '<button type="button" class="club-crest-btn" data-action="open-photo" data-photo="assets/metalist-crest.png" data-photo-save="1" data-photo-name="Metalist-Shtuttgart.png" title="Емблема на весь екран">' +
         '<img class="club-crest" src="assets/metalist-crest.png" alt="Емблема Металіст Штуттгарт"/></button>' +
         '<div class="club-hero-copy"><div class="club-kicker">Одна команда</div><h1>Металіст Штуттгарт</h1>' +
-        '<p>Гість бачить активність, ріст акаунтів і медіа клубу. Тап по емблемі відкриває її на весь екран — її можна зберегти.</p></div></div>' +
+        '<p>Гість бачить активність, ріст акаунтів і медіа клубу. Тап по емблемі відкриває її на весь екран — її можна зберегти.</p>' +
+        '<button type="button" class="btn btn-s btn-sm" data-io="import" data-action="import-trigger">Імпорт JSON</button></div></div>' +
       '<div class="club-kpis">' +
         '<div><b>' + players.length + '</b><span>гравців</span></div>' +
         '<div><b>' + done.length + '</b><span>сесій</span></div>' +
@@ -1549,7 +1550,7 @@ trainings() {
     const badge = this._giftStatusBadge(mine);
     return '<div class="pl-card glass pl-card-tint pl-acc home-pattern" data-player-id="' + p.id + '" data-action="open-player-card" role="button" tabindex="0" style="' + this._accAttr(p) + ';' + this._playerPatternStyle(p) + '">' +
       '<div class="pl-card-av-wrap">' + (photo
-        ? ('<button type="button" class="pl-card-av" data-action="open-player-card" data-player-id="' + p.id + '">' + ph + '</button>')
+        ? ('<button type="button" class="pl-card-av" data-action="open-fifa-card" data-player-id="' + p.id + '">' + ph + '</button>')
         : ('<div class="pl-card-av">' + ph + '</div>')) +
       cloud + '</div>' +
       '<div class="pl-card-body"><div class="pl-card-name"><span class="pl-card-name-txt">#' + (p.number || '—') + ' ' + sanitize(name) + '</span>' + badge + '</div>' +
