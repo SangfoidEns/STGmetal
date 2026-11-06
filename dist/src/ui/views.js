@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z49',
+  APP_BUILD: 'z50',
   APP_UPDATED: '06.11.2026',
 
   _buildLine() {
@@ -461,7 +461,7 @@ const Views = {
           <div class="coach-xp-head"><span>Досвід тренера</span><b>LVL ${coachXp.level}</b></div>
           <div class="soc-xp-bar"><div class="soc-xp-fill" style="width:${coachXp.levelProgress}%"></div></div>
           <div class="soc-xp-sub">${coachXp.xp} XP · до LVL ${coachXp.level + 1}: ${coachXp.xpToNext}</div>
-          <div class="coach-xp-meta">Тренування ${coachXp.xpTrain} XP · прокачка команди ${coachXp.xpTeam} XP · подарунки ${coachXp.xpGifts} XP</div>
+          <div class="coach-xp-meta">Рівень як середній по складу · ${coachXp.players || 0} гравців · сер. LVL ${coachXp.avgLevel || coachXp.level}</div>
           <div class="coach-grow-title">Ріст команди</div>
           <div class="coach-grow-sub">${coachXp.sessions} сесій · середня явка ${coachXp.avgAtt}% · XP гравців ${coachXp.teamXp}</div>
           <div class="cp-stat-spark">${this._sparkline(coachXp.attSeries, { color: '#e8c547', fill: 'rgba(232,197,71,.16)' })}</div>
@@ -968,14 +968,14 @@ const Views = {
     if (!me) return '';
     const s = Store.get();
     const past = (s.trainings || []).filter(t => {
-      if (t.status === 'cancelled') return false;
-      if (t.status === 'done') return true;
-      try { return t.date && t.date < today(); } catch (_) { return false; }
+      if (typeof LoadModel !== 'undefined' && LoadModel.isCancelled && LoadModel.isCancelled(t)) return false;
+      if (t.status === 'cancelled' || t.status === 'canceled') return false;
+      return t.status === 'done';
     }).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     const last12 = past.slice(-12);
     const attSeries = last12.map(t => {
       const a = t.attendance && t.attendance[me.id];
-      if (!a) return 0;
+      if (!a) return null;
       return a.present === false ? 0 : 1;
     });
     const rpeSeries = last12.map(t => {
@@ -989,7 +989,7 @@ const Views = {
       const x = pad + i * barW;
       const h = v ? (H - pad * 2) * 0.85 : 4;
       const y = H - pad - h;
-      const fill = v ? '#2ecc71' : '#e74c3c55';
+      const fill = v == null ? '#ffffff22' : (v ? '#2ecc71' : '#e74c3c');
       return `<rect x="${x + 1}" y="${y}" width="${Math.max(2, barW - 2)}" height="${h}" rx="2" fill="${fill}"/>`;
     }).join('');
     const rpePts = rpeSeries.map((v, i) => {
@@ -1001,8 +1001,9 @@ const Views = {
     const poly = rpePts.length > 1
       ? `<polyline fill="none" stroke="#e8c547" stroke-width="2" points="${rpePts.join(' ')}"/>`
       : '';
-    const presentCnt = attSeries.filter(Boolean).length;
-    const totalCnt = attSeries.length;
+    const marked = attSeries.filter(v => v != null);
+    const presentCnt = marked.filter(Boolean).length;
+    const totalCnt = marked.length;
     const attPct = totalCnt ? Math.round(presentCnt / totalCnt * 100) : (stats && stats.attPct) || 0;
 
     return `
@@ -1030,7 +1031,10 @@ const Views = {
       const LM = (typeof LoadModel !== 'undefined') ? LoadModel : null;
       let cancelled = 0, present = 0, absent = 0;
       (s.trainings || []).forEach(t => {
-        if (t.status === 'cancelled' || t.status === 'canceled') { cancelled++; return; }
+        const off = (typeof LoadModel !== 'undefined' && LoadModel.isCancelled && LoadModel.isCancelled(t))
+          || t.status === 'cancelled' || t.status === 'canceled';
+        if (off) { cancelled++; return; }
+        if (t.status !== 'done') return;
         const a = t.attendance && t.attendance[playerId];
         if (!a) return;
         if (a.present === false) absent++; else present++;
@@ -1151,15 +1155,18 @@ const Views = {
         <div class="ct">${t('recent_trainings')}</div>
         <div class="player-tr-list">${pastTr.length ? pastTr.map(tr => {
           const a = me && tr.attendance && tr.attendance[me.id];
-          const cancelled = tr.status === 'cancelled' || tr.status === 'canceled';
-          const present = a ? (a.present !== false) : null;
+          const cancelled = (typeof LoadModel !== 'undefined' && LoadModel.isCancelled && LoadModel.isCancelled(tr))
+            || tr.status === 'cancelled' || tr.status === 'canceled';
+          const held = !cancelled && tr.status === 'done';
+          const present = (held && a) ? (a.present !== false) : null;
           const cls = cancelled ? 'ptr-cancel' : (present === true ? 'ptr-ok' : (present === false ? 'ptr-miss' : 'ptr-na'));
-          const badge = cancelled ? '⊘' : (present === true ? '✓' : (present === false ? '✗' : '—'));
-          const rpe = a && a.rpe != null ? ('RPE ' + a.rpe) : '';
+          const badge = cancelled ? 'скас.' : (present === true ? '✓' : (present === false ? '✗' : '—'));
+          const rpe = held && a && a.rpe != null ? ('RPE ' + a.rpe) : '';
+          const note = cancelled ? ' · скасовано, не пропуск' : (!held ? ' · не відбулось' : '');
           return '<div class="player-tr-row ' + cls + '">' +
             '<span class="ptr-badge">' + badge + '</span>' +
             '<span class="ptr-name">' + sanitize(tr.name || 'Тренування') + '</span>' +
-            '<span class="ptr-meta">' + sanitize(tr.date || '') + ' ' + rpe + '</span></div>';
+            '<span class="ptr-meta">' + sanitize(tr.date || '') + ' ' + rpe + note + '</span></div>';
         }).join('') : '<p class="note-sm">Немає даних. Імпортуйте JSON від тренера.</p>'}</div>
       </div>
       ${this._coachPublicCard()}
@@ -1325,51 +1332,76 @@ const Views = {
   },
 
 
-  /** Мініатюра схеми (SVG) з об'єктів дошки */
+  /** Мініатюра схеми (SVG) з усіх об'єктів дошки, включно зі стрілками і суперником. */
   _schemeThumbSvg(board) {
     try {
       const objs = (board && board.objects) || [];
       const W = 100, H = 160;
-      let svg = '<svg class="scheme-thumb-svg" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
+      const paths = { arrow: 1, arrowDash: 1, pass: 1, run: 1, dribble: 1, press: 1, shot: 1, movement: 1 };
+      const norm = (v) => {
+        let n = +v;
+        if (!isFinite(n)) return 0.5;
+        if (n > 1.5) n = n > 100 ? n / 800 : n / 100;
+        return Math.max(0.02, Math.min(0.98, n));
+      };
+      const hex = (c, fb) => (/^#[0-9a-fA-F]{3,8}$/.test(String(c || '')) ? String(c) : fb);
+      const isOpp = (o) => o && (o.type === 'opponent' || o.team === 'opp' || o.isOpponent);
+      let svg = '<svg class="scheme-thumb-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
       svg += '<rect width="' + W + '" height="' + H + '" rx="10" fill="#166534"/>';
       svg += '<rect x="5" y="5" width="' + (W - 10) + '" height="' + (H - 10) + '" rx="4" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.2"/>';
       svg += '<line x1="5" y1="' + (H / 2) + '" x2="' + (W - 5) + '" y2="' + (H / 2) + '" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>';
       svg += '<circle cx="' + (W / 2) + '" cy="' + (H / 2) + '" r="14" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>';
       svg += '<rect x="' + (W * 0.2) + '" y="5" width="' + (W * 0.6) + '" height="22" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1"/>';
       svg += '<rect x="' + (W * 0.2) + '" y="' + (H - 27) + '" width="' + (W * 0.6) + '" height="22" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1"/>';
-      const norm = (v, axis) => {
-        let n = +v;
-        if (!isFinite(n)) return 0.5;
-        if (n > 1.5) {
-          if (n > 100) n = axis === 'x' ? n / 800 : n / 520;
-          else n = n / 100;
-        }
-        return Math.max(0.03, Math.min(0.97, n));
-      };
-      const pts = objs.filter(o => o && (o.x != null || o.nx != null)).slice(0, 30);
-      pts.forEach(o => {
-        let x = norm(o.nx != null ? o.nx : o.x, 'x');
-        let y = norm(o.ny != null ? o.ny : o.y, 'y');
-        const px = x * W, py = y * H;
+      const draw = objs.filter(o => o && o.visible !== false);
+      draw.forEach(o => {
+        const typ = String(o.type || o.kind || '');
+        if (typ !== 'zone') return;
+        const x = norm(o.nx != null ? o.nx : o.x) * W;
+        const y = norm(o.ny != null ? o.ny : o.y) * H;
+        const w = Math.max(2, norm(o.w || 0.08) * W);
+        const h = Math.max(2, norm(o.h || 0.08) * H);
+        svg += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" fill="rgba(200,168,75,0.28)" stroke="#e8c547" stroke-width="0.6"/>';
+      });
+      draw.forEach(o => {
+        const typ = String(o.type || o.kind || '');
+        if (!paths[typ] || o.x2 == null && o.nx2 == null) return;
+        const x1 = norm(o.nx != null ? o.nx : o.x) * W;
+        const y1 = norm(o.ny != null ? o.ny : o.y) * H;
+        const x2 = norm(o.nx2 != null ? o.nx2 : o.x2) * W;
+        const y2 = norm(o.ny2 != null ? o.ny2 : o.y2) * H;
+        const col = hex(o.color, typ === 'shot' ? '#e67e22' : (typ === 'press' ? '#e74c3c' : '#f5c542'));
+        const dash = (typ === 'run' || typ === 'arrowDash' || typ === 'dribble') ? ' stroke-dasharray="2.2 1.4"' : '';
+        svg += '<line x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) + '" x2="' + x2.toFixed(1) + '" y2="' + y2.toFixed(1) + '" stroke="' + col + '" stroke-width="1.35"' + dash + '/>';
+        const ang = Math.atan2(y2 - y1, x2 - x1);
+        const ah = 3.2;
+        const ax = x2 - Math.cos(ang) * 0.4;
+        const ay = y2 - Math.sin(ang) * 0.4;
+        const p1 = (ax - Math.cos(ang - 0.45) * ah).toFixed(1) + ',' + (ay - Math.sin(ang - 0.45) * ah).toFixed(1);
+        const p2 = (ax - Math.cos(ang + 0.45) * ah).toFixed(1) + ',' + (ay - Math.sin(ang + 0.45) * ah).toFixed(1);
+        svg += '<polygon points="' + ax.toFixed(1) + ',' + ay.toFixed(1) + ' ' + p1 + ' ' + p2 + '" fill="' + col + '"/>';
+      });
+      let chips = 0;
+      draw.forEach(o => {
         const typ = String(o.type || o.kind || 'player');
+        if (paths[typ] || typ === 'zone' || typ === 'text') return;
+        if (o.x == null && o.nx == null) return;
+        const px = norm(o.nx != null ? o.nx : o.x) * W;
+        const py = norm(o.ny != null ? o.ny : o.y) * H;
+        chips++;
         if (typ === 'ball') {
-          svg += '<circle cx="' + px.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="3" fill="#fff"/>';
-        } else if (typ === 'opponent') {
-          svg += '<circle cx="' + px.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="4.2" fill="#e74c3c" stroke="#fff" stroke-width="0.6"/>';
-        } else if (typ === 'arrow' || typ === 'pass' || typ === 'run' || typ === 'movement') {
-          let ax = o.nx2 != null ? o.nx2 : (o.x2 != null ? o.x2 : x + 0.06);
-          let ay = o.ny2 != null ? o.ny2 : (o.y2 != null ? o.y2 : y + 0.08);
-          ax = norm(ax, 'x'); ay = norm(ay, 'y');
-          svg += '<line x1="' + px.toFixed(1) + '" y1="' + py.toFixed(1) + '" x2="' + (ax * W).toFixed(1) + '" y2="' + (ay * H).toFixed(1) + '" stroke="#f5c542" stroke-width="1.5"/>';
-        } else {
-          const col = (o.team === 'opp' || o.isOpponent) ? '#e74c3c' : (o.color || '#3d7eff');
-          svg += '<circle cx="' + px.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="5" fill="' + col + '" stroke="rgba(255,255,255,0.75)" stroke-width="0.8"/>';
-          if (o.number != null) {
-            svg += '<text x="' + px.toFixed(1) + '" y="' + (py + 1.6).toFixed(1) + '" text-anchor="middle" fill="#fff" font-size="5.5" font-weight="700">' + String(o.number).slice(0, 2) + '</text>';
-          }
+          svg += '<circle cx="' + px.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="2.6" fill="#fff"/>';
+          return;
+        }
+        const opp = isOpp(o);
+        const col = opp ? '#e74c3c' : hex(o.chipColor || o.color, '#3d7eff');
+        const r = (typ === 'chipLarge' || typ === 'opponent') ? 4.4 : 3.6;
+        svg += '<circle cx="' + px.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="' + r + '" fill="' + col + '" stroke="' + (opp ? '#fff' : 'rgba(255,255,255,0.75)') + '" stroke-width="0.7"/>';
+        if (o.number != null && typ !== 'cone' && typ !== 'wall') {
+          svg += '<text x="' + px.toFixed(1) + '" y="' + (py + 1.5).toFixed(1) + '" text-anchor="middle" fill="#fff" font-size="4.6" font-weight="700">' + String(o.number).replace(/[^\d]/g, '').slice(0, 2) + '</text>';
         }
       });
-      if (!pts.length) {
+      if (!draw.length) {
         svg += '<text x="' + (W / 2) + '" y="' + (H / 2 + 3) + '" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-size="9">порожня</text>';
       }
       svg += '</svg>';

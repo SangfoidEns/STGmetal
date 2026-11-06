@@ -491,21 +491,20 @@ const App = {
     const boardsN = (s.boards || []).length;
     const playersN = (s.players || []).length;
     const giftsGiven = (s.gifts || []).length;
-    // Coach EXP: sessions + planning time + gifts + boards
-    const appH = Math.floor((cs.appMs || 0) / 3600000);
-    const boardH = Math.floor((cs.boardMs || 0) / 3600000);
-    const coachXp = Math.max(0,
-      past.length * 40 +
-      planned.length * 5 +
-      giftsGiven * 25 +
-      boardsN * 8 +
-      Math.min(200, appH * 12) +
-      Math.min(150, boardH * 20) +
-      Math.round(totalMin / 10)
-    );
-    const coachLvl = Math.max(1, Math.floor(coachXp / 100) + 1);
-    const xpInLvl = coachXp % 100;
-    const rating = Math.min(99, 60 + Math.min(25, past.length) + Math.min(10, Math.floor(giftsGiven / 3)) + Math.min(4, boardsN));
+    const teamProg = (typeof CoachTools !== 'undefined' && CoachTools.coachProgress)
+      ? CoachTools.coachProgress()
+      : { level: 1, levelProgress: 0, xp: 0 };
+    const coachXp = teamProg.xp || 0;
+    const coachLvl = teamProg.level || 1;
+    const xpInLvl = teamProg.levelProgress || 0;
+    let ratingSum = 0, ratingN = 0;
+    (s.players || []).forEach(p => {
+      if (!p) return;
+      const ovr = Math.round((Number(p.readiness != null ? p.readiness : p.condition) || 70) * 0.85 + (100 - Math.min(100, (p.load || 0) * 8)) * 0.15);
+      ratingSum += ovr;
+      ratingN++;
+    });
+    const rating = ratingN ? Math.max(40, Math.min(99, Math.round(ratingSum / ratingN))) : 70;
     const fmtShort = function (ms) {
       ms = Math.max(0, Number(ms) || 0);
       const m = Math.floor(ms / 60000);
@@ -544,7 +543,7 @@ const App = {
             <div class="cc-stat"><span class="cc-k">Схеми</span><b class="cc-v">${boardsN}</b></div>
             <div class="cc-stat"><span class="cc-k">Склад</span><b class="cc-v">${playersN}</b></div>
             <div class="cc-stat cc-stat-wide"><span class="cc-k">Нагород гравцям</span><b class="cc-v">${giftsGiven}</b></div>
-            <div class="cc-stat cc-stat-wide"><span class="cc-k">Досвід (XP)</span><b class="cc-v">${coachXp}</b></div>
+            <div class="cc-stat cc-stat-wide"><span class="cc-k">Середній XP складу</span><b class="cc-v">${coachXp}</b></div>
           </div>
           <div class="cc-traits">
             <span>★ Головний тренер</span>
@@ -3364,6 +3363,29 @@ const App = {
             BoardEngine.deleteSelected();
             Toast.show('Видалено', 'ok');
           }
+        } catch (_) {}
+        return;
+      }
+      if (action === 'board-clear-opponents') {
+        e.preventDefault(); e.stopPropagation();
+        try {
+          const ab = Store.get().activeBoard;
+          const n = (ab && ab.objects || []).filter(o => BoardEngine.isOpponentChip && BoardEngine.isOpponentChip(o)).length;
+          if (!n) { Toast.show('На полі немає фішок суперника', 'warn'); return; }
+          Modal.confirm('Прибрати всі фішки суперника (' + n + ')? Свої гравці, м\'яч і стрілки лишаться.', () => {
+            const removed = BoardEngine.deleteOpponents();
+            Toast.show(removed ? ('Прибрано фішок суперника: ' + removed) : 'Немає фішок суперника', removed ? 'ok' : 'warn');
+          });
+        } catch (_) {}
+        return;
+      }
+      if (action === 'set-arrow-type') {
+        e.preventDefault(); e.stopPropagation();
+        const typ = t.dataset.arrowType;
+        try {
+          const ok = BoardEngine.setSelectedArrowType && BoardEngine.setSelectedArrowType(typ);
+          if (!ok) Toast.show('Спочатку виберіть стрілку', 'warn');
+          else Toast.show('Тип стрілки змінено', 'ok');
         } catch (_) {}
         return;
       }

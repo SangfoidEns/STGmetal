@@ -538,13 +538,10 @@ CoachTools.homePatternVars = function (gifts) {
 };
 CoachTools.coachProgress = function () {
   const s = Store.get();
-  const done = (s.trainings || []).filter(t => t && t.status === 'done')
+  const done = (s.trainings || []).filter(t => t && t.status === 'done' && !(typeof LoadModel !== 'undefined' && LoadModel.isCancelled && LoadModel.isCancelled(t)))
     .slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
-  let xpTrain = 0;
   const attSeries = [];
   done.forEach(t => {
-    xpTrain += 32;
-    xpTrain += Math.min(24, Math.round((Number(t.duration) || 0) / 5));
     const att = t.attendance || {};
     const ids = Object.keys(att);
     let pct = 0;
@@ -552,31 +549,27 @@ CoachTools.coachProgress = function () {
       let present = 0;
       ids.forEach(k => { if (att[k] && att[k].present !== false && att[k].present !== 0) present++; });
       pct = Math.round(present / ids.length * 100);
-      xpTrain += Math.round(pct / 8);
     }
     attSeries.push(pct);
   });
-  let teamXp = 0;
+  const rows = [];
   (s.players || []).forEach(p => {
-    try { teamXp += (PlayerProgress.compute(p.id).xp || 0); } catch (_) {}
+    if (!p || !p.id) return;
+    try { rows.push(PlayerProgress.compute(p.id)); } catch (_) {}
   });
-  const xpTeam = Math.round(teamXp / 12);
-  const xpGifts = (s.gifts || []).length * 8;
-  const xp = xpTrain + xpTeam + xpGifts;
-  let level = 1;
-  let need = 140;
-  let rest = xp;
-  while (rest >= need && level < 99) {
-    rest -= need;
-    level += 1;
-    need = Math.round(need * 1.26);
-  }
-  const avgAtt = attSeries.length ? Math.round(attSeries.reduce((a, n) => a + n, 0) / attSeries.length) : 0;
+  const n = rows.length || 1;
+  const teamXp = rows.reduce((a, r) => a + (r.xp || 0), 0);
+  const avgLevel = rows.length ? rows.reduce((a, r) => a + (r.level || 1), 0) / rows.length : 1;
+  const level = Math.max(1, Math.round(avgLevel));
+  const levelProgress = rows.length ? Math.round(rows.reduce((a, r) => a + (r.levelProgress || 0), 0) / rows.length) : 0;
+  const xp = rows.length ? Math.round(teamXp / rows.length) : 0;
+  const xpToNext = rows.length ? Math.max(0, Math.round(rows.reduce((a, r) => a + (r.xpToNext || 0), 0) / n)) : 100;
+  const avgAtt = attSeries.length ? Math.round(attSeries.reduce((a, v) => a + v, 0) / attSeries.length) : 0;
   return {
-    xp, level,
-    levelProgress: need ? Math.round(rest / need * 100) : 0,
-    xpToNext: Math.max(0, need - rest),
-    xpTrain, xpTeam, xpGifts, teamXp,
+    xp, level, levelProgress, xpToNext,
+    xpTrain: 0, xpTeam: xp, xpGifts: 0, teamXp,
+    players: rows.length,
+    avgLevel: Math.round(avgLevel * 10) / 10,
     sessions: done.length,
     avgAtt,
     attSeries: attSeries.slice(-8)
@@ -974,7 +967,7 @@ const PlayerProgress = {
   compute(playerId) {
     const s = Store.get();
     const p = (s.players || []).find(x => x.id === playerId) || {};
-    const trainings = (s.trainings || []).filter(t => t.status === 'done');
+    const trainings = (s.trainings || []).filter(t => t && t.status === 'done' && !(typeof LoadModel !== 'undefined' && LoadModel.isCancelled && LoadModel.isCancelled(t)));
     let xp = 0;
     let present = 0, absent = 0, sessions = 0;
     const history = [];

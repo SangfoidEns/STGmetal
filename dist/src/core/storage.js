@@ -173,6 +173,7 @@ const StorageManager = {
         updatedAt: localStats.updatedAt || remoteStats.updatedAt || null
       };
     }
+    if (migrated.settings) delete migrated.settings.lang;
     this._suppressClubPush = true;
     try {
       Store.set(migrated, { keepStamp: true });
@@ -188,6 +189,7 @@ const StorageManager = {
     if (!opts || !opts.quiet) {
       try { Toast.show('Дані клубу оновлено', 'ok'); } catch (_) {}
     }
+    try { if (typeof I18n !== 'undefined' && I18n.initFromStore) I18n.initFromStore(); } catch (_) {}
     try { if (typeof App !== 'undefined') { App.applyBranding(); App.renderCurrent(); } } catch (_) {}
     try { if (typeof AuthManager !== 'undefined') { AuthManager._resolveRole(); AuthManager._applyUiRole(); } } catch (_) {}
     try {

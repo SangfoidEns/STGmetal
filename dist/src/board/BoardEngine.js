@@ -988,6 +988,42 @@ const BoardEngine = {
     this.render();
   },
 
+  isOpponentChip(o) {
+    if (!o) return false;
+    return o.type === 'opponent' || o.team === 'opp' || o.isOpponent === true;
+  },
+
+  deleteOpponents() {
+    const s = Store.get();
+    const ab = s.activeBoard;
+    if (!ab) return 0;
+    const before = (ab.objects || []).length;
+    ab.objects = (ab.objects || []).filter(o => !this.isOpponentChip(o));
+    const removed = before - ab.objects.length;
+    if (ab.selectedId && !ab.objects.some(o => o.id === ab.selectedId)) ab.selectedId = null;
+    if (removed) {
+      this.pushHistory();
+      this.render();
+      try { StorageManager.save(); } catch (_) {}
+    }
+    return removed;
+  },
+
+  setSelectedArrowType(type) {
+    const types = ['arrow', 'arrowDash', 'pass', 'run', 'dribble', 'press', 'shot'];
+    if (!types.includes(type)) return false;
+    const ab = Store.get().activeBoard;
+    if (!ab) return false;
+    const obj = (ab.objects || []).find(o => o.id === ab.selectedId);
+    if (!obj || !types.includes(obj.type)) return false;
+    obj.type = type;
+    this.pushHistory();
+    this.render();
+    try { this.renderToolbar(); } catch (_) {}
+    try { StorageManager.save(); } catch (_) {}
+    return true;
+  },
+
   clear() {
     Modal.confirm((typeof t==='function'?t('confirm_clear_board'):'Очистити дошку?'), () => {
       Store.get().activeBoard.objects = [];
@@ -2482,6 +2518,28 @@ const BoardEngine = {
     const ab = Store.get().activeBoard;
     const drawCol = ab.drawColor || '';
     const paletteOpen = !!ab.paletteOpen;
+    const pathTypes = ['arrow', 'arrowDash', 'pass', 'run', 'dribble', 'press', 'shot'];
+    const selObj = ab && (ab.objects || []).find(o => o.id === ab.selectedId);
+    const arrowOn = !!(selObj && pathTypes.includes(selObj.type));
+    const arrowTypes = [
+      ['pass', 'Пас'], ['run', 'Біг'], ['dribble', 'Ведення'], ['press', 'Прес'],
+      ['shot', 'Удар'], ['arrow', 'Стрілка'], ['arrowDash', 'Пунктир']
+    ];
+    const arrowRow = arrowOn ? (
+      '<div class="arrow-edit-row">' +
+        '<div class="arrow-edit-label">Виділена стрілка</div>' +
+        '<div class="arrow-edit-types">' +
+          arrowTypes.map(([id, label]) =>
+            '<button type="button" class="tb tb-arrow-type' + (selObj.type === id ? ' on' : '') + '" data-action="set-arrow-type" data-arrow-type="' + id + '">' + label + '</button>'
+          ).join('') +
+        '</div>' +
+        '<div class="arrow-edit-colors">' +
+          ['#ecf0f1', '#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#e74c3c', '#9b59b6', '#000000'].map(c =>
+            '<button type="button" class="tb color-swatch' + ((selObj.color || '') === c ? ' on' : '') + '" data-action="set-draw-color" data-color="' + c + '" style="background:' + c + '" title="Колір стрілки"></button>'
+          ).join('') +
+        '</div>' +
+      '</div>'
+    ) : '';
 
     // ── ВЕРХ: chrome у темній смузі ──
     if (top) {
@@ -2513,6 +2571,7 @@ const BoardEngine = {
           <button class="tb ${tool==='select'?'on':''}" data-tool="select" title="${typeof t==='function'?t('tool_select','Вибір'):'Вибір'}">↖</button>
           <button class="tb ${tool==='player'?'on':''}" data-tool="player" title="${typeof t==='function'?t('tool_player','Гравець'):'Гравець'}">●</button>
           <button class="tb ${tool==='opponent'?'on':''}" data-tool="opponent" title="${typeof t==='function'?t('tool_opponent','Суперник'):'Суперник'}">○</button>
+          <button type="button" class="tb tb-del-opp" data-action="board-clear-opponents" title="Прибрати всі фішки суперника">○✕</button>
           <button class="tb ${tool==='ball'?'on':''}" data-tool="ball" title="${typeof t==='function'?t('tool_ball','М\u2019яч'):'М\u2019яч'}">⚽</button>
           <button class="tb ${tool==='pass'?'on':''}" data-tool="pass" title="${typeof t==='function'?t('tool_pass','Пас'):'Пас'}">⇒</button>
           <button class="tb ${tool==='run'?'on':''}" data-tool="run" title="${typeof t==='function'?t('tool_run','Рух'):'Рух'}">⇢</button>
@@ -2523,6 +2582,7 @@ const BoardEngine = {
             <span class="tb-more-icon">${trayOpen ? '✕' : '⊕'}</span>
           </button>
         </div>
+        ${arrowRow}
         <div class="palette-swatches ${paletteOpen ? 'open' : ''}" id="paletteSwatches">
           <button type="button" class="tb color-swatch ${drawCol==='#ecf0f1'?'on':''}" data-action="set-draw-color" data-color="#ecf0f1" style="background:#ecf0f1" title="${typeof t==='function'?t('color_white'):'Білий'}"></button>
           <button type="button" class="tb color-swatch ${drawCol==='#3498db'?'on':''}" data-action="set-draw-color" data-color="#3498db" style="background:#3498db" title="${typeof t==='function'?t('color_blue'):'Синій'}"></button>

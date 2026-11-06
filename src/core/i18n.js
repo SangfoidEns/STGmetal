@@ -578,19 +578,16 @@ const I18n = (() => {
   function setLang(code, opts) {
     lang = normalize(code);
     try { document.documentElement.setAttribute('lang', lang === 'de' ? 'de' : 'uk'); } catch (_) {}
-    try {
-      if (typeof Store !== 'undefined' && Store.get) {
-        const s = Store.get();
-        if (s) {
-          if (!s.settings) s.settings = {};
-          s.settings.lang = lang;
-          if (!(opts && opts.skipSave) && typeof StorageManager !== 'undefined' && StorageManager.save) {
-            StorageManager.save();
-          }
+    // Мова лише на цьому телефоні. Файл клубу спільний — settings.lang звідти всіх не перемикає.
+    const manual = !(opts && opts.skipSave);
+    if (manual) {
+      try { localStorage.setItem('metalist_lang_choice', lang); } catch (_) {}
+      try {
+        if (typeof Store !== 'undefined' && Store.get && Store.get() && Store.get().settings) {
+          delete Store.get().settings.lang;
         }
-      }
-    } catch (_) {}
-    try { localStorage.setItem('metalist_lang', lang); } catch (_) {}
+      } catch (_) {}
+    }
     applyChrome();
     if (!(opts && opts.silent) && typeof App !== 'undefined' && App.renderCurrent) {
       try { App.renderCurrent(); } catch (_) {}
@@ -601,29 +598,8 @@ const I18n = (() => {
   function initFromStore() {
     let code = 'uk';
     try {
-      if (typeof Store !== 'undefined' && Store.get) {
-        const s = Store.get();
-        if (s && s.settings && s.settings.lang) code = s.settings.lang;
-      }
-    } catch (_) {}
-    try {
-      const ls = localStorage.getItem('metalist_lang');
-      if (ls) code = ls;
-    } catch (_) {}
-    try {
-      // За замовчуванням uk для клубу; de лише після явного вибору в Налаштуваннях
-      const tg = window.Telegram && window.Telegram.WebApp;
-      let explicit = false;
-      try { explicit = !!localStorage.getItem('metalist_lang'); } catch (_) {}
-      try {
-        if (typeof Store !== 'undefined' && Store.get && Store.get() && Store.get().settings && Store.get().settings.lang) {
-          explicit = true;
-          code = Store.get().settings.lang;
-        }
-      } catch (_) {}
-      if (!explicit) {
-        code = 'uk';
-      }
+      const choice = localStorage.getItem('metalist_lang_choice');
+      if (choice === 'uk' || choice === 'de') code = choice;
     } catch (_) {}
     setLang(code, { skipSave: true, silent: true });
   }

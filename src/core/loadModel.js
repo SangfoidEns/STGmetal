@@ -17,11 +17,20 @@ const LoadModel = {
    * Лише тренування, які вже відбулися (дата ≤ сьогодні)
    * і не скасовані. Майбутні planned/draft не враховуються.
    */
+  /** Скасоване не є пропуском, навіть якщо в журналі лишився present:false. */
+  isCancelled(t) {
+    if (!t) return false;
+    const st = String(t.status || '').toLowerCase();
+    if (st === 'cancelled' || st === 'canceled' || st === 'скасовано') return true;
+    if (t.cancelledAt) return true;
+    return false;
+  },
+
   pastTrainings(trainings, refDate) {
     const today = this.todayStr(refDate);
     return (trainings || []).filter(t => {
       if (!t || !t.date) return false;
-      if (t.status === 'cancelled' || t.status === 'canceled') return false;
+      if (this.isCancelled(t)) return false;
       return String(t.date) <= today;
     });
   },
