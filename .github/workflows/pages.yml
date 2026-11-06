@@ -1,6 +1,9 @@
 name: Telegram
 
+# Єдиний публікатор сайту. Повторний запуск тієї самої збірки лишає
+# другий артефакт github-pages, тому повтор іде лише новим запуском.
 on:
+  workflow_dispatch:
   push:
     branches: [main]
 
