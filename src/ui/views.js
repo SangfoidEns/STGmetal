@@ -1,10 +1,24 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z54',
+  APP_BUILD: 'z55',
   APP_UPDATED: '06.11.2026',
+  VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
+
+  versionLetter(stamp) {
+    const raw = String(stamp || this.APP_UPDATED || '');
+    const parts = raw.split('.');
+    const day = Number(parts[0]);
+    const month = Number(parts[1]);
+    const year = Number(parts[2]);
+    const date = (parts.length === 3 && day && month && year)
+      ? new Date(year, month - 1, day)
+      : new Date(raw + 'T12:00:00');
+    const idx = (date.getDay() + 6) % 7;
+    return this.VERSION_LETTERS[idx] || 'А';
+  },
 
   _buildLine() {
-    return '<div class="app-build-tag">Оновлено ' + this.APP_UPDATED + ' · збірка ' + this.APP_BUILD + '</div>';
+    return '<div class="app-build-tag">Оновлено ' + this.APP_UPDATED + ' · ' + this.versionLetter() + '</div>';
   },
 
   _gl(g) {
@@ -1970,13 +1984,13 @@ trainings() {
       '<button type="button" class="btn btn-s btn-sm cal-nav-btn" data-action="cal-next" aria-label="Наступний місяць">›</button>' +
       '</div>' +
       '<div class="cal-weekdays cg">' +
-      '<span class="cdn" title="Понеділок">А</span>' +
-      '<span class="cdn" title="Вівторок">Б</span>' +
-      '<span class="cdn" title="Середа">В</span>' +
-      '<span class="cdn" title="Четвер">Г</span>' +
-      '<span class="cdn" title="П\'ятниця">Ґ</span>' +
-      '<span class="cdn" title="Субота">Д</span>' +
-      '<span class="cdn" title="Неділя">Е</span></div>' +
+      '<span class="cdn" title="Понеділок">Пн</span>' +
+      '<span class="cdn" title="Вівторок">Вт</span>' +
+      '<span class="cdn" title="Середа">Ср</span>' +
+      '<span class="cdn" title="Четвер">Чт</span>' +
+      '<span class="cdn" title="П\'ятниця">Пт</span>' +
+      '<span class="cdn" title="Субота">Сб</span>' +
+      '<span class="cdn" title="Неділя">Нд</span></div>' +
       '<div class="cal-grid cg">' + cells + '</div></div>' +
       dayDetail +
       '<p class="note-sm">● заплановане · ✓ проведено · ✕ скасовано</p>';

@@ -4,7 +4,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 describe('calendar weekday letters', () => {
-  it('labels Monday through Sunday from the start of the alphabet', () => {
+  it('keeps weekday names on the calendar and puts the alphabet letter on the version', () => {
     const context = {
       console,
       setTimeout,
@@ -21,14 +21,16 @@ describe('calendar weekday letters', () => {
     const src = readFileSync(new URL('../src/ui/views.js', import.meta.url), 'utf8');
     vm.runInContext(src + '\nthis.Views = Views;', context, { filename: 'views.js' });
     const html = context.Views.calendar();
-    assert.match(html, /title="Понеділок">А</);
-    assert.match(html, /title="Вівторок">Б</);
-    assert.match(html, /title="Середа">В</);
-    assert.match(html, /title="Четвер">Г</);
-    assert.match(html, /title="П'ятниця">Ґ</);
-    assert.match(html, /title="Субота">Д</);
-    assert.match(html, /title="Неділя">Е</);
-    assert.equal(html.includes('>Пн<'), false);
-    assert.equal(context.Views.APP_BUILD, 'z54');
+    assert.match(html, /title="Понеділок">Пн</);
+    assert.match(html, /title="Вівторок">Вт</);
+    assert.match(html, /title="Середа">Ср</);
+    assert.match(html, /title="Четвер">Чт</);
+    assert.match(html, /title="П'ятниця">Пт</);
+    assert.match(html, /title="Субота">Сб</);
+    assert.match(html, /title="Неділя">Нд</);
+    assert.equal(html.includes('>А<'), false);
+    assert.equal(context.Views.APP_BUILD, 'z55');
+    assert.equal(context.Views.versionLetter('06.11.2026'), 'Ґ');
+    assert.equal(context.Views.versionLetter('02.11.2026'), 'А');
   });
 });

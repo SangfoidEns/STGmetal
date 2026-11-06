@@ -772,9 +772,9 @@ const App = {
     }
     const build = document.getElementById('appBuild');
     if (build) {
-      const id = (typeof Views !== 'undefined' && Views.APP_BUILD) || 'z24';
-      const when = (typeof Views !== 'undefined' && Views.APP_UPDATED) || '30.10.2026';
-      build.textContent = id + ' · ' + when;
+      const letter = (typeof Views !== 'undefined' && Views.versionLetter) ? Views.versionLetter() : 'А';
+      const when = (typeof Views !== 'undefined' && Views.APP_UPDATED) || '06.11.2026';
+      build.textContent = letter + ' · ' + when;
     }
     const parts = (s.clubName || 'МЕТАЛІСТ ШТУТТГАРТ').split(' ');
     const cn = document.getElementById('clubName');
@@ -1083,14 +1083,64 @@ const App = {
   },
 
   _armChatGuard() {
-    this._chatGuardUntil = Date.now() + 1600;
+    this._chatGuardUntil = Date.now() + 500;
     this._chatPointerDown = true;
+    clearTimeout(this._chatPointerTimer);
+    this._chatPointerTimer = setTimeout(() => { this._chatPointerDown = false; }, 500);
   },
 
   _chatHitOpensTraining(node) {
-    return !!(node && node.closest && node.closest(
-      '[data-view="trainings"], [data-edit-training], [data-training-id], [data-next-training], .card-training, [data-action="open-training"], [data-action="new-training"], [data-sheet-act="edit"], [data-nsheet="edit"]'
-    ));
+    if (!node || !node.closest) return false;
+    if (node.closest('#mobileNav, .mn, .sidebar, button, [data-edit-training], [data-action="open-training"], [data-action="preview-next-training"], [data-action="new-training"]')) return false;
+    return !!node.closest('.card-training, [data-training-id], [data-next-training]');
+  },
+
+  _navButtonAt(x, y) {
+    const nav = document.getElementById('mobileNav');
+    if (!nav) return null;
+    const cs = getComputedStyle(nav);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || cs.pointerEvents === 'none') return null;
+    const r = nav.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return null;
+    if (y < r.top - 6 || y > window.innerHeight + 2) return null;
+    if (x < r.left - 16 || x > r.right + 16) return null;
+    const buttons = Array.prototype.filter.call(nav.querySelectorAll('.mni'), el => {
+      const s = getComputedStyle(el);
+      return s.display !== 'none' && s.visibility !== 'hidden';
+    });
+    let best = null;
+    let bestDx = 1e9;
+    for (let i = 0; i < buttons.length; i++) {
+      const b = buttons[i].getBoundingClientRect();
+      if (b.width < 2) continue;
+      const cx = b.left + b.width / 2;
+      const dx = Math.abs(x - cx);
+      if (x >= b.left - 8 && x <= b.right + 8 && dx < bestDx) {
+        best = buttons[i];
+        bestDx = dx;
+      }
+    }
+    return best;
+  },
+
+  _runNavButton(btn) {
+    if (!btn) return;
+    this._chatPointerDown = false;
+    this._chatGuardUntil = 0;
+    this._navTap = true;
+    document.querySelectorAll('.tg-sheet-backdrop').forEach(n => n.remove());
+    const action = btn.getAttribute('data-action');
+    const view = btn.getAttribute('data-view');
+    try {
+      if (action === 'toggle-sidebar') {
+        if (document.body.classList.contains('drawer-open')) this.closeDrawer();
+        else this.openDrawer();
+        return;
+      }
+      if (view) this.navigate(view);
+    } finally {
+      this._navTap = false;
+    }
   },
 
   /** Поле лишається в блоці чату. Копію, яка була приклеєна до екрана, прибираємо. */
@@ -1101,8 +1151,8 @@ const App = {
     if (form) form.id = 'teamChatForm';
   },
 
-  navigate(view) {
-    if (view === 'trainings' && this._chatBlocksTraining()) return;
+    navigate(view) {
+    if (view === 'trainings' && this._chatBlocksTraining() && !this._navTap) return;
     if (view === 'trainings' && typeof AuthManager !== 'undefined' && AuthManager.isGuest && AuthManager.isGuest()) view = 'analytics';
     // Aliases for dashboard pills / legacy links
     if (view === 'schemes' || view === 'scheme') view = 'tactics';
@@ -2084,6 +2134,41 @@ const App = {
   },
 
   bindEvents() {
+    if (!this._navGuardBound) {
+      this._navGuardBound = true;
+      document.addEventListener('click', (e) => {
+        const node = e.target;
+        if (node && node.closest && node.closest('.tg-sheet, #modal .md, .md')) return;
+        const btn = App._navButtonAt(e.clientX, e.clientY);
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        App._runNavButton(btn);
+      }, true);
+      document.addEventListener('click', (e) => {
+        const node = e.target;
+        if (!node || !node.closest) return;
+        if (node.closest('#mobileNav, .mn, .tg-sheet, #teamChat, #teamChatForm, .team-chat, .team-chat-form')) return;
+        const openBtn = node.closest('[data-edit-training], [data-action="open-training"], [data-action="preview-next-training"], [data-next-training]');
+        if (!openBtn) return;
+        const tid = openBtn.getAttribute('data-edit-training')
+          || openBtn.getAttribute('data-training-id')
+          || openBtn.getAttribute('data-next-training')
+          || openBtn.getAttribute('data-tid');
+        if (!tid) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        App._chatPointerDown = false;
+        App._chatGuardUntil = 0;
+        if (openBtn.getAttribute('data-action') === 'preview-next-training' || openBtn.hasAttribute('data-next-training')) {
+          App.openNextTrainingPreview(tid);
+        } else {
+          App.openTrainingActionSheet(tid);
+        }
+      }, true);
+    }
     if (!this._cardCaptureBound) {
       this._cardCaptureBound = true;
       document.addEventListener('click', (ev) => {
@@ -2128,7 +2213,8 @@ const App = {
       };
       const onChatCapture = (e) => {
         const t = e.target;
-        if (t && t.closest && t.closest('#modal, .mo, .coach-public-card, .coach-squad-card, .coach-card-overlay, .pps-account, [data-action="open-fifa-card"]')) return;
+        if (t && t.closest && t.closest('#mobileNav, .mn, #modal, .mo, .coach-public-card, .coach-squad-card, .coach-card-overlay, .pps-account, [data-action="open-fifa-card"]')) return;
+        if (App._navButtonAt && App._navButtonAt(e.clientX, e.clientY)) return;
         const closestOk = t && t.closest && t.closest('#teamChat, #teamChatForm, #teamChatInput, .team-chat, .team-chat-form');
         const inBox = inChatBox(e);
         if (!closestOk && !inBox) {
