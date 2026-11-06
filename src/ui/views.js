@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z58',
+  APP_BUILD: 'z59',
   APP_UPDATED: '06.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -19,6 +19,15 @@ const Views = {
 
   _buildLine() {
     return '<div class="app-build-tag">Оновлено ' + this.APP_UPDATED + ' · ' + this.versionLetter() + '</div>';
+  },
+
+  isHeadCoach() {
+    return typeof AuthManager !== 'undefined' && AuthManager._canWriteClub && AuthManager._canWriteClub();
+  },
+
+  /** Нова емблема лише в головного тренера. У решти лишається основний герб. */
+  clubMark() {
+    return this.isHeadCoach() ? 'assets/coach-crest.png' : 'assets/metalist-crest.png';
   },
 
   _gl(g) {
@@ -241,7 +250,15 @@ const Views = {
     const s = Store.get();
     const set = s.settings || {};
     // Картка тренера ЗАВЖДИ з налаштувань клубу — НЕ з сесії поточного гравця
-    const name = (set.coachName && String(set.coachName).trim()) || 'Artem Serdiuk';
+    let name = (set.coachName && String(set.coachName).trim()) || 'Artem Serdiuk';
+    let photo = set.coachPhoto || set.coachPhotoUrl || '';
+    try {
+      const isCoachSession = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+      if (!photo && isCoachSession && typeof TelegramManager !== 'undefined' && TelegramManager.getUser) {
+        const u = TelegramManager.getUser();
+        if (u && u.photo_url) photo = u.photo_url;
+      }
+    } catch (_) {}
     const ach = (typeof CoachTools !== 'undefined' && CoachTools.getCoachAchievements)
       ? CoachTools.getCoachAchievements()
       : { attendancePct: 100, appMs: 0, boardMs: 0, trainingsDone: 0, boards: 0 };
@@ -251,9 +268,12 @@ const Views = {
       if (m < 60) return m + 'хв';
       return (Math.round(m / 6) / 10) + 'г';
     };
-    const ph = '<img class="coach-crest" src="assets/coach-crest.jpg" alt="Емблема тренера">';
+    const initials = (name || 'AS').split(/\s+/).map(p => p[0] || '').join('').slice(0, 2).toUpperCase();
+    const ph = photo
+      ? '<img src="' + sanitize(photo) + '" alt="" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'"/>'
+      : '<span class="cp-avatar-ph">' + sanitize(initials) + '</span>';
     return '<div class="pl-card glass coach-squad-card is-coach" data-action="open-coach-card" role="button" tabindex="0">' +
-      '<div class="pl-card-av-wrap"><div class="pl-card-av coach-av coach-av-crest" style="border-color:#e8c547;background:#0c0c0c">' + ph + '</div></div>' +
+      '<div class="pl-card-av-wrap"><div class="pl-card-av coach-av" style="border-color:#f0c14b;background:linear-gradient(145deg,#3d2e0a,#1a1408)">' + ph + '</div></div>' +
       '<div class="pl-card-body">' +
       '<div class="pl-card-name">★ ' + sanitize(name) + '</div>' +
       '<div class="pl-card-meta">' + (typeof t==='function'?t('head_coach','Головний тренер'):'Головний тренер') + ' · METALIST</div>' +
@@ -788,7 +808,7 @@ const Views = {
     const otherId = (typeof window !== 'undefined' && (window.__fifaCompareId || window.__coachCompareId || window.__playerCompareId)) || '';
     const compareHtml = this._compareBlock(p, otherId);
 
-    const clubLogo = 'assets/metalist-crest.png';
+    const clubLogo = this.clubMark();
     const logoTag = clubLogo
       ? ('<img class="fifa-club-logo" src="' + (typeof sanitize==='function'?sanitize(clubLogo):clubLogo) + '" alt="club" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'"/>')
       : '';
@@ -1311,8 +1331,8 @@ const Views = {
     return '<div class="club-public">' +
       this._buildLine() +
       '<div class="club-hero">' +
-        '<button type="button" class="club-crest-btn" data-action="open-photo" data-photo="assets/metalist-crest.png" data-photo-save="1" data-photo-name="Metalist-Shtuttgart.png" title="Емблема на весь екран">' +
-        '<img class="club-crest" src="assets/metalist-crest.png" alt="Емблема Металіст Штуттгарт"/></button>' +
+        '<button type="button" class="club-crest-btn" data-action="open-photo" data-photo="' + this.clubMark() + '" data-photo-save="1" data-photo-name="Metalist-Shtuttgart.png" title="Емблема на весь екран">' +
+        '<img class="club-crest" src="' + this.clubMark() + '" alt="Емблема Металіст Штуттгарт"/></button>' +
         '<div class="club-hero-copy"><div class="club-kicker">Одна команда</div><h1>Металіст Штуттгарт</h1>' +
         '<p>Гість бачить активність, ріст акаунтів і медіа клубу. Тап по емблемі відкриває її на весь екран — її можна зберегти.</p>' +
         '<button type="button" class="btn btn-s btn-sm" data-io="import" data-action="import-trigger">Імпорт JSON</button></div></div>' +
@@ -2262,7 +2282,9 @@ trainings() {
     const nameOf = (p) => '#' + (p.number || '—') + ' ' + sanitize(p.lastName || p.firstName || 'Гравець');
     const cap = players.find(p => p && p.isCaptain) || null;
     const assistants = Array.isArray(staff.assistants) ? staff.assistants.map(String) : [];
-    const crest = '<img class="settings-crest" src="assets/coach-crest.jpg" alt="Емблема тренера">';
+    const crest = head
+      ? '<img class="settings-crest" src="assets/coach-crest.png" alt="Емблема Металіст Штуттгарт">'
+      : '';
     if (!head) {
       const pres = players.find(p => p && String(p.id) === String(staff.presidentId || ''));
       const asst = assistants.map(id => players.find(p => p && String(p.id) === id)).filter(Boolean).map(nameOf);

@@ -11970,22 +11970,23 @@ body.role-guest .team-chat { display: none !important; }
 .club-player-card.fifa-classic::after { content: none !important; background: none !important; }
 .cc-crest, .settings-crest {
   display: block;
-  width: 148px;
-  height: auto;
-  margin: 0 auto 8px;
+  width: 44px;
+  height: 54px;
   object-fit: contain;
-  background: #0c0c0c;
-  border-radius: 16px;
+  background: transparent;
 }
-.settings-crest { width: 112px; }
-.coach-av-crest { padding: 3px !important; overflow: hidden; background: #0c0c0c !important; }
-.coach-av-crest .coach-crest {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-  border-radius: 12px;
+.cc-frame .cc-crest {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  margin: 0;
+  z-index: 2;
+  pointer-events: none;
 }
+.settings-crest { margin: 0 0 8px; }
+body.role-coach #mobileNav.glass-nav { overflow-x: hidden; }
+body.role-coach #mobileNav .mni { min-width: 0; }
+body.role-coach #mobileNav .mni-more { flex: 0 0 56px; }
 .staff-list { max-height: 340px; overflow: auto; margin: 8px 0 12px; }
 .staff-row {
   display: grid;

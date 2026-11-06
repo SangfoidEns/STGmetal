@@ -44,12 +44,25 @@ describe('club staff and classic player card', () => {
     assert.match(html, /fifa-classic/);
     assert.equal(html.includes('player-collectible'), false);
     assert.match(html, /МЕТАЛІСТ/);
+    assert.match(html, /assets\/coach-crest\.png/);
+  });
+
+  it('keeps the main crest for everyone except the head coach', () => {
+    const { context } = boot(false);
+    const html = context.Views._fifaCard(context.Store.get().players[0], { attPct: 80, avgRpe: 5, load28: 10 });
+    assert.match(html, /assets\/metalist-crest\.png/);
+    assert.equal(html.includes('coach-crest'), false);
+    const squad = context.Views._coachSquadCard();
+    assert.equal(squad.includes('coach-crest'), false);
+    assert.match(squad, /pl-card-av coach-av/);
+    const headSquad = boot(true).context.Views._coachSquadCard();
+    assert.equal(headSquad.includes('coach-crest'), false);
   });
 
   it('lets the head coach assign assistants, the president and the captain', () => {
     const { context } = boot(true);
     const html = context.Views.settings();
-    assert.match(html, /assets\/coach-crest\.jpg/);
+    assert.match(html, /assets\/coach-crest\.png/);
     assert.match(html, /data-assistant/);
     assert.match(html, /name="setPresident"/);
     assert.match(html, /name="setCaptain"/);
@@ -62,7 +75,7 @@ describe('club staff and classic player card', () => {
     const html = context.Views.settings();
     assert.match(html, /Капітан:/);
     assert.equal(html.includes('data-assistant'), false);
-    assert.match(html, /assets\/coach-crest\.jpg/);
+    assert.equal(html.includes('coach-crest'), false);
   });
 
   it('puts the player stats on the coach sheet helper', () => {

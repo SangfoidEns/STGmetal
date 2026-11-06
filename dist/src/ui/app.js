@@ -27,6 +27,7 @@ const App = {
     try { if (typeof AuthManager !== 'undefined') AuthManager.init(); } catch (e) { console.warn('Auth', e); }
     this._refreshIdentity();
     try { if (typeof AuthManager !== 'undefined') { AuthManager._resolveRole(); AuthManager._applyUiRole(); } } catch (_) {}
+    try { this.applyBranding(); } catch (_) {}
     // Server HMAC validation of Telegram initData (async — does not block first paint)
     try {
       if (typeof AuthManager !== 'undefined' && AuthManager.validateWithServer) {
@@ -75,6 +76,7 @@ const App = {
       const nextId = AuthManager.user && AuthManager.user.id;
       if (prev !== AuthManager.role || String(prevId || '') !== String(nextId || '')) {
         this.syncRoleClass && this.syncRoleClass();
+        this.applyBranding && this.applyBranding();
         if (this._booted) this.renderCurrent && this.renderCurrent();
       }
     } catch (e) { console.warn('identity', e); }
@@ -125,6 +127,9 @@ const App = {
       this.navigate(next);
     }, { passive: true });
   },
+
+  openDrawer() { this.toggleMobileSidebar(true); },
+  closeDrawer() { this.toggleMobileSidebar(false); },
 
   toggleMobileSidebar(force) {
     if (document.body.classList.contains('mode-board-focus')) {
@@ -523,7 +528,9 @@ const App = {
       <div class="coach-card-fifa" role="dialog" aria-label="Картка тренера">
         <div class="cc-glow"></div>
         <div class="cc-frame">
-          <img class="cc-crest" src="assets/coach-crest.jpg" alt="Емблема Металіст Штуттгарт">
+          ${(typeof Views !== 'undefined' && Views.isHeadCoach && Views.isHeadCoach())
+            ? '<img class="cc-crest" src="' + Views.clubMark() + '" alt="Емблема Металіст Штуттгарт">'
+            : ''}
           <div class="cc-rating">${rating}</div>
           <div class="cc-pos">HEAD COACH</div>
           <div class="cc-photo">${photoHtml}</div>
@@ -769,8 +776,8 @@ const App = {
     document.documentElement.style.setProperty('--club-accent', s.accent);
     const logo = document.getElementById('clubLogo');
     if (logo) {
-      const crest = (typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach())
-        ? 'assets/coach-crest.jpg'
+      const crest = (typeof Views !== 'undefined' && Views.clubMark)
+        ? Views.clubMark()
         : 'assets/metalist-crest.png';
       logo.innerHTML = '<img src="' + crest + '" alt="Металіст Штуттгарт">';
     }
@@ -778,7 +785,7 @@ const App = {
     if (build) {
       const letter = (typeof Views !== 'undefined' && Views.versionLetter) ? Views.versionLetter() : 'А';
       const when = (typeof Views !== 'undefined' && Views.APP_UPDATED) || '06.11.2026';
-      build.textContent = letter + ': ' + when;
+      build.textContent = letter + ' › ' + when;
     }
     const parts = (s.clubName || 'МЕТАЛІСТ ШТУТТГАРТ').split(' ');
     const cn = document.getElementById('clubName');
@@ -1063,7 +1070,7 @@ const App = {
         return;
       }
       // drawer
-      if (document.body.classList.contains('drawer-open') || document.getElementById('sidebar')?.classList.contains('open')) {
+      if (document.body.classList.contains('sb-open') || document.body.classList.contains('drawer-open') || document.getElementById('sidebar')?.classList.contains('open')) {
         try { this.closeDrawer && this.closeDrawer(); } catch (_) {
           document.body.classList.remove('drawer-open');
           document.getElementById('sidebar')?.classList.remove('open');
@@ -1137,8 +1144,7 @@ const App = {
     const view = btn.getAttribute('data-view');
     try {
       if (action === 'toggle-sidebar') {
-        if (document.body.classList.contains('drawer-open')) this.closeDrawer();
-        else this.openDrawer();
+        this.toggleMobileSidebar();
         return;
       }
       if (view) this.navigate(view);
