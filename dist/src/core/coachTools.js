@@ -1041,13 +1041,44 @@ const PlayerProgress = {
     intensityBonusMax: 12, // from RPE 1..10
     giftBonus: 25,
     levelBase: 100,
-    levelGrowth: 1.35
+    levelGrowth: 1.35,
+    streakBonus: { 3: 30, 5: 50, 8: 80 }
+  },
+
+  /** Проведена сесія, або минула, де тренер уже поставив явку. Чернетка теж рахується. */
+  sessionCounts(t) {
+    if (!t) return false;
+    if (t.status === 'cancelled' || t.status === 'canceled' || t.cancelledAt) return false;
+    try {
+      if (typeof LoadModel !== 'undefined' && LoadModel.isCancelled && LoadModel.isCancelled(t)) return false;
+    } catch (_) {}
+    if (t.status === 'done') return true;
+    let todayStr = '';
+    try {
+      todayStr = (typeof LoadModel !== 'undefined' && LoadModel.todayStr) ? LoadModel.todayStr() : '';
+    } catch (_) {}
+    if (!t.date || (todayStr && String(t.date) > todayStr)) return false;
+    const att = t.attendance || {};
+    return Object.keys(att).some(function (id) {
+      const cell = att[id];
+      return cell && (cell.present === true || cell.present === false || cell.present === 0);
+    });
+  },
+
+  streakBonusXp(streak) {
+    const n = Number(streak) || 0;
+    const table = this.RULES.streakBonus || {};
+    let bonus = 0;
+    Object.keys(table).forEach(function (step) {
+      if (n >= Number(step)) bonus = Math.max(bonus, table[step]);
+    });
+    return bonus;
   },
 
   compute(playerId) {
     const s = Store.get();
     const p = (s.players || []).find(x => x.id === playerId) || {};
-    const trainings = (s.trainings || []).filter(t => t && t.status === 'done' && !(typeof LoadModel !== 'undefined' && LoadModel.isCancelled && LoadModel.isCancelled(t)));
+    const trainings = (s.trainings || []).filter(t => this.sessionCounts(t));
     let xp = 0;
     let present = 0, absent = 0, sessions = 0;
     const history = [];
@@ -1055,7 +1086,7 @@ const PlayerProgress = {
       const att = (t.attendance || {})[playerId];
       if (!att) return;
       sessions++;
-      const was = att.present !== false && att.present !== 0;
+      const was = att.present === true;
       if (was) {
         present++;
         let gain = this.RULES.present;
@@ -1063,7 +1094,7 @@ const PlayerProgress = {
         if (rpe > 0) gain += Math.min(this.RULES.intensityBonusMax, Math.round(rpe * 1.2));
         xp += gain;
         history.push({ date: t.date, name: t.name, delta: gain, kind: 'present' });
-      } else {
+      } else if (att.present === false || att.present === 0) {
         absent++;
         xp += this.RULES.absent;
         history.push({ date: t.date, name: t.name, delta: this.RULES.absent, kind: 'absent' });
@@ -1073,7 +1104,7 @@ const PlayerProgress = {
     let xpIntensity = 0;
     trainings.forEach(t => {
       const att = (t.attendance || {})[playerId];
-      if (!att || att.present === false || att.present === 0) return;
+      if (!att || att.present !== true) return;
       xpAttend += this.RULES.present;
       const rpe = att.rpe != null ? +att.rpe : (att.intensity != null ? +att.intensity : 0);
       if (rpe > 0) xpIntensity += Math.min(this.RULES.intensityBonusMax, Math.round(rpe * 1.2));
@@ -1087,9 +1118,14 @@ const PlayerProgress = {
     let streak = 0;
     for (let i = 0; i < doneDesc.length; i++) {
       const att = (doneDesc[i].attendance || {})[playerId];
-      if (!att) continue;
+      if (!att || att.present == null) continue;
       if (att.present === false || att.present === 0) break;
-      streak++;
+      if (att.present === true) streak++;
+    }
+    const xpStreak = this.streakBonusXp(streak);
+    if (xpStreak) {
+      xp += xpStreak;
+      history.push({ date: '', name: 'Серія ' + streak, delta: xpStreak, kind: 'streak' });
     }
     // level curve
     let level = 1, need = this.RULES.levelBase, remain = xp;
@@ -1103,7 +1139,7 @@ const PlayerProgress = {
     return {
       xp, level, levelProgress: pct, xpIntoLevel: remain, xpToNext: need - remain, need,
       present, absent, sessions, attPct,
-      xpAttend, xpIntensity, xpGifts, streak,
+      xpAttend, xpIntensity, xpGifts, xpStreak, streak,
       form: level >= 80 ? '99' : level >= 50 ? 'elite' : level >= 25 ? 'pro' : 'rising',
       history: history.slice(-12).reverse()
     };

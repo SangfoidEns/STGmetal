@@ -832,7 +832,7 @@ const App = {
     if (build) {
       const letter = (typeof Views !== 'undefined' && Views.versionLetter) ? Views.versionLetter() : 'А';
       const when = (typeof Views !== 'undefined' && Views.APP_UPDATED) || '06.11.2026';
-      build.textContent = letter + ' | ' + when;
+      build.textContent = letter + ' ~ ' + when;
     }
     const parts = (s.clubName || 'МЕТАЛІСТ ШТУТТГАРТ').split(' ');
     const cn = document.getElementById('clubName');
@@ -1797,7 +1797,7 @@ const App = {
       </div>`;
     const coachActions = isCoach ? `
       <button type="button" class="tg-sheet-btn" data-sheet-act="edit" data-tid="${t.id}">✏️ ${typeof I18n!=='undefined'?I18n.t('sheet_edit','Редагувати'):'Редагувати'}</button>
-      <button type="button" class="tg-sheet-btn" data-sheet-act="beats" data-tid="${t.id}">▸ Кадри пояснення</button>
+      <button type="button" class="tg-sheet-btn" data-sheet-act="slides" data-tid="${t.id}">▣ Слайди схем</button>
       <button type="button" class="tg-sheet-btn" data-sheet-act="attendance" data-tid="${t.id}">✓ ${(typeof I18n!=='undefined'?I18n.t('sheet_attendance','Відвідування'):'Відвідування')}</button>
       <button type="button" class="tg-sheet-btn" data-sheet-act="dup" data-tid="${t.id}">⧉ ${(typeof I18n!=='undefined'?I18n.t('sheet_dup','Дубль / копія'):'Дубль / копія')}</button>
       <button type="button" class="tg-sheet-btn" data-sheet-act="open-board" data-tid="${t.id}">⚽ ${(typeof I18n!=='undefined'?I18n.t('open_board','Відкрити дошку'):'Відкрити дошку')}</button>
@@ -1845,7 +1845,7 @@ const App = {
         return;
       }
       if (act === 'edit') return Actions.editTraining(tid);
-      if (act === 'beats') return Actions.editBeats(tid);
+      if (act === 'slides') return Actions.editSlides(tid);
       if (act === 'attendance') return Actions.openAttendance(tid);
       if (act === 'dup') return Actions.dupTraining(tid);
       if (act === 'open-board') return Actions.openTrainingBoard(tid);
@@ -2784,6 +2784,44 @@ const App = {
         return;
       }
       if (action === 'save-settings') return Actions.saveSettings();
+      if (action === 'staff-add') {
+        e.preventDefault(); e.stopPropagation();
+        const role = t.dataset.staffRole || '';
+        const titles = { assistant: 'Помічник', president: 'Президент', captain: 'Капітан' };
+        const players = (Store.get().players || []).slice().sort((a, b) => (a.number || 0) - (b.number || 0));
+        const rows = players.map(p => {
+          const name = '#' + (p.number || '—') + ' ' + sanitize([p.lastName, p.firstName].filter(Boolean).join(' ') || 'Гравець');
+          return '<button type="button" class="staff-pick" data-action="staff-pick" data-staff-role="' + role + '" data-player-id="' + sanitize(String(p.id)) + '">' + name + '</button>';
+        }).join('') || '<p class="note-sm">У складі ще немає гравців.</p>';
+        Modal.open(titles[role] || 'Призначення', '<div class="staff-picks">' + rows + '</div>', [
+          { label: 'Закрити', cls: 'btn-s', action: 'cancel' }
+        ]);
+        return;
+      }
+      if (action === 'staff-pick') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.assignStaff(t.dataset.staffRole, t.dataset.playerId);
+      }
+      if (action === 'staff-remove') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.clearStaff(t.dataset.staffRole, t.dataset.playerId);
+      }
+      if (action === 'edit-slides') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.editSlides(t.dataset.trainingId);
+      }
+      if (action === 'open-training-slide') {
+        e.preventDefault(); e.stopPropagation();
+        const board = (Store.get().boards || []).find(b => String(b.id) === String(t.dataset.boardId));
+        if (!board) { Toast.show('Схему не знайдено', 'warn'); return; }
+        const thumb = (typeof Views !== 'undefined' && Views._schemeThumbSvg) ? Views._schemeThumbSvg(board) : '';
+        const desc = sanitize(board.description || board.notes || board.text || 'Опису ще немає.');
+        Modal.open(sanitize(board.name || board.title || 'Схема'),
+          '<div class="tr-slide-view">' + thumb + '<p>' + desc + '</p>' +
+          '<button type="button" class="btn btn-p" data-action="load-scheme-board" data-board-id="' + sanitize(String(board.id)) + '">На дошку</button></div>',
+          [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
+        return;
+      }
       if (action === 'save-rbac') {
         const coachesRaw = (document.getElementById('setCoaches')?.value || '').split(',').map(x => x.trim()).filter(Boolean);
         let links = {};
@@ -4051,6 +4089,7 @@ const App = {
       if (t.dataset.modalAction === 'open-attendance') return Actions.openAttendance(t.dataset.tid);
       if (t.dataset.modalAction === 'save-attendance') return Actions.saveAttendance(t.dataset.tid);
       if (t.dataset.modalAction === 'save-beats') return Actions.saveBeats(t.dataset.tid);
+      if (t.dataset.modalAction === 'save-slides') return Actions.saveSlides(t.dataset.tid);
       if (t.dataset.modalAction === 'create-player') return Actions.createPlayer();
       if (t.dataset.modalAction === 'save-player') return Actions.savePlayer(t.dataset.pid);
       if (t.dataset.modalAction === 'create-exercise') return Actions.createExercise();

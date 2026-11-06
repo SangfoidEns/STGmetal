@@ -12016,6 +12016,25 @@ body.role-guest .team-chat { display: none !important; }
 body.role-coach #mobileNav.glass-nav { overflow-x: hidden; }
 body.role-coach #mobileNav .mni { min-width: 0; }
 body.role-coach #mobileNav .mni-more { flex: 0 0 56px; }
+.staff-cat { margin: 10px 0; }
+.staff-cat-head { display: flex; align-items: center; justify-content: space-between; font-weight: 800; }
+.staff-plus { width: 36px; height: 36px; border-radius: 10px; border: 1px solid rgba(232,197,71,.55); background: rgba(232,197,71,.12); color: #f4efe2; font-size: 22px; line-height: 1; }
+.staff-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.staff-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 999px; background: rgba(255,255,255,.06); }
+.staff-chip button { border: 0; background: transparent; color: #f4efe2; font-size: 16px; }
+.staff-picks { display: flex; flex-direction: column; gap: 6px; }
+.staff-pick { min-height: 44px; text-align: left; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04); color: inherit; padding: 8px 10px; }
+.tr-slides { margin-top: 8px; }
+.tr-slides-label { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: #e8c547; margin-bottom: 6px; }
+.tr-slides-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.tr-slide { flex: 0 0 112px; border: 0; background: transparent; color: inherit; text-align: left; }
+.tr-slide-thumb { display: block; height: 72px; overflow: hidden; border-radius: 10px; background: rgba(0,0,0,.25); }
+.tr-slide-thumb svg { width: 100%; height: 72px; }
+.tr-slide-name { display: block; font-size: 11px; margin-top: 4px; }
+.tr-slide-add { flex: 0 0 auto; align-self: center; }
+.tr-slide-view svg { width: 100%; height: auto; border-radius: 12px; }
+.slide-pick { display: flex; gap: 8px; align-items: center; min-height: 40px; }
+.seal-bonus { margin-left: auto; color: #e8c547; font-weight: 800; }
 .staff-list { max-height: 340px; overflow: auto; margin: 8px 0 12px; }
 .staff-row {
   display: grid;

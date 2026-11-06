@@ -62,7 +62,10 @@ const SessionPlay = {
   },
 
   weekMarks(trainings, playerId) {
-    const done = (trainings || []).filter(t => t && t.status === 'done' && !this.cancelled(t));
+    const done = (trainings || []).filter(t => {
+      if (typeof PlayerProgress !== 'undefined' && PlayerProgress.sessionCounts) return PlayerProgress.sessionCounts(t);
+      return t && t.status === 'done' && !this.cancelled(t);
+    });
     done.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
     return done.slice(-7).map(t => {
       const cell = t.attendance && t.attendance[playerId];
@@ -133,7 +136,36 @@ const SessionPlay = {
       const on = got.indexOf(step) >= 0;
       return '<span class="seal-pip' + (on ? ' on' : '') + '">' + step + '</span>';
     }).join('');
-    return '<div class="seal-row" title="Серія відвідувань"><span>Серія ' + streak + '</span>' + marks + '</div>';
+    let bonus = '';
+    try {
+      if (typeof PlayerProgress !== 'undefined' && PlayerProgress.streakBonusXp) {
+        const xp = PlayerProgress.streakBonusXp(streak);
+        if (xp) bonus = '<span class="seal-bonus">+' + xp + ' XP</span>';
+      }
+    } catch (_) {}
+    return '<div class="seal-row" title="Серія відвідувань, які позначив тренер"><span>Серія ' + streak + '</span>' + marks + bonus + '</div>';
+  },
+
+  slidesHtml(tr) {
+    if (!tr || !tr.id) return '';
+    const s = (typeof Store !== 'undefined' && Store.get && Store.get()) || { boards: [] };
+    const boards = s.boards || [];
+    const ids = Array.isArray(tr.slides) ? tr.slides : [];
+    const esc = (v) => (typeof sanitize === 'function' ? sanitize(v || '') : String(v || ''));
+    const coach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+    const slides = ids.map(id => {
+      const board = boards.find(b => b && String(b.id) === String(id));
+      if (!board) return '';
+      const thumb = (typeof Views !== 'undefined' && Views._schemeThumbSvg) ? Views._schemeThumbSvg(board) : '📐';
+      const title = esc(board.name || board.title || 'Схема');
+      return '<button type="button" class="tr-slide" data-action="open-training-slide" data-training-id="' + tr.id + '" data-board-id="' + esc(board.id) + '">' +
+        '<span class="tr-slide-thumb">' + thumb + '</span><span class="tr-slide-name">' + title + '</span></button>';
+    }).join('');
+    const add = coach
+      ? '<button type="button" class="btn btn-s btn-sm tr-slide-add" data-action="edit-slides" data-training-id="' + tr.id + '">+ Схема</button>'
+      : '';
+    if (!slides && !add) return '';
+    return '<div class="tr-slides"><div class="tr-slides-label">Слайди схем</div><div class="tr-slides-row">' + slides + add + '</div></div>';
   },
 
   weekHtml(playerId) {
@@ -158,7 +190,10 @@ const SessionPlay = {
     const me = this.me();
     if (!me) return;
     const s = (typeof Store !== 'undefined' && Store.get && Store.get()) || { trainings: [] };
-    const done = (s.trainings || []).filter(t => t && t.status === 'done' && !this.cancelled(t));
+    const done = (s.trainings || []).filter(t => {
+      if (typeof PlayerProgress !== 'undefined' && PlayerProgress.sessionCounts) return PlayerProgress.sessionCounts(t);
+      return t && t.status === 'done' && !this.cancelled(t);
+    });
     done.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
     const tr = done.find(t => t.attendance && t.attendance[me.id] && t.attendance[me.id].present === true);
     if (!tr) return;

@@ -9,7 +9,8 @@ function boot(head) {
     settings: { clubName: 'МЕТАЛІСТ ШТУТТГАРТ', staff: { assistants: ['p2'], presidentName: 'Олег' } },
     players: [
       { id: 'p1', number: 6, firstName: 'Павло', lastName: 'Михайловський', position: 'RB', readiness: 84, load: 4, isCaptain: true, telegramUsername: 'misha' },
-      { id: 'p2', number: 8, firstName: 'Тарас', lastName: 'Коновал', position: 'RB', readiness: 70, load: 3, telegramUsername: 'artem_serdyuk' }
+      { id: 'p2', number: 8, firstName: 'Тарас', lastName: 'Коновал', position: 'RB', readiness: 70, load: 3, telegramUsername: 'artem_serdyuk' },
+      { id: 'p3', number: 11, firstName: 'Ігор', lastName: 'Запасний', position: 'ST', readiness: 60, load: 2 }
     ],
     trainings: [],
     gifts: [],
@@ -63,11 +64,15 @@ describe('club staff and classic player card', () => {
     const { context } = boot(true);
     const html = context.Views.settings();
     assert.match(html, /assets\/coach-crest\.png/);
-    assert.match(html, /data-assistant/);
-    assert.match(html, /name="setPresident"/);
-    assert.match(html, /name="setCaptain"/);
+    assert.match(html, /data-action="staff-add"/);
+    assert.match(html, /Помічники/);
+    assert.match(html, /Президент/);
+    assert.match(html, /Капітан/);
+    assert.match(html, /Коновал/);
+    assert.match(html, /Михайловський/);
+    assert.equal(html.includes('Запасний'), false);
+    assert.equal(html.includes('data-assistant'), false);
     assert.match(html, /setPresidentName/);
-    assert.match(html, /checked> капітан/);
   });
 
   it('shows the staff to everyone else without the appointment controls', () => {

@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z61',
+  APP_BUILD: 'z62',
   APP_UPDATED: '06.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -1063,10 +1063,14 @@ const Views = {
         const off = (typeof LoadModel !== 'undefined' && LoadModel.isCancelled && LoadModel.isCancelled(t))
           || t.status === 'cancelled' || t.status === 'canceled';
         if (off) { cancelled++; return; }
-        if (t.status !== 'done') return;
+        const counts = (typeof PlayerProgress !== 'undefined' && PlayerProgress.sessionCounts)
+          ? PlayerProgress.sessionCounts(t)
+          : t.status === 'done';
+        if (!counts) return;
         const a = t.attendance && t.attendance[playerId];
-        if (!a) return;
-        if (a.present === false) absent++; else present++;
+        if (!a || a.present == null) return;
+        if (a.present === false || a.present === 0) absent++;
+        else if (a.present === true) present++;
       });
       return {
         attPct: LM && LM.attendanceRate ? LM.attendanceRate(s.trainings, playerId) : null,
@@ -1179,7 +1183,7 @@ const Views = {
             '<span>Load ' + (nextLoad || '—') + '</span>' +
             '<span>~+' + nextXp + ' XP</span>' +
           '</div></button>' +
-          ((typeof SessionPlay !== 'undefined') ? (SessionPlay.claimHtml(next) + SessionPlay.beatHtml(next)) : '') +
+          ((typeof SessionPlay !== 'undefined') ? (SessionPlay.claimHtml(next) + SessionPlay.slidesHtml(next)) : '') +
           '</div>')
         : '<div class="card glass next-tr-card"><div class="ct">Наступне тренування</div><div class="note-sm">Немає запланованого тренування</div></div>'}
 
@@ -1191,8 +1195,10 @@ const Views = {
           const a = me && tr.attendance && tr.attendance[me.id];
           const cancelled = (typeof LoadModel !== 'undefined' && LoadModel.isCancelled && LoadModel.isCancelled(tr))
             || tr.status === 'cancelled' || tr.status === 'canceled';
-          const held = !cancelled && tr.status === 'done';
-          const present = (held && a) ? (a.present !== false) : null;
+          const held = !cancelled && ((typeof PlayerProgress !== 'undefined' && PlayerProgress.sessionCounts)
+            ? PlayerProgress.sessionCounts(tr)
+            : tr.status === 'done');
+          const present = (held && a && a.present != null) ? (a.present === true) : null;
           const cls = cancelled ? 'ptr-cancel' : (present === true ? 'ptr-ok' : (present === false ? 'ptr-miss' : 'ptr-na'));
           const badge = cancelled ? 'скас.' : (present === true ? '✓' : (present === false ? '✗' : '—'));
           const rpe = held && a && a.rpe != null ? ('RPE ' + a.rpe) : '';
@@ -1530,7 +1536,7 @@ trainings() {
       const dur = tr.duration != null ? (tr.duration + ' хв') : '';
       const title = sanitize(tr.name || 'Тренування');
       const date = sanitize(tr.date || '');
-      const bits = (typeof SessionPlay !== 'undefined') ? (SessionPlay.beatHtml(tr) + SessionPlay.claimHtml(tr)) : '';
+      const bits = (typeof SessionPlay !== 'undefined') ? (SessionPlay.slidesHtml(tr) + SessionPlay.claimHtml(tr)) : '';
       return '<div class="card glass card-training tg-row ' + statusCls(st) + '" data-training-id="' + (tr.id || '') + '" data-action="open-training">' +
         '<div class="tr-top"><div class="tr-title">' + title + '</div><span class="tr-badge ' + statusCls(st) + '">' + statusLabel(st) + '</span></div>' +
         '<div class="tr-meta"><span>' + date + '</span>' + (dur ? '<span class="tr-dot">·</span><span>' + dur + '</span>' : '') +
@@ -2308,30 +2314,23 @@ trainings() {
         '<p>Помічники: ' + sanitize(asst.join(', ') || '—') + '</p>' +
         '<p>Капітан: ' + sanitize(cap ? nameOf(cap) : '—') + '</p></div>';
     }
-    const presId = String(staff.presidentId || '');
-    const capId = cap ? String(cap.id) : '';
-    const row = (p) => {
-      const id = sanitize(String(p.id));
-      return '<div class="staff-row">' +
-        '<span class="staff-name">' + nameOf(p) + '</span>' +
-        '<label><input type="checkbox" data-assistant value="' + id + '"' + (assistants.indexOf(String(p.id)) >= 0 ? ' checked' : '') + '> помічник</label>' +
-        '<label><input type="radio" name="setPresident" value="' + id + '"' + (presId === String(p.id) ? ' checked' : '') + '> президент</label>' +
-        '<label><input type="radio" name="setCaptain" value="' + id + '"' + (capId === String(p.id) ? ' checked' : '') + '> капітан</label>' +
-      '</div>';
-    };
+    const pres = players.find(p => p && String(p.id) === String(staff.presidentId || '')) || null;
+    const chip = (role, id, label) => '<span class="staff-chip">' + sanitize(label) +
+      '<button type="button" data-action="staff-remove" data-staff-role="' + role + '" data-player-id="' + sanitize(String(id)) + '" aria-label="Прибрати">×</button></span>';
+    const plus = (role) => '<button type="button" class="staff-plus" data-action="staff-add" data-staff-role="' + role + '" aria-label="Додати">+</button>';
+    const cat = (title, role, body) => '<section class="staff-cat"><div class="staff-cat-head"><span>' + title + '</span>' + plus(role) + '</div><div class="staff-chips">' + (body || '<span class="note-sm">Нікого</span>') + '</div></section>';
+    const asstChips = assistants.map(id => {
+      const p = players.find(x => x && String(x.id) === String(id));
+      return p ? chip('assistant', p.id, nameOf(p)) : '';
+    }).join('');
     return '<div class="card glass settings-card"><div class="ct">Склад тренерів</div>' + crest +
-      '<p class="note-sm">Головний тренер — Artem Serdiuk. Помічник входить як тренер, коли в картці гравця є Telegram. Капітана обирають лише тут.</p>' +
-      '<div class="staff-list">' +
-        '<div class="staff-row staff-row-clear">' +
-          '<span class="staff-name">Не призначено</span><span></span>' +
-          '<label><input type="radio" name="setPresident" value=""' + (presId ? '' : ' checked') + '> президент</label>' +
-          '<label><input type="radio" name="setCaptain" value=""' + (capId ? '' : ' checked') + '> капітан</label>' +
-        '</div>' +
-        players.map(row).join('') +
-      '</div>' +
+      '<p class="note-sm">Головний тренер — Artem Serdiuk. Плюс відкриває вибір. Помічник з Telegram входить як тренер.</p>' +
+      cat('Помічники', 'assistant', asstChips) +
+      cat('Президент', 'president', pres ? chip('president', pres.id, nameOf(pres)) : '') +
       '<label class="fl"><span class="fl-label">Президент не зі складу</span>' +
         '<input type="text" id="setPresidentName" class="fl-input" value="' + sanitize(staff.presidentName || '') + '" placeholder="Ім’я, якщо це не гравець">' +
       '</label>' +
+      cat('Капітан', 'captain', cap ? chip('captain', cap.id, nameOf(cap)) : '') +
       '<button type="button" class="btn btn-p" data-action="save-settings">Зберегти склад</button></div>';
   },
 

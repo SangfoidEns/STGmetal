@@ -84,6 +84,19 @@ describe('z50 club rules', () => {
     assert.equal(coach.level, Math.max(1, avg));
     assert.ok(coach.level < 10, 'gifts must not push the coach to the old inflated level');
     assert.equal(coach.players, 2);
+    ctx.__store.trainings.push({
+      id: 'draft-last', status: 'draft', date: '2026-11-03', name: 'Тренування 03/11',
+      attendance: { p1: { present: true, rpe: 7 } }
+    });
+    const again = ctx.PlayerProgress.compute('p1');
+    assert.equal(again.present, 2);
+    ctx.__store.trainings.push(
+      { id: 's2', status: 'done', date: '2026-11-04', attendance: { p1: { present: true } } },
+      { id: 's3', status: 'done', date: '2026-11-02', attendance: { p1: { present: true } } }
+    );
+    const streaked = ctx.PlayerProgress.compute('p1');
+    assert.ok(streaked.streak >= 3);
+    assert.equal(streaked.xpStreak, 30);
   });
 
   it('scheme thumbnail draws every arrow and every opponent', () => {

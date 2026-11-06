@@ -962,6 +962,99 @@ const Actions = {
     });
   },
 
+  editSlides(trainingId) {
+    const t = Store.get().trainings.find(x => x.id === trainingId);
+    if (!t) { Toast.show('Тренування не знайдено', 'warn'); return; }
+    const selected = new Set((t.slides || []).map(String));
+    const boards = (Store.get().boards || []).filter(b => b && b.id);
+    const rows = boards.length
+      ? boards.map(b => {
+          const id = sanitize(String(b.id));
+          const name = sanitize(b.name || b.title || 'Схема');
+          return '<label class="slide-pick"><input type="checkbox" class="slide-pick-box" value="' + id + '"' +
+            (selected.has(String(b.id)) ? ' checked' : '') + '> ' + name + '</label>';
+        }).join('')
+      : '<p class="note-sm">Немає збережених схем. Спочатку збережіть схему на дошці.</p>';
+    Modal.open('Слайди схем', '<p class="note-sm">Оберіть готові схеми. На картці тренування вони стають слайдами.</p>' + rows, [
+      { label: 'Скасувати', cls: 'btn-s', action: 'cancel' },
+      { label: 'Зберегти', cls: 'btn-p', action: 'save-slides' }
+    ]);
+    const save = document.querySelector('[data-modal-action="save-slides"]');
+    if (save) save.dataset.tid = trainingId;
+  },
+
+  saveSlides(trainingId) {
+    const t = Store.get().trainings.find(x => x.id === trainingId);
+    if (!t) return;
+    t.slides = Array.from(document.querySelectorAll('.slide-pick-box:checked')).map(el => el.value).filter(Boolean);
+    StorageManager.save();
+    Modal.close();
+    App.renderCurrent();
+    Toast.show(t.slides.length ? ('Слайдів: ' + t.slides.length) : 'Слайди прибрано', 'ok');
+  },
+
+  _syncAssistantCoaches() {
+    const s = Store.get().settings;
+    s.staff = s.staff || {};
+    if (!s.rbac) s.rbac = { coaches: ['Serdiuk_Artem'], playerLinks: {} };
+    const nicks = (s.staff.assistants || []).map(id => {
+      const pl = (Store.get().players || []).find(x => String(x.id) === String(id));
+      return pl && pl.telegramUsername ? String(pl.telegramUsername).replace(/^@/, '') : '';
+    }).filter(n => {
+      const low = n.toLowerCase();
+      return low && low !== 'artem_serdyuk' && low !== 'serdiuk_artem';
+    });
+    const seen = {};
+    s.rbac.coaches = ['Serdiuk_Artem'].concat(nicks).filter(n => {
+      const key = n.toLowerCase();
+      if (seen[key]) return false;
+      seen[key] = true;
+      return true;
+    });
+  },
+
+  assignStaff(role, playerId) {
+    const s = Store.get().settings;
+    s.staff = s.staff || {};
+    const players = Store.get().players || [];
+    const person = players.find(p => p && String(p.id) === String(playerId));
+    if (role === 'captain') {
+      if (typeof Store.setCaptain === 'function') Store.setCaptain(playerId || '');
+      s.staff.captainId = playerId || '';
+    } else if (role === 'president') {
+      s.staff.presidentId = playerId || '';
+      if (person) {
+        s.staff.presidentName = [person.firstName, person.lastName].filter(Boolean).join(' ');
+      }
+    } else if (role === 'assistant' && playerId) {
+      const list = (s.staff.assistants || []).map(String);
+      if (list.indexOf(String(playerId)) < 0) list.push(String(playerId));
+      s.staff.assistants = list;
+      this._syncAssistantCoaches();
+    }
+    StorageManager.save();
+    try { Modal.close(); } catch (_) {}
+    App.renderCurrent();
+    Toast.show('Призначення збережено', 'ok');
+  },
+
+  clearStaff(role, playerId) {
+    const s = Store.get().settings;
+    s.staff = s.staff || {};
+    if (role === 'captain') {
+      if (typeof Store.setCaptain === 'function') Store.setCaptain('');
+      s.staff.captainId = '';
+    } else if (role === 'president') {
+      s.staff.presidentId = '';
+    } else if (role === 'assistant') {
+      s.staff.assistants = (s.staff.assistants || []).filter(id => String(id) !== String(playerId));
+      this._syncAssistantCoaches();
+    }
+    StorageManager.save();
+    App.renderCurrent();
+    Toast.show('Прибрано', 'ok');
+  },
+
   editBeats(trainingId) {
     const t = Store.get().trainings.find(x => x.id === trainingId);
     if (!t) { Toast.show('Тренування не знайдено', 'warn'); return; }
@@ -1025,7 +1118,7 @@ const Actions = {
       };
     });
     t.updatedAt = new Date().toISOString();
-    if (t.status === 'planned') t.status = 'done';
+    if (t.status !== 'cancelled' && t.status !== 'canceled') t.status = 'done';
     try { LoadModel.recomputePlayerLoads(Store.get().players, Store.get().trainings); } catch (_) {}
     StorageManager.save();
     try { if (StorageManager.syncCloud) StorageManager.syncCloud(); } catch (_) {}
@@ -1271,23 +1364,9 @@ const Actions = {
       s.staff = s.staff || {};
       if (presPick) s.staff.presidentId = presPick.value || '';
       if (presNameEl) s.staff.presidentName = String(presNameEl.value || '').trim();
-      if (asstBoxes && asstBoxes.length) {
+        if (asstBoxes && asstBoxes.length) {
         s.staff.assistants = Array.from(asstBoxes).filter(b => b.checked).map(b => b.value);
-        if (!s.rbac) s.rbac = { coaches: ['Serdiuk_Artem'], playerLinks: {} };
-        const nicks = s.staff.assistants.map(id => {
-          const pl = (Store.get().players || []).find(x => String(x.id) === String(id));
-          return pl && pl.telegramUsername ? String(pl.telegramUsername).replace(/^@/, '') : '';
-        }).filter(n => {
-          const low = n.toLowerCase();
-          return low && low !== 'artem_serdyuk' && low !== 'serdiuk_artem';
-        });
-        const seen = {};
-        s.rbac.coaches = ['Serdiuk_Artem'].concat(nicks).filter(n => {
-          const key = n.toLowerCase();
-          if (seen[key]) return false;
-          seen[key] = true;
-          return true;
-        });
+        Actions._syncAssistantCoaches();
       }
     }
 
