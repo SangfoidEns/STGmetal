@@ -799,6 +799,7 @@ const Actions = {
       const intensity = Math.max(1, Math.min(10, +row.querySelector('.att-rpe')?.value || t.intensity || 6));
       t.attendance[pid] = { present, intensity, updatedAt: new Date().toISOString() };
     });
+    t.updatedAt = new Date().toISOString();
     if (t.status === 'planned') t.status = 'done';
     try { LoadModel.recomputePlayerLoads(Store.get().players, Store.get().trainings); } catch (_) {}
     StorageManager.save();

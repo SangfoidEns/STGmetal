@@ -139,12 +139,30 @@ const StorageManager = {
     return true;
   },
 
+  _readBackupPayload() {
+    try {
+      const raw = localStorage.getItem(BACKUP_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data || typeof data !== 'object') return null;
+      if (data.payload && typeof data.payload === 'object') return data.payload;
+      if (data.players || data.trainings || data.settings) return data;
+    } catch (_) {}
+    return null;
+  },
+
   applyClubPayload(remote, opts) {
     if (!remote || !remote.payload || !remote.updatedAt) return false;
     const current = Store.get() || {};
     const ui = current.ui;
     const localStats = current.settings && current.settings.coachStats;
-    const migrated = this.migrate(remote.payload, remote.payload.schemaVersion || 1);
+    let migrated = this.migrate(remote.payload, remote.payload.schemaVersion || 1);
+    if (this._staticClubOnly() && typeof ClubMerge !== 'undefined' && ClubMerge.mergePayload) {
+      if (!this._freshInstall) migrated = ClubMerge.mergePayload(migrated, current);
+      const backup = this._readBackupPayload();
+      if (backup) migrated = ClubMerge.mergePayload(migrated, backup);
+      migrated = this.migrate(migrated, migrated.schemaVersion || remote.payload.schemaVersion || 1);
+    }
     migrated.updatedAt = remote.updatedAt;
     if (ui) migrated.ui = Object.assign(migrated.ui || {}, ui);
     if (localStats && migrated.settings) {
@@ -193,12 +211,8 @@ const StorageManager = {
     if (!remote || remote.error || remote.empty || !remote.payload || !remote.updatedAt) return false;
     if (this._clubUpdatedAt && remote.updatedAt === this._clubUpdatedAt) return false;
     if (this._staticClubOnly()) {
-      if (!this._fileIsNewer(remote)) {
-        this._setClubSyncLine('Локальні зміни новіші. Експортуйте JSON і замініть club.json');
-        return false;
-      }
       const applied = this.applyClubPayload(remote);
-      if (applied) this._setClubSyncLine('Клуб з файлу club.json');
+      if (applied) this._setClubSyncLine('Клуб порівняно: новіші зміни без повторів');
       return applied;
     }
     if (this._clubDirty && this._isCoachWriter()) {
@@ -226,13 +240,9 @@ const StorageManager = {
     try { remote = await this.fetchClub(); } catch (_) { remote = { error: true }; }
     const offline = !remote || remote.error;
     if (this._staticClubOnly()) {
-      if (!offline && remote.payload && remote.updatedAt && this._fileIsNewer(remote)) {
+      if (!offline && remote.payload && remote.updatedAt) {
         this.applyClubPayload(remote, { quiet: true });
-        this._setClubSyncLine('Клуб з файлу club.json');
-      } else if (!offline && remote.payload && remote.updatedAt && this._clubStamp(Store.get() && Store.get().updatedAt) > this._clubStamp(remote.updatedAt)) {
-        this._setClubSyncLine('Локальні зміни новіші. Експортуйте JSON і замініть club.json');
-      } else if (!offline && remote.payload) {
-        this._setClubSyncLine('Клуб з файлу club.json');
+        this._setClubSyncLine('Клуб порівняно: новіші зміни без повторів');
       }
       clearTimeout(this._clubPushTimer);
       this._clubReady = true;
