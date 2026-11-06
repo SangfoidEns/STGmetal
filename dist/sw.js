@@ -1,9 +1,10 @@
-const CACHE_NAME = 'metalist-coach-v20261028z12';
+const CACHE_NAME = 'metalist-coach-v20261106z47';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './assets/metalist-mark.svg',
   './src/styles/app.css',
-  './src/core/utils.js', './src/core/toast.js', './src/core/store.js',
+  './src/core/utils.js', './src/core/toast.js', './src/core/store.js', './src/core/i18n.js',
   './src/core/auth.js', './src/core/storage.js', './src/core/modal.js', './src/core/loadModel.js',
+  './src/core/coachTools.js', './src/core/boardLink.js',
   './src/telegram/TelegramManager.js', './src/data/demo.js', './src/data/schemes.js',
   './src/board/TimerEngine.js', './src/board/BoardEngine.js',
   './src/ui/views.js', './src/ui/ai.js', './src/ui/app.js', './src/ui/actions.js'
@@ -18,8 +19,17 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
+  if (url.pathname.indexOf('/api/') === 0) return;
+  if (url.pathname.endsWith('/club.json')) {
+    event.respondWith(fetch(event.request, { cache: 'no-store' }));
+    return;
+  }
   event.respondWith(fetch(event.request).then(response => {
     if (response && response.ok) caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
     return response;
-  }).catch(() => caches.match(event.request).then(cached => cached || (event.request.mode === 'navigate' ? caches.match('./index.html') : undefined))));
+  }).catch(() => caches.match(event.request, { ignoreSearch: true }).then(cached => {
+    if (cached) return cached;
+    if (event.request.mode === 'navigate') return caches.match('./index.html');
+    return new Response('', { status: 504, statusText: 'offline' });
+  })));
 });

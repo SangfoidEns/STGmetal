@@ -9,7 +9,7 @@ const Store = (() => {
       schemaVersion: SCHEMA_VERSION,
       updatedAt: new Date().toISOString(),
       settings: {
-        clubName: 'МЕТАЛІСТ ШТУТГАРТ', clubShort: 'МШ', primary: '#1a3a5c', accent: '#c8a84b',
+        clubName: 'МЕТАЛІСТ ШТУТТГАРТ', clubShort: 'МШ', primary: '#1a3a5c', accent: '#c8a84b',
         logoData: null, defaultDuration: 90, defaultIntensity: 6, autosave: true, sound: true, theme: 'dark', defaultScheme: '4-3-3',
         rbac: { coaches: ['Serdiuk_Artem'], playerLinks: {} }
       },
@@ -22,6 +22,7 @@ const Store = (() => {
       diary: [],
       gifts: [],
       moments: [],
+      chat: [],
       myExercises: [],
       animations: [],
       activeBoard: { objects: [], history: [], historyIdx: -1, selectedId: null, tool: 'select', fieldView: 'full', anim: { playing: false, frame: 0, paths: [], speed: 1 } },
@@ -33,9 +34,9 @@ const Store = (() => {
   return {
     get() { return state; },
     getSlice(key) { return state ? state[key] : null; },
-    set(next) {
+    set(next, opts) {
       state = next;
-      state.updatedAt = new Date().toISOString();
+      if (!(opts && opts.keepStamp && state.updatedAt)) state.updatedAt = new Date().toISOString();
       listeners.forEach(fn => { try { fn(state); } catch (e) { ErrorManager.log('subscriber', e); } });
     },
     update(fn) {

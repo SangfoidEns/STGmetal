@@ -13,7 +13,7 @@ const CoachTools = {
     const blocks = (next.structure || [])
       .map(b => '• ' + (b.title || b.name || 'Блок') + ' — ' + (b.duration || 0) + ' хв')
       .join('\n');
-    const club = (s.settings && s.settings.clubName) || 'МЕТАЛІСТ ШТУТГАРТ';
+    const club = (s.settings && s.settings.clubName) || 'МЕТАЛІСТ ШТУТТГАРТ';
     return (
       '⚽ ' + club + '\n' +
       '📋 ' + (next.name || 'Тренування') + '\n' +
@@ -42,14 +42,14 @@ const CoachTools = {
 
   async shareNextTraining() {
     const text = this.formatNextTrainingMessage();
-    const ok = await TelegramManager.shareText('План тренування · МЕТАЛІСТ ШТУТГАРТ', text);
+    const ok = await TelegramManager.shareText('План тренування · МЕТАЛІСТ ШТУТТГАРТ', text);
     if (!ok && typeof Toast !== 'undefined') Toast.show(typeof t==='function'?t('toast_share_fail'):'Не вдалося поділитися — скопіюйте з буфера', 'warn');
     return ok;
   },
 
   async shareRoster() {
     const text = this.formatRosterSummary();
-    return TelegramManager.shareText('Склад · МЕТАЛІСТ ШТУТГАРТ', text);
+    return TelegramManager.shareText('Склад · МЕТАЛІСТ ШТУТТГАРТ', text);
   },
 
   async syncCloudNow() {
@@ -86,7 +86,7 @@ const CoachTools = {
       // 1) Telegram / native share
       try {
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ title: 'Metalist Roster', text: 'Склад МЕТАЛІСТ ШТУТГАРТ', files: [file] });
+          await navigator.share({ title: 'Metalist Roster', text: 'Склад МЕТАЛІСТ ШТУТТГАРТ', files: [file] });
           return;
         }
       } catch (_) {}
@@ -240,7 +240,24 @@ if (typeof window !== 'undefined') window.CoachTools = CoachTools;
 /** ── Telegram-style gifts & memorable moments ── */
 /** NFT-артефакти клубу (як Telegram Gifts) — унікальні серійні екземпляри */
 CoachTools.GIFT_CATALOG = [
-  /* ── Telegram-style animated emoji artifacts ── */
+  /* Футбольні колекційні Металіста — як подарунки Telegram: фон, символ, рідкість, серійний номер */
+  { id: 'crest_edition', ico: '🛡️', label: 'Щит Штуттгарта', rarity: 'legendary', hue: 45, pattern: 12, anim: 'sparkle',
+    description: 'Клубний щит сезону. Кожен екземпляр має свій візерунок.', momentHint: 'За клуб. За Штуттгарт.' },
+  { id: 'golden_boot', ico: '👟', label: 'Золота бутса', rarity: 'legendary', hue: 42, pattern: 8, anim: 'bounce',
+    description: 'За голи і удари, від яких тримається рахунок.' },
+  { id: 'clean_sheet', ico: '🧤', label: 'Суха сітка', rarity: 'epic', hue: 168, pattern: 10, anim: 'sway',
+    description: 'Ворота лишились зачиненими.' },
+  { id: 'hat_trick', ico: '⚽', label: 'Хет-трик', rarity: 'epic', hue: 28, pattern: 7, anim: 'spin',
+    description: 'Три голи в одному матчі або три точні виконання на тренуванні.' },
+  { id: 'captain_band', ico: '🎗️', label: 'Пов’язка капітана', rarity: 'epic', hue: 48, pattern: 1, anim: 'pulse',
+    description: 'За голос у роздягальні і рішення на полі.' },
+  { id: 'last_minute', ico: '⏱️', label: 'Остання хвилина', rarity: 'rare', hue: 12, pattern: 4, anim: 'flash',
+    description: 'За характер, коли час уже спливає.' },
+  { id: 'derby_night', ico: '🏟️', label: 'Ніч дербі', rarity: 'rare', hue: 220, pattern: 3, anim: 'pulse',
+    description: 'За гру, яку пам’ятає трибуна.' },
+  { id: 'first_touch', ico: '✨', label: 'Перший дотик', rarity: 'common', hue: 50, pattern: 2, anim: 'sparkle',
+    description: 'За чистий перший дотик і включення в епізод.' },
+  /* ── Класичні артефакти клубу ── */
   { id: 'star_gold',   ico: '⭐', label: 'Золота зірка',     rarity: 'legendary', hue: 42,  pattern: 1, anim: 'sparkle' },
   { id: 'cup_silver',  ico: '🏆', label: 'Срібний кубок',    rarity: 'epic',      hue: 210, pattern: 2, anim: 'bounce' },
   { id: 'fire_core',   ico: '🔥', label: 'Ядро вогню',       rarity: 'rare',      hue: 14,  pattern: 3, anim: 'pulse' },
@@ -262,7 +279,7 @@ CoachTools.GIFT_CATALOG = [
     description: 'Рідкісний артефакт за видатний внесок у клуб.' },
   { id: 'fox_smart',   ico: '🦊', label: 'Хитрий лис',       rarity: 'rare',      hue: 25,  pattern: 4, anim: 'wiggle',
     description: 'За розумну гру і тактичну кмітливість.' },
-  { id: 'lion_heart',  ico: '🦁', label: 'Лев Штутгарта',    rarity: 'epic',      hue: 40,  pattern: 6, anim: 'roar',
+  { id: 'lion_heart',  ico: '🦁', label: 'Лев Штуттгарта',    rarity: 'epic',      hue: 40,  pattern: 6, anim: 'roar',
     description: 'За лідерство і характер на полі.' },
   { id: 'dragon_power', ico: '🐉', label: 'Дракон сили',     rarity: 'legendary', hue: 320, pattern: 9, anim: 'pulse',
     description: 'Максимальна інтенсивність і бойовий дух.' },
@@ -277,7 +294,7 @@ CoachTools.GIFT_CATALOG = [
   { id: 'welcome_club_badge', ico: '🔰', label: 'Священна Гільза Клубу', rarity: 'common', hue: 200, pattern: 1, anim: 'sway',
     description: 'Тренер дарує цей артефакт кожному новобранцю як знак офіційного приєднання до нашої футбольної родини.',
     momentHint: 'Вітаємо в клубі! Перший крок у великій історії Metalist Stuttgart!' },
-  { id: 'neural_horse_tester', ico: '🧠', label: 'Нейронний Ударник Штутгарта',
+  { id: 'neural_horse_tester', ico: '🧠', label: 'Нейронний Ударник Штуттгарта',
     rarity: 'legendary', hue: 280, pattern: 11, anim: 'neural', special: 'neural-horse',
     exclusive: 'grok', series: 'Architects',
     description: 'Цей артефакт вручається за глибоке занурення в архітектуру додатку, виявлення критичних багів та візіонерські пропозиції, що формують майбутнє Metalist Stuttgart.',
@@ -295,18 +312,77 @@ CoachTools.giftById = function (id) {
 
 /** Унікальні фонові символи подарунка (як у Telegram Gifts) */
 CoachTools.GIFT_PATTERN_SYMBOLS = {
-  1:  ['✦', '✧', '⋆', '·', '✦'],
-  2:  ['◆', '◇', '◈', '·', '◆'],
-  3:  ['▴', '·', '✦', '▴', '·'],
-  4:  ['⚡', '·', '✧', '⚡', '·'],
-  5:  ['♥', '♡', '·', '♥', '·'],
-  6:  ['❖', '·', '✦', '❖', '·'],
-  7:  ['●', '○', '·', '◎', '·'],
-  8:  ['♛', '·', '✦', '✧', '·'],
-  9:  ['►', '·', '✧', '►', '·'],
-  10: ['🧤', '·', '✦', '·', '✧'],
-  11: ['◎', '·', '✦', '◎', '·'],
-  12: ['⬡', '·', '✧', '⬢', '·']
+  1:  ['⚽', '✦', '★', '·', '🛡️'],
+  2:  ['🥅', '·', '✦', '○', '⚽'],
+  3:  ['👟', '·', '✧', '▲', '·'],
+  4:  ['⏱️', '·', '✦', '⚡', '·'],
+  5:  ['💛', '·', '★', '💙', '·'],
+  6:  ['🐴', '·', '✦', '★', '·'],
+  7:  ['●', '○', '⚽', '◎', '·'],
+  8:  ['👑', '·', '✦', '★', '·'],
+  9:  ['▶', '·', '⚽', '✦', '·'],
+  10: ['🧤', '·', '✦', '🥅', '·'],
+  11: ['◎', '·', '⬡', '✦', '·'],
+  12: ['🛡️', '·', '★', '⚽', '·']
+};
+CoachTools.giftSeed = function (g) {
+  const raw = [
+    g && (g.seed != null ? String(g.seed) : ''),
+    g && (g.patternSeed || g.uid || g.id || ''),
+    g && (g.serial || ''),
+    g && (g.giftId || ''),
+    g && (g.playerId || ''),
+    g && (g.createdAt || '')
+  ].join('|') || 'metalist-stuttgart';
+  let h = 2166136261;
+  for (let i = 0; i < raw.length; i++) {
+    h ^= raw.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+};
+CoachTools.mintSerial = function (key) {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let h = 2166136261;
+  const s = String(key || 'metalist');
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  h = h >>> 0;
+  let code = '';
+  let x = h;
+  for (let i = 0; i < 4; i++) {
+    code += alphabet[x % alphabet.length];
+    x = Math.imul(x, 16777619) >>> 0;
+  }
+  return 'MS-' + code + '-' + String(1000 + (h % 9000));
+};
+CoachTools.giftHue = function (g) {
+  if (!g) return 42;
+  // Старі екземпляри вже мають власний seed і свій відтінок.
+  if (g.seed != null && g.seed !== '' && g.hue != null && isFinite(Number(g.hue))) {
+    return (Number(g.hue) % 360 + 360) % 360;
+  }
+  let base = 42;
+  try {
+    const def = g.giftId && CoachTools.giftById(g.giftId);
+    if (def && def.hue != null && isFinite(Number(def.hue))) base = Number(def.hue);
+    else if (g.hue != null && isFinite(Number(g.hue))) base = Number(g.hue);
+  } catch (_) {}
+  const shift = (CoachTools.giftSeed(g) >>> 4) % 16;
+  return (base + shift * 19) % 360;
+};
+CoachTools.giftLabel = function (g) {
+  if (!g) return '';
+  const def = g.giftId && CoachTools.giftById(g.giftId);
+  return (def && def.label) || g.label || '';
+};
+CoachTools.giftSerial = function (g) {
+  if (!g) return '';
+  const cur = g.serial ? String(g.serial) : '';
+  if (/^MS-[A-Z0-9]{4}-\d{4}$/.test(cur)) return cur;
+  return CoachTools.mintSerial(g.uid || g.id || g.patternSeed || ((g.giftId || '') + '|' + (g.createdAt || '') + '|' + (g.playerId || '')));
 };
 CoachTools.giftPatternSymbols = function (g) {
   try {
@@ -314,43 +390,207 @@ CoachTools.giftPatternSymbols = function (g) {
     const pid = def.pattern != null ? def.pattern : (g && g.pattern != null ? g.pattern : 1);
     const base = CoachTools.GIFT_PATTERN_SYMBOLS[pid] || CoachTools.GIFT_PATTERN_SYMBOLS[1];
     const ico = (g && g.ico) || def.ico || '★';
-    // унікальний набір: ico + pattern symbols
-    return [ico, base[0], base[1], ico, base[2], base[3], base[0], base[4] || base[1]];
+    const seed = CoachTools.giftSeed(g);
+    const shift = seed % base.length;
+    const spun = base.slice(shift).concat(base.slice(0, shift));
+    return [ico, spun[0], spun[1], ico, spun[2], spun[3 % spun.length], spun[0], spun[4] || spun[1]];
   } catch (_) {
     return ['★', '✦', '·', '✧', '★', '·'];
   }
 };
+/** Футбольні символи фону. Екземпляр подарунка бере один знак і повторює його сіткою, як у Telegram. */
+CoachTools.FOOTBALL_PATTERNS = [
+  { id: 'ball', label: 'М’яч' },
+  { id: 'goal', label: 'Ворота' },
+  { id: 'boot', label: 'Бутса' },
+  { id: 'whistle', label: 'Свисток' },
+  { id: 'jersey', label: 'Майка' },
+  { id: 'captain', label: 'Капітан' },
+  { id: 'flag', label: 'Прапорець' },
+  { id: 'cup', label: 'Кубок' },
+  { id: 'glove', label: 'Рукавиця' },
+  { id: 'scarf', label: 'Шарф' },
+  { id: 'medal', label: 'Медаль' },
+  { id: 'horse', label: 'Кінь' },
+  { id: 'shield', label: 'Герб' },
+  { id: 'timer', label: 'Секундомір' },
+  { id: 'cone', label: 'Фішка' },
+  { id: 'studs', label: 'Шипи' }
+];
+CoachTools.FOOTBALL_SYMBOLS = CoachTools.FOOTBALL_PATTERNS;
+CoachTools._patternBase = function (g) {
+  const n = (CoachTools.FOOTBALL_PATTERNS || []).length || 1;
+  let x = g ? CoachTools.giftSeed(g) : 0;
+  x = Math.imul(x ^ (x >>> 16), 0x7feb352d) >>> 0;
+  x = Math.imul(x ^ (x >>> 15), 0x846ca68b) >>> 0;
+  x = (x ^ (x >>> 16)) >>> 0;
+  return x % n;
+};
+CoachTools.footballPatternIndex = function (g) {
+  const n = (CoachTools.FOOTBALL_PATTERNS || []).length || 1;
+  const base = CoachTools._patternBase(g);
+  try {
+    if (!g || !g.giftId || typeof Store === 'undefined' || !Store.get) return base;
+    const sibs = (Store.get().gifts || []).filter(s => s && s.giftId === g.giftId)
+      .slice()
+      .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')) || String(a.id || a.uid || '').localeCompare(String(b.id || b.uid || '')));
+    const used = new Set();
+    let mine = base;
+    const key = String(g.uid || g.id || '');
+    sibs.forEach(s => {
+      let i = CoachTools._patternBase(s);
+      let guard = 0;
+      while (used.has(i) && guard < n) { i = (i + 1) % n; guard += 1; }
+      used.add(i);
+      if (String(s.uid || s.id || '') === key) mine = i;
+    });
+    return mine;
+  } catch (_) {}
+  return base;
+};
+CoachTools._footballSymbol = function (id, ink) {
+  const g = '<g fill="' + ink + '" stroke="none" opacity="0.26">';
+  const z = '</g>';
+  const e = ' fill-rule="evenodd"';
+  if (id === 'ball') {
+    return g + '<path' + e + ' d="M6.5,0 A6.5,6.5 0 1 1 -6.5,0 A6.5,6.5 0 1 1 6.5,0 Z M0,-2.7 L2.55,-0.85 L1.58,2.15 L-1.58,2.15 L-2.55,-0.85 Z"/>' + z;
+  }
+  if (id === 'goal') {
+    return g + '<path d="M-6.2,5.4 V-4.4 H6.2 V5.4 H4.5 V-2.7 H-4.5 V5.4 Z"/>' + z;
+  }
+  if (id === 'boot') {
+    return g + '<path d="M-5.4,1.2 C-5.8,-0.6 -4.4,-2.2 -2.4,-2.5 L-3.5,-5.2 L-1.1,-4.4 L-0.3,-2.3 L2.2,-2 C4.6,-1.5 6.3,0 6.4,1.5 C6.5,2.7 5.2,3.4 3.8,3.4 L3.8,4.3 A0.65,0.65 0 1 1 2.5,4.3 L2.5,3.4 L1.1,3.4 L1.1,4.4 A0.65,0.65 0 1 1 -0.2,4.4 L-0.2,3.4 L-1.8,3.4 L-1.8,4.3 A0.65,0.65 0 1 1 -3.1,4.3 L-3.1,3.4 H-4.2 C-5.5,3.4 -5.8,2.2 -5.4,1.2 Z"/>' + z;
+  }
+  if (id === 'whistle') {
+    return g + '<path' + e + ' d="M-7,-0.7 H-3.4 V-2.2 H2.4 C5,-2.2 6.4,-0.7 6.4,0.9 C6.4,2.6 4.8,3.7 2.4,3.7 H-3.4 V1.5 H-7 Z M-1.7,-2.2 H-0.5 V-3.4 H-1.7 Z M-2.15,-4.85 A1.15,1.15 0 1 0 0.15,-4.85 A1.15,1.15 0 1 0 -2.15,-4.85 Z M-1.48,-4.85 A0.48,0.48 0 1 0 -0.52,-4.85 A0.48,0.48 0 1 0 -1.48,-4.85 Z M3.15,0.75 A0.75,0.75 0 1 0 4.65,0.75 A0.75,0.75 0 1 0 3.15,0.75 Z"/>' + z;
+  }
+  if (id === 'jersey') {
+    return g + '<path d="M-6,-2 L-3.6,-5 L-1.8,-5.8 L0,-3.6 L1.8,-5.8 L3.6,-5 L6,-2 L4.5,-0.5 V5.4 H-4.5 V-0.5 Z"/>' + z;
+  }
+  if (id === 'captain') {
+    return g + '<path' + e + ' d="M-6.6,-2.6 H6.6 C7.3,-2.6 7.5,-1.2 6.8,-0.5 V0.5 C7.5,1.2 7.3,2.6 6.6,2.6 H-6.6 C-7.3,2.6 -7.5,1.2 -6.8,0.5 V-0.5 C-7.5,-1.2 -7.3,-2.6 -6.6,-2.6 Z M3.1,-1.7 C0.2,-3.5 -2.8,-1.8 -2.8,0 C-2.8,1.8 0.2,3.5 3.1,1.7 L1.9,0.45 C0.4,1.4 -1.2,0.7 -1.2,0 C-1.2,-0.7 0.4,-1.4 1.9,-0.45 Z"/>' + z;
+  }
+  if (id === 'flag') {
+    return g + '<path d="M-1.5,6.2 V-5.6 A0.9,0.9 0 1 1 0.3,-5.6 V-5.4 L6.2,-2.8 L0.3,-0.2 V6.2 Z"/>' + z;
+  }
+  if (id === 'cup') {
+    return g + '<path d="M-4.2,-4.4 H4.2 L3,1.1 C2.4,3 1.4,4 0,4 C-1.4,4 -2.4,3 -3,1.1 Z M-0.65,4 H0.65 V5.5 H2.5 V6.6 H-2.5 V5.5 H-0.65 Z M-4.2,-3.4 C-6.8,-3.4 -6.8,0.2 -4.2,0.5 V-0.6 C-5.4,-0.5 -5.4,-2.2 -4.2,-2.3 Z M4.2,-3.4 C6.8,-3.4 6.8,0.2 4.2,0.5 V-0.6 C5.4,-0.5 5.4,-2.2 4.2,-2.3 Z"/>' + z;
+  }
+  if (id === 'glove') {
+    return g + '<g transform="scale(0.68)"><path' + e + ' d="M-8.6,4.4 C-9.6,6 -7.4,8 -5.2,8.4 L-3.8,9.2 H4.4 C6.8,8.6 7.2,4.6 6,1.8 L5.2,-0.2 L5.2,-5.6 C5.3,-7.6 2.7,-8 2.5,-6 L2.4,-0.4 L1.3,-0.8 L1.2,-7.8 C1.1,-9.8 -1.5,-10 -1.6,-8 L-1.5,-1 L-2.6,-0.6 L-2.8,-6 C-2.9,-8 -5.5,-8 -5.4,-6 L-5.1,0.4 C-6.6,1 -8.2,2.4 -8.6,4.4 Z M-4.2,4.2 H3.6 V5.6 H-4.2 Z"/></g>' + z;
+  }
+  if (id === 'scarf') {
+    return g + '<path d="M-5.8,-2.2 C-2.4,-4.6 2.4,-4.6 5.8,-2.2 L5,-1.1 C2.2,-2.8 -2.2,-2.8 -5,-1.1 Z M-4.8,-1.4 L-5.6,4.8 H-3.2 L-2.6,-0.8 Z M2.2,-1 L3.2,5.6 H5.6 L4.4,-1.4 Z M-5.7,4.8 H-5.1 V6.3 H-5.7 Z M-4.6,4.8 H-4 V6.6 H-4.6 Z M-3.5,4.8 H-2.9 V6.3 H-3.5 Z M3.3,5.6 H3.9 V7.1 H3.3 Z M4.3,5.6 H4.9 V7.4 H4.3 Z M5.3,5.6 H5.9 V7.1 H5.3 Z"/>' + z;
+  }
+  if (id === 'medal') {
+    return g + '<path' + e + ' d="M-2.6,-6.4 L-0.75,-1.8 H0.75 L2.6,-6.4 L1.3,-6.4 L0,-3.6 L-1.3,-6.4 Z M0,1.8 m-4,0 a4,4 0 1 0 8,0 a4,4 0 1 0 -8,0 Z M0,1.8 m-1.55,0 a1.55,1.55 0 1 0 3.1,0 a1.55,1.55 0 1 0 -3.1,0 Z"/>' + z;
+  }
+  if (id === 'horse') {
+    return g + '<path' + e + ' d="M0.2,-6.6 L1.9,-4.2 L0.8,-3.2 C3,-3.6 5.4,-1.8 6,0.1 C6.4,1.4 5.4,2.3 4.6,2.1 L5,3.1 C3.8,4.5 1.8,4.1 1,3.1 L-0.2,4.6 C-1.6,6.2 -4.2,5.8 -5.1,4.2 L-5.6,2.2 L-4.1,1.6 L-5.2,0.2 L-3.6,-0.9 L-4.6,-2.1 L-2.2,-2.7 L-1.4,-4.2 Z M2.5,-0.5 m-0.5,0 a0.5,0.5 0 1 0 1,0 a0.5,0.5 0 1 0 -1,0 Z"/>' + z;
+  }
+  if (id === 'shield') {
+    return g + '<path' + e + ' d="M-5.4,-5.6 H5.4 V-0.8 C5.4,2.2 2.8,4.6 0,6.2 C-2.8,4.6 -5.4,2.2 -5.4,-0.8 Z M-3.2,-3.4 H3.2 V-2.1 H-3.2 Z M-3.2,-1 H3.2 V0.3 H-3.2 Z"/>' + z;
+  }
+  if (id === 'timer') {
+    return g + '<path d="M-1.05,-6.3 H1.05 V-3.7 H-1.05 Z M1.2,-5.5 H2.9 V-4.6 H1.2 Z"/>' +
+      '<path' + e + ' d="M0,1.3 m-5,0 a5,5 0 1 0 10,0 a5,5 0 1 0 -10,0 Z M-0.38,1.35 L-0.02,-1.9 L0.42,-1.75 L0.12,1.5 Z M-0.12,1.15 L2.25,2.5 L1.95,3.15 L-0.38,1.65 Z"/>' + z;
+  }
+  if (id === 'cone') {
+    return g + '<path' + e + ' d="M0,-6.4 L4.6,3.8 H-4.6 Z M-2.2,0.4 H2.2 L2.6,1.6 H-2.6 Z"/>' +
+      '<path d="M-5,4.2 H5 A5,1.15 0 1 1 -5,4.2 Z"/>' + z;
+  }
+  return g + '<path d="M-5.2,-1 H5.2 V0.5 H-5.2 Z M-4.2,0.5 L-2.7,5 H-5.6 Z M-0.8,0.5 L0.8,5.2 H-2.3 Z M2.6,0.5 L4.2,5 H1.2 Z"/>' + z;
+};
+CoachTools._footballSymbolTile = function (id, ink) {
+  const glyph = CoachTools._footballSymbol(id, ink);
+  const gap = 42;
+  const parts = [];
+  for (let row = 0; row <= 4; row++) {
+    const y = row * gap;
+    const odd = row % 2 === 1;
+    for (let i = -1; i <= 5; i++) {
+      const x = (odd ? gap / 2 : 0) + i * gap;
+      if (x < -9 || x > 177) continue;
+      parts.push('<g transform="translate(' + x + ' ' + y + ')">' + glyph + '</g>');
+    }
+  }
+  return parts.join('');
+};
+CoachTools.giftPatternSvg = function (g) {
+  const seed = g ? CoachTools.giftSeed(g) : 0x4d4554;
+  const hue = g ? CoachTools.giftHue(g) : 42;
+  const idx = CoachTools.footballPatternIndex(g);
+  const def = CoachTools.FOOTBALL_PATTERNS[idx] || CoachTools.FOOTBALL_PATTERNS[0];
+  const ink = 'hsl(' + hue + ' 22% 96%)';
+  const body = CoachTools._footballSymbolTile(def.id, ink);
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="168" height="168" viewBox="0 0 168 168">' + body + '</svg>';
+  return { svg: svg, hue: hue, seed: seed, patternId: def.id, patternLabel: def.label };
+};
+CoachTools.homePatternVars = function (gifts) {
+  const list = (gifts || []).filter(Boolean).slice()
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  const featured = list.find(g => g && g.featured) || list[0] || null;
+  const pat = CoachTools.giftPatternSvg(featured);
+  const ox = pat.seed % 70;
+  const oy = (pat.seed >>> 5) % 70;
+  const glow = 16 + (pat.seed % 68);
+  return '--home-pat:url(\'data:image/svg+xml,' + encodeURIComponent(pat.svg) + '\');--pat-x:' + ox + 'px;--pat-y:' + oy + 'px;--pat-hue:' + pat.hue + ';--pat-glow:' + glow + '%;';
+};
+CoachTools.coachProgress = function () {
+  const s = Store.get();
+  const done = (s.trainings || []).filter(t => t && t.status === 'done')
+    .slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+  let xpTrain = 0;
+  const attSeries = [];
+  done.forEach(t => {
+    xpTrain += 32;
+    xpTrain += Math.min(24, Math.round((Number(t.duration) || 0) / 5));
+    const att = t.attendance || {};
+    const ids = Object.keys(att);
+    let pct = 0;
+    if (ids.length) {
+      let present = 0;
+      ids.forEach(k => { if (att[k] && att[k].present !== false && att[k].present !== 0) present++; });
+      pct = Math.round(present / ids.length * 100);
+      xpTrain += Math.round(pct / 8);
+    }
+    attSeries.push(pct);
+  });
+  let teamXp = 0;
+  (s.players || []).forEach(p => {
+    try { teamXp += (PlayerProgress.compute(p.id).xp || 0); } catch (_) {}
+  });
+  const xpTeam = Math.round(teamXp / 12);
+  const xpGifts = (s.gifts || []).length * 8;
+  const xp = xpTrain + xpTeam + xpGifts;
+  let level = 1;
+  let need = 140;
+  let rest = xp;
+  while (rest >= need && level < 99) {
+    rest -= need;
+    level += 1;
+    need = Math.round(need * 1.26);
+  }
+  const avgAtt = attSeries.length ? Math.round(attSeries.reduce((a, n) => a + n, 0) / attSeries.length) : 0;
+  return {
+    xp, level,
+    levelProgress: need ? Math.round(rest / need * 100) : 0,
+    xpToNext: Math.max(0, need - rest),
+    xpTrain, xpTeam, xpGifts, teamXp,
+    sessions: done.length,
+    avgAtt,
+    attSeries: attSeries.slice(-8)
+  };
+};
 CoachTools.giftBackdropHtml = function (g, size) {
-  // size: 'sm' | 'md' | 'lg'
-  const hue = (g && g.hue != null) ? g.hue : 42;
+  const pat = CoachTools.giftPatternSvg(g || {});
   const rar = (g && g.rarity) || 'common';
-  const pid = (g && g.pattern != null) ? g.pattern : 1;
-  const syms = CoachTools.giftPatternSymbols(g);
-  // positions around the badge (Telegram-like scatter)
-  const slots = [
-    { x: 12, y: 18, s: 0.55, o: 0.22 },
-    { x: 78, y: 14, s: 0.5, o: 0.18 },
-    { x: 18, y: 72, s: 0.48, o: 0.2 },
-    { x: 82, y: 68, s: 0.52, o: 0.16 },
-    { x: 50, y: 8, s: 0.4, o: 0.14 },
-    { x: 8, y: 48, s: 0.42, o: 0.15 },
-    { x: 90, y: 42, s: 0.38, o: 0.12 },
-    { x: 48, y: 88, s: 0.45, o: 0.14 }
-  ];
-  const bgSyms = slots.map((sl, i) => {
-    const sy = syms[i % syms.length];
-    return '<span class="tg-gift-bg-sym" style="left:' + sl.x + '%;top:' + sl.y + '%;font-size:' +
-      (sl.s * 100) + '%;opacity:' + sl.o + ';transform:translate(-50%,-50%) rotate(' + ((i * 37) % 60 - 30) + 'deg)">' +
-      sy + '</span>';
-  }).join('');
   const ico = (g && g.ico) || '★';
   const media = (g && g.mediaUrl)
     ? ('<img class="tg-emoji-media" src="' + String(g.mediaUrl).replace(/"/g, '') + '" alt="">')
     : ico;
   return '<span class="tg-gift-art size-' + (size || 'md') + ' rarity-' + rar +
-    '" style="--art-hue:' + hue + ';--art-pattern:' + pid + '">' +
-    '<span class="tg-gift-art-bg" aria-hidden="true">' + bgSyms + '</span>' +
-    '<span class="tg-gift-art-glow" aria-hidden="true"></span>' +
+    '" style="--art-hue:' + pat.hue + ';--home-pat:url(\'data:image/svg+xml,' + encodeURIComponent(pat.svg) + '\')">' +
     '<span class="tg-gift-art-ico">' + media + '</span>' +
     '</span>';
 };
@@ -397,19 +637,47 @@ CoachTools.getCoachAchievements = function () {
 CoachTools.giveGift = function (playerId, giftId, momentText) {
   const s = Store.get();
   if (!s.gifts) s.gifts = [];
-  const def = CoachTools.giftById(giftId) || { id: giftId, ico: '🎁', label: giftId };
+  const def = CoachTools.giftById(giftId) || { id: giftId, ico: '🎁', label: giftId, hue: 42 };
   const uid = 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+  const seed = (Math.floor(Math.random() * 0x7fffffff) ^ Date.now()) >>> 0;
+  const baseHue = def.hue != null ? Number(def.hue) : 42;
+  const hue = (baseHue + ((seed >>> 4) % 16) * 19) % 360;
+  const pattern = seed % ((CoachTools.FOOTBALL_PATTERNS && CoachTools.FOOTBALL_PATTERNS.length) || 16);
+  let serial = CoachTools.mintSerial(uid);
+  const taken = new Set((s.gifts || []).map(x => x && x.serial).filter(Boolean));
+  let guard = 0;
+  while (taken.has(serial) && guard < 8) {
+    serial = CoachTools.mintSerial(uid + ':' + guard);
+    guard += 1;
+  }
   const entry = {
     uid,
+    id: uid,
     giftId: def.id,
     playerId,
     ico: def.ico,
     label: def.label,
     rarity: def.rarity || 'common',
+    seed,
+    hue,
+    pattern,
+    patternSeed: uid,
+    serial,
+    anim: def.anim || 'sparkle',
     moment: momentText || def.momentHint || '',
+    note: momentText || '',
+    featured: true,
+    attached: true,
     createdAt: new Date().toISOString()
   };
+  s.gifts.forEach(g => { if (g && String(g.playerId) === String(playerId)) g.featured = false; });
   s.gifts.push(entry);
+  const player = (s.players || []).find(x => x && String(x.id) === String(playerId));
+  if (player) {
+    if (!player.profile) player.profile = {};
+    player.profile.themeHue = entry.hue;
+    player.profile.featuredGiftId = entry.uid;
+  }
   try { StorageManager.save(); } catch (_) {}
   try {
     if (typeof CoachTools.GiftFX === 'function') CoachTools.GiftFX(entry);
@@ -418,10 +686,30 @@ CoachTools.giveGift = function (playerId, giftId, momentText) {
   return entry;
 };
 
+CoachTools.awardGift = function (playerId, giftId, momentText) {
+  return CoachTools.giveGift(playerId, giftId, momentText);
+};
+
 CoachTools.deleteGift = function (uid) {
   const s = Store.get();
-  s.gifts = (s.gifts || []).filter(g => g.uid !== uid);
+  const key = String(uid || '');
+  if (!key) return false;
+  const before = (s.gifts || []).length;
+  s.gifts = (s.gifts || []).filter(g => {
+    if (!g) return false;
+    return String(g.uid || '') !== key && String(g.id || '') !== key;
+  });
+  if ((s.gifts || []).length === before) return false;
+  (s.players || []).forEach(p => {
+    if (!p || !p.profile) return;
+    if (String(p.profile.featuredGiftId || '') !== key) return;
+    const next = (s.gifts || []).find(g => g && String(g.playerId) === String(p.id) && g.featured)
+      || (s.gifts || []).find(g => g && String(g.playerId) === String(p.id));
+    p.profile.featuredGiftId = next ? (next.uid || next.id || '') : '';
+    if (next && next.hue != null) p.profile.themeHue = next.hue;
+  });
   try { StorageManager.save(); } catch (_) {}
+  try { if (typeof Toast !== 'undefined') Toast.show('Подарунок видалено', 'ok'); } catch (_) {}
   return true;
 };
 
@@ -435,39 +723,176 @@ CoachTools.attachGift = function (uid) {
   return true;
 };
 
+CoachTools.canFeatureGift = function (g) {
+  try {
+    if (!g || typeof AuthManager === 'undefined') return false;
+    if (AuthManager.isCoach && AuthManager.isCoach()) return true;
+    if (!(AuthManager.isPlayer && AuthManager.isPlayer())) return false;
+    const me = AuthManager.getLinkedPlayer && AuthManager.getLinkedPlayer();
+    if (!me || g.playerId == null || g.playerId === '') return false;
+    return String(me.id) === String(g.playerId);
+  } catch (_) { return false; }
+};
+
+CoachTools.setFeaturedGift = function (playerId, uid) {
+  const s = Store.get();
+  const key = String(uid || '');
+  const g = (s.gifts || []).find(x => x && (String(x.uid || '') === key || String(x.id || '') === key));
+  if (!g) return false;
+  if (playerId && String(g.playerId) !== String(playerId)) return false;
+  if (!CoachTools.canFeatureGift(g)) return false;
+  (s.gifts || []).forEach(x => { if (x && String(x.playerId) === String(g.playerId)) x.featured = false; });
+  g.featured = true;
+  if (!g.id) g.id = g.uid || ('g_' + Date.now());
+  if (!g.uid) g.uid = g.id;
+  const p = (s.players || []).find(x => x && String(x.id) === String(g.playerId));
+  if (p) {
+    if (!p.profile) p.profile = {};
+    const hue = CoachTools.giftHue ? CoachTools.giftHue(g) : g.hue;
+    if (hue != null && isFinite(Number(hue))) {
+      p.profile.themeHue = Number(hue);
+      p.themeHue = Number(hue);
+    }
+    p.profile.featuredGiftId = g.uid || g.id;
+  }
+  try { StorageManager.save(); } catch (_) {}
+  return true;
+};
+
+CoachTools._giftKey = function (g) {
+  return String((g && (g.uid || g.id)) || '');
+};
+CoachTools._seenGiftIds = function () {
+  try {
+    const raw = localStorage.getItem('ms_seen_gift_ids');
+    const arr = raw ? JSON.parse(raw) : [];
+    return new Set((Array.isArray(arr) ? arr : []).map(String));
+  } catch (_) { return new Set(); }
+};
+CoachTools._rememberGiftKeys = function (keys) {
+  try {
+    const set = CoachTools._seenGiftIds();
+    (keys || []).forEach(k => { if (k) set.add(String(k)); });
+    localStorage.setItem('ms_seen_gift_ids', JSON.stringify(Array.from(set).slice(-600)));
+  } catch (_) {}
+};
+CoachTools._giftAudience = function (g, live) {
+  if (!g) return false;
+  if (live) return true;
+  try {
+    if (typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach()) return true;
+    const me = AuthManager.getLinkedPlayer && AuthManager.getLinkedPlayer();
+    if (me && String(me.id) === String(g.playerId)) return true;
+  } catch (_) {}
+  return false;
+};
+CoachTools.noticeNewGifts = function (gifts) {
+  gifts = gifts || [];
+  const seen = CoachTools._seenGiftIds();
+  const boot = !CoachTools._giftsBooted;
+  CoachTools._giftsBooted = true;
+  const cutoff = Date.now() - 30 * 60 * 1000;
+  const fresh = [];
+  const historical = [];
+  gifts.forEach(g => {
+    const k = CoachTools._giftKey(g);
+    if (!k || seen.has(k)) return;
+    const t = Date.parse((g && g.createdAt) || '');
+    const recent = isFinite(t) && t >= cutoff;
+    if (boot && !recent) historical.push(k);
+    else fresh.push(g);
+  });
+  if (historical.length) CoachTools._rememberGiftKeys(historical);
+  if (!fresh.length) return;
+  fresh.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  const newest = fresh[0];
+  const rest = fresh.slice(1).map(CoachTools._giftKey);
+  if (rest.length) CoachTools._rememberGiftKeys(rest);
+  const show = function () {
+    if (!CoachTools._giftAudience(newest, !boot)) {
+      CoachTools._rememberGiftKeys([CoachTools._giftKey(newest)]);
+      return;
+    }
+    CoachTools.GiftFX(newest);
+  };
+  if (!boot) { show(); return; }
+  let tries = 0;
+  const tick = function () {
+    tries += 1;
+    let ready = true;
+    try {
+      const local = AuthManager._isLocalCoachHost && AuthManager._isLocalCoachHost();
+      ready = !!(AuthManager.user || local);
+      if (!ready && tries >= 6) ready = true;
+    } catch (_) { ready = true; }
+    if (!ready) { setTimeout(tick, 700); return; }
+    show();
+  };
+  setTimeout(tick, 500);
+};
+
 CoachTools.GiftFX = function (entry) {
   try {
+    if (!entry) return;
+    const key = CoachTools._giftKey(entry);
+    if (!CoachTools._fxShown) CoachTools._fxShown = {};
+    if (key && CoachTools._fxShown[key]) return;
+    if (key) {
+      CoachTools._fxShown[key] = true;
+      CoachTools._rememberGiftKeys([key]);
+    }
+    const esc = function (v) {
+      const s = String(v == null ? '' : v);
+      if (typeof sanitize === 'function') return sanitize(s);
+      return s.replace(/[&<>"']/g, function (c) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+      });
+    };
+    let who = '';
+    try {
+      const p = (Store.get().players || []).find(x => x && String(x.id) === String(entry.playerId));
+      if (p) who = [p.firstName, p.lastName].filter(Boolean).join(' ');
+    } catch (_) {}
+    let kicker = 'Новий подарунок клубу';
+    try {
+      const me = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer) ? AuthManager.getLinkedPlayer() : null;
+      if (me && String(me.id) === String(entry.playerId)) kicker = 'Тобі подарунок';
+      else if (typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach()) kicker = 'Подарунок надіслано';
+    } catch (_) {}
+    const rarMap = { common: 'звичайний', rare: 'рідкісний', epic: 'епічний', legendary: 'легендарний' };
+    const rar = rarMap[entry.rarity] || entry.rarity || '';
+    const label = (CoachTools.giftLabel && CoachTools.giftLabel(entry)) || entry.label || 'Подарунок';
+    const serial = (CoachTools.giftSerial && CoachTools.giftSerial(entry)) || entry.serial || '';
+    const note = entry.note || entry.moment || '';
+    const hue = CoachTools.giftHue ? CoachTools.giftHue(entry) : (entry.hue || 42);
+    const patStyle = CoachTools.homePatternVars ? CoachTools.homePatternVars([entry]) : '';
+    const art = CoachTools.giftBackdropHtml ? CoachTools.giftBackdropHtml(entry, 'lg') : esc(entry.ico || '🎁');
     document.getElementById('giftFxOverlay')?.remove();
     const ov = document.createElement('div');
     ov.id = 'giftFxOverlay';
-    ov.className = 'gift-fx-overlay';
-    const parts = [];
-    for (let i = 0; i < 18; i++) {
-      const ang = (Math.PI * 2 * i) / 18;
-      const dist = 60 + Math.random() * 90;
-      const dx = Math.cos(ang) * dist;
-      const dy = Math.sin(ang) * dist;
-      const colors = ['#f5c542', '#7cf0c0', '#3d7eff', '#ff8fbf', '#fff'];
-      const c = colors[i % colors.length];
-      parts.push('<span class="gift-fx-p" style="left:50%;top:50%;--dx:' + dx.toFixed(1) + 'px;--dy:' + dy.toFixed(1) + 'px;background:' + c + ';animation-delay:' + (i * 0.03).toFixed(2) + 's"></span>');
-    }
-    ov.innerHTML = '<div class="gift-fx-burst">' +
-      '<div class="gift-fx-particles">' + parts.join('') + '</div>' +
-      '<div class="gift-fx-ico">' + (entry.ico || '🎁') + '</div>' +
-      '<div class="gift-fx-label">' + (entry.label || '') + '</div>' +
-      (entry.moment ? ('<div class="gift-fx-moment">' + entry.moment + '</div>') : '') +
+    ov.className = 'gift-fx-overlay rarity-' + (entry.rarity || 'common');
+    ov.style.setProperty('--gift-hue', String(hue));
+    ov.innerHTML =
+      '<div class="gift-fx-card home-pattern" style="--gift-hue:' + hue + ';' + patStyle + '">' +
+        '<div class="gift-fx-title">' + esc(kicker) + '</div>' +
+        '<div class="gift-fx-art">' + art + '</div>' +
+        (rar ? ('<div class="gift-fx-badge">' + esc(rar) + '</div>') : '') +
+        '<div class="gift-fx-label">' + esc(label) + '</div>' +
+        (who ? ('<div class="gift-fx-to">для ' + esc(who) + '</div>') : '') +
+        (serial ? ('<div class="gift-fx-serial">' + esc(serial) + '</div>') : '') +
+        (note ? ('<div class="gift-fx-note">«' + esc(note) + '»</div>') : '') +
+        '<button type="button" class="gift-fx-ok">Чудово</button>' +
       '</div>';
+    const close = function () {
+      ov.classList.remove('show');
+      setTimeout(function () { try { ov.remove(); } catch (_) {} }, 320);
+    };
+    ov.addEventListener('click', function (ev) {
+      if (ev.target === ov || (ev.target && ev.target.classList && ev.target.classList.contains('gift-fx-ok'))) close();
+    });
     document.body.appendChild(ov);
     requestAnimationFrame(function () { ov.classList.add('show'); });
-    ov.addEventListener('click', function () {
-      ov.classList.remove('show');
-      setTimeout(function () { ov.remove(); }, 350);
-    });
-    setTimeout(function () {
-      if (!ov.parentNode) return;
-      ov.classList.remove('show');
-      setTimeout(function () { ov.remove(); }, 400);
-    }, 3200);
+    setTimeout(close, 6400);
     try { TelegramManager.hapticSuccess && TelegramManager.hapticSuccess(); } catch (_) {}
   } catch (e) { console.warn('[GiftFX]', e); }
 };
@@ -480,7 +905,7 @@ CoachTools.openGiftAnimation = function (entry, onDone) {
     ov.id = 'giftOpenOverlay';
     ov.className = 'gift-open-overlay';
     const ico = (entry && entry.ico) || '🎁';
-    const label = (entry && entry.label) || 'Подарунок';
+    const label = CoachTools.giftLabel(entry) || 'Подарунок';
     const rar = (entry && entry.rarity) || 'common';
     const parts = [];
     for (let i = 0; i < 24; i++) {
@@ -501,8 +926,9 @@ CoachTools.openGiftAnimation = function (entry, onDone) {
           '<div class="gift-open-bow"></div>' +
         '</div>' +
         '<div class="gift-open-reveal">' +
-          '<div class="gift-open-ico">' + ico + '</div>' +
-          '<div class="gift-open-label">' + (typeof sanitize === 'function' ? sanitize(label) : label) + '</div>' +
+          '<div class="gift-open-ico">' + (CoachTools.giftBackdropHtml ? CoachTools.giftBackdropHtml(entry, 'lg') : ico) + '</div>' +
+          '<div class="gift-open-label">' + (typeof sanitize === 'function' ? sanitize(label) : label) +
+            (CoachTools.giftSerial(entry) ? (' · ' + CoachTools.giftSerial(entry)) : '') + '</div>' +
         '</div>' +
       '</div>';
     document.body.appendChild(ov);
@@ -570,10 +996,28 @@ const PlayerProgress = {
         history.push({ date: t.date, name: t.name, delta: this.RULES.absent, kind: 'absent' });
       }
     });
+    let xpAttend = 0;
+    let xpIntensity = 0;
+    trainings.forEach(t => {
+      const att = (t.attendance || {})[playerId];
+      if (!att || att.present === false || att.present === 0) return;
+      xpAttend += this.RULES.present;
+      const rpe = att.rpe != null ? +att.rpe : (att.intensity != null ? +att.intensity : 0);
+      if (rpe > 0) xpIntensity += Math.min(this.RULES.intensityBonusMax, Math.round(rpe * 1.2));
+    });
     const gifts = (s.gifts || []).filter(g => g.playerId === playerId);
-    xp += gifts.length * this.RULES.giftBonus;
+    const xpGifts = gifts.length * this.RULES.giftBonus;
+    xp += xpGifts;
     gifts.forEach(g => history.push({ date: (g.createdAt || '').slice(0, 10), name: g.label || 'Подарунок', delta: this.RULES.giftBonus, kind: 'gift' }));
     if (xp < 0) xp = 0;
+    const doneDesc = trainings.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+    let streak = 0;
+    for (let i = 0; i < doneDesc.length; i++) {
+      const att = (doneDesc[i].attendance || {})[playerId];
+      if (!att) continue;
+      if (att.present === false || att.present === 0) break;
+      streak++;
+    }
     // level curve
     let level = 1, need = this.RULES.levelBase, remain = xp;
     while (remain >= need && level < 99) {
@@ -586,6 +1030,7 @@ const PlayerProgress = {
     return {
       xp, level, levelProgress: pct, xpIntoLevel: remain, xpToNext: need - remain, need,
       present, absent, sessions, attPct,
+      xpAttend, xpIntensity, xpGifts, streak,
       form: level >= 80 ? '99' : level >= 50 ? 'elite' : level >= 25 ? 'pro' : 'rising',
       history: history.slice(-12).reverse()
     };
@@ -637,7 +1082,7 @@ CoachTools.ensureWornGift = function (playerId) {
 };
 CoachTools.giftAccent = function (g) {
   if (!g) return { hue: 42, ring: 'rgba(232,197,71,0.55)', bg: 'linear-gradient(145deg,#2a2410,#12100a)' };
-  const hue = g.hue != null ? g.hue : 42;
+  const hue = CoachTools.giftHue ? CoachTools.giftHue(g) : (g.hue != null ? g.hue : 42);
   return {
     hue: hue,
     ring: 'hsla(' + hue + ',75%,55%,0.85)',

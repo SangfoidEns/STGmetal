@@ -33,7 +33,7 @@ const DEMO = {
     { id: 'e07', name: 'Побудова атаки 4v2+GK', category: 'buildup', objective: 'Вихід з оборони', description: 'Захисники будують проти пресингу', players: 7, area: 'Третя', duration: 18, intensity: 6, equipment: ['м\'ячі', 'манішки'], instructions: '4 захисники + GK vs 2 пресингуючих', coachingPoints: 'Кути передач, терпіння', progression: '4v3', regression: '4v1', boardSetup: null },
     { id: 'e08', name: 'Завершення з флангу', category: 'finishing', objective: 'Удар після подачі', description: 'Подача + удар головою/ногою', players: 8, area: 'Штрафний', duration: 15, intensity: 7, equipment: ['м\'ячі', 'фішки'], instructions: 'Подача з флангу, 2 нападники завершують', coachingPoints: 'Таймінг забігання, напрямок удару', progression: 'Додати захисника', regression: 'Статична подача', boardSetup: null },
     { id: 'e09', name: 'Оборонний блок 6v6', category: 'defending', objective: 'Компактність блоку', description: 'Середній блок, відсікання передач', players: 12, area: 'Половина', duration: 18, intensity: 7, equipment: ['м\'ячі', 'манішки'], instructions: '6 обороняються, 6 атакують', coachingPoints: 'Дистанція між лініями', progression: '5v6', regression: '7v5', boardSetup: null },
-    { id: 'e10', name: 'Перехід атака→оборона', category: 'transition', objective: 'Швидкий перехід', description: 'Контрпресинг після втрати', players: 12, area: 'Половина', duration: 16, intensity: 8, equipment: ['м\'ячі', 'манішки',
+    { id: 'e10', name: 'Перехід атака→оборона', category: 'transition', objective: 'Швидкий перехід', description: 'Контрпресинг після втрати', players: 12, area: 'Половина', duration: 16, intensity: 8, equipment: ['м\'ячі', 'манішки'], instructions: 'Після втрати — 5 сек на відбір', coachingPoints: 'Реакція, найближчий гравець', progression: '3 сек', regression: '8 сек', boardSetup: null },
     { id: 'e11', name: 'Побудова 3-2 проти пресингу', category: 'build-up', objective: 'Вийти з-під першої лінії пресингу',
       description: 'Три центральні + два опорні будують атаку проти 2–3 пресингуючих. Акцент на третю людину та відкриті кути.',
       players: 10, area: 'Власна третина', duration: 18, intensity: 6,
@@ -89,9 +89,7 @@ const DEMO = {
       equipment: ["м\'ячі", 'фішки', 'міні-ворота'],
       instructions: 'Черги з обох флангів. Після прострілу — удар першим дотиком.',
       coachingPoints: 'Перший дотик уперед; бачити 9 і дальню штангу',
-      progression: '2 захисники', regression: 'Без захисника', tags: ['finishing','1v1','wingback'], boardSetup: null }
-
-  ], instructions: 'Після втрати — 5 сек на відбір', coachingPoints: 'Реакція, найближчий гравець', progression: '3 сек', regression: '8 сек', boardSetup: null },
+      progression: '2 захисники', regression: 'Без захисника', tags: ['finishing','1v1','wingback'], boardSetup: null },
   ],
   boardTemplates: [
     { id: 'bt1', name: 'Побудова 3-2', scheme: '3-2-build', phase: 'build-up',

@@ -68,7 +68,7 @@ export async function sendTrainingPlan({ chatId: cid, training, clubName } = {})
     .map((b, i) => `${i + 1}. ${b.title || b.name || 'Блок'} — ${b.duration || 0} хв`)
     .join('\n');
   const text =
-    `⚽ ${clubName || 'МЕТАЛІСТ ШТУТГАРТ'}\n` +
+    `⚽ ${clubName || 'МЕТАЛІСТ ШТУТТГАРТ'}\n` +
     `📋 План тренування: ${t.name || 'Тренування'}\n` +
     `📅 ${t.date || ''}${t.time ? ' · ' + t.time : ''}\n` +
     `⏱ ${t.duration || 0} хв · RPE ${t.intensity != null ? t.intensity : '—'}\n` +
@@ -90,7 +90,7 @@ export async function sendMatchLineup({ chatId: cid, match, players, clubName } 
     .map(p => `• #${p.number || '—'} ${[p.lastName, p.firstName].filter(Boolean).join(' ')} (${p.position || ''})`)
     .join('\n');
   const text =
-    `🏟️ ${clubName || 'МЕТАЛІСТ ШТУТГАРТ'}\n` +
+    `🏟️ ${clubName || 'МЕТАЛІСТ ШТУТТГАРТ'}\n` +
     `Склад на матч${m.opponent ? ' vs ' + m.opponent : ''}\n` +
     `📅 ${m.date || ''}${m.time ? ' · ' + m.time : ''}\n` +
     (m.venue ? `📍 ${m.venue}\n` : '') +
@@ -107,7 +107,7 @@ export async function sendMatchLineup({ chatId: cid, match, players, clubName } 
 /** Подія клубу */
 export async function sendClubEvent({ chatId: cid, title, body, date, place, clubName } = {}) {
   const text =
-    `📣 ${clubName || 'МЕТАЛІСТ ШТУТГАРТ'}\n` +
+    `📣 ${clubName || 'МЕТАЛІСТ ШТУТТГАРТ'}\n` +
     `«${title || 'Подія клубу'}»\n` +
     (date ? `📅 ${date}\n` : '') +
     (place ? `📍 ${place}\n` : '') +

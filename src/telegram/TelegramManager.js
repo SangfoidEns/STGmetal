@@ -11,7 +11,13 @@ const TelegramManager = {
     try {
       this.tg = window.Telegram && window.Telegram.WebApp;
       if (!this.tg) return false;
-      this.isTelegram = true;
+      const platform = String(this.tg.platform || '').toLowerCase();
+      const hasInit = !!(this.tg.initData && String(this.tg.initData).length > 0);
+      // Скрипт telegram-web-app.js створює заглушку і в звичайному браузері (platform = unknown).
+      this.isTelegram = hasInit || (!!platform && platform !== 'unknown');
+      if (!this.isTelegram) return false;
+      if (this._inited) return true;
+      this._inited = true;
 
       try { this.tg.ready(); } catch (_) {}
       try { this.tg.expand(); } catch (_) {}
@@ -258,6 +264,7 @@ const TelegramManager = {
   /* ── Haptics ── */
   haptic(type) {
     try {
+      if (!this.isTelegram) return;
       const h = this.tg && this.tg.HapticFeedback;
       if (!h) return;
       if (type === 'select' && h.selectionChanged) h.selectionChanged();
@@ -266,18 +273,21 @@ const TelegramManager = {
   },
   hapticSuccess() {
     try {
+      if (!this.isTelegram) return;
       const h = this.tg && this.tg.HapticFeedback;
       if (h && h.notificationOccurred) h.notificationOccurred('success');
     } catch (_) {}
   },
   hapticError() {
     try {
+      if (!this.isTelegram) return;
       const h = this.tg && this.tg.HapticFeedback;
       if (h && h.notificationOccurred) h.notificationOccurred('error');
     } catch (_) {}
   },
   hapticWarning() {
     try {
+      if (!this.isTelegram) return;
       const h = this.tg && this.tg.HapticFeedback;
       if (h && h.notificationOccurred) h.notificationOccurred('warning');
     } catch (_) {}
@@ -285,10 +295,10 @@ const TelegramManager = {
 
   /* ── Back button + view stack ── */
   showBackButton() {
-    try { if (this.tg && this.tg.BackButton) this.tg.BackButton.show(); } catch (_) {}
+    try { if (this.isTelegram && this.tg && this.tg.BackButton) this.tg.BackButton.show(); } catch (_) {}
   },
   hideBackButton() {
-    try { if (this.tg && this.tg.BackButton) this.tg.BackButton.hide(); } catch (_) {}
+    try { if (this.isTelegram && this.tg && this.tg.BackButton) this.tg.BackButton.hide(); } catch (_) {}
   },
   pushView(view) {
     if (!view) return;
@@ -499,7 +509,7 @@ const TelegramManager = {
   async shareText(title, text) {
     try {
       if (navigator.share) {
-        await navigator.share({ title: title || 'МЕТАЛІСТ ШТУТГАРТ', text: text || '' });
+        await navigator.share({ title: title || 'МЕТАЛІСТ ШТУТТГАРТ', text: text || '' });
         this.hapticSuccess();
         return true;
       }

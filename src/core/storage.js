@@ -8,23 +8,282 @@ const StorageManager = {
     const loaded = this.load();
     if (!loaded) {
       Store.reset();
-      this.save();
+      this._freshInstall = true;
     }
-    // Фонова синхронізація з Telegram Cloud Storage
+    // Фонова синхронізація з Telegram Cloud Storage і спільним JSON клубу
     setTimeout(() => {
       this.syncFromCloud().catch(() => {});
+      this.bootstrapClubSync().catch(() => {});
     }, 400);
   },
 
-  save() {
+  _isCoachWriter() {
+    try {
+      return typeof AuthManager !== 'undefined' && AuthManager._canWriteClub && AuthManager._canWriteClub();
+    } catch (_) { return false; }
+  },
+
+  _clubApi(path) {
+    let base = '';
+    try {
+      if (typeof window !== 'undefined' && window.METALIST_API) base = String(window.METALIST_API);
+    } catch (_) {}
+    base = String(base || '').replace(/\/+$/, '');
+    return (base || '') + path;
+  },
+
+  _clubInitData() {
+    try {
+      if (typeof TelegramManager !== 'undefined' && TelegramManager.tg && TelegramManager.tg.initData) {
+        return String(TelegramManager.tg.initData);
+      }
+    } catch (_) {}
+    return '';
+  },
+
+  _staticClubOnly() {
+    try {
+      return !(typeof window !== 'undefined' && window.METALIST_API);
+    } catch (_) { return true; }
+  },
+
+  _clubStamp(value) {
+    const n = Date.parse(value || '');
+    return Number.isFinite(n) ? n : 0;
+  },
+
+  /** club.json — або конверт { updatedAt, payload }, або прямий експорт з додатка. */
+  _normalizeClubFile(data) {
+    if (!data || typeof data !== 'object') return { error: true };
+    if (data.payload && typeof data.payload === 'object') {
+      const updatedAt = data.updatedAt || data.payload.updatedAt || data.payload.exportedAt || data.exportedAt || null;
+      if (!updatedAt) return { empty: true };
+      return { updatedAt, updatedBy: data.updatedBy || 'club.json', payload: data.payload };
+    }
+    if (data.players || data.trainings || data.boards || data.schemaVersion) {
+      const updatedAt = data.updatedAt || data.exportedAt || null;
+      if (!updatedAt) return { empty: true };
+      return { updatedAt, updatedBy: data.updatedBy || 'club.json', payload: data };
+    }
+    return { empty: true };
+  },
+
+  scheduleClubPush() {
+    if (this._staticClubOnly()) return;
+    if (this._suppressClubPush || !this._clubReady || !this._isCoachWriter()) return;
+    clearTimeout(this._clubPushTimer);
+    this._clubPushTimer = setTimeout(() => { this.pushClub().catch(() => {}); }, 400);
+  },
+
+  async fetchClub() {
+    if (this._staticClubOnly()) {
+      try {
+        const url = new URL('club.json', window.location.href);
+        const res = await fetch(url.toString(), { cache: 'no-store' });
+        if (!res.ok) {
+          this._setClubSyncLine('Немає файлу club.json');
+          return { error: true };
+        }
+        const club = this._normalizeClubFile(await res.json());
+        if (club.empty) this._setClubSyncLine('Покладіть експорт у club.json');
+        return club;
+      } catch (_) {
+        this._setClubSyncLine('Немає файлу club.json');
+        return { error: true };
+      }
+    }
+    try {
+      const res = await fetch(this._clubApi('/api/club-data'), { cache: 'no-store' });
+      if (!res.ok) return { error: true };
+      return res.json();
+    } catch (_) {
+      this._setClubSyncLine('Клубний обмін: немає зв’язку');
+      return { error: true };
+    }
+  },
+
+  async pushClub(opts) {
+    if (this._staticClubOnly()) return false;
+    const force = !!(opts && opts.force);
+    const coach = this._isCoachWriter();
+    let playerChat = false;
+    try {
+      playerChat = force && typeof AuthManager !== 'undefined' && AuthManager.isPlayer && AuthManager.isPlayer();
+    } catch (_) {}
+    if ((!coach && !playerChat) || this._suppressClubPush || !this._clubReady) return false;
+    const s = Store.get();
+    if (!s) return false;
+    const payload = this.buildExportPayload();
+    payload.updatedAt = s.updatedAt || new Date().toISOString();
+    const res = await fetch(this._clubApi('/api/club-data'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updatedAt: payload.updatedAt,
+        updatedBy: (typeof AuthManager !== 'undefined' && AuthManager.displayName) ? AuthManager.displayName() : 'coach',
+        initData: this._clubInitData(),
+        payload
+      })
+    });
+    if (res.status === 409) {
+      const remote = await res.json().catch(() => null);
+      if (remote && remote.payload) this.applyClubPayload(remote, { quiet: true });
+      this._clubDirty = false;
+      return false;
+    }
+    if (!res.ok) return false;
+    const data = await res.json().catch(() => null);
+    this._clubUpdatedAt = (data && data.updatedAt) || payload.updatedAt;
+    this._clubDirty = false;
+    this._setClubSyncLine('Клубний обмін: надіслано');
+    return true;
+  },
+
+  applyClubPayload(remote, opts) {
+    if (!remote || !remote.payload || !remote.updatedAt) return false;
+    const current = Store.get() || {};
+    const ui = current.ui;
+    const localStats = current.settings && current.settings.coachStats;
+    const migrated = this.migrate(remote.payload, remote.payload.schemaVersion || 1);
+    migrated.updatedAt = remote.updatedAt;
+    if (ui) migrated.ui = Object.assign(migrated.ui || {}, ui);
+    if (localStats && migrated.settings) {
+      const remoteStats = migrated.settings.coachStats || {};
+      migrated.settings.coachStats = {
+        appMs: Math.max(remoteStats.appMs || 0, localStats.appMs || 0),
+        boardMs: Math.max(remoteStats.boardMs || 0, localStats.boardMs || 0),
+        updatedAt: localStats.updatedAt || remoteStats.updatedAt || null
+      };
+    }
+    this._suppressClubPush = true;
+    try {
+      Store.set(migrated, { keepStamp: true });
+      const cur = Store.get();
+      if (cur) cur.updatedAt = remote.updatedAt;
+      const payload = this._buildLocalPayload();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    } finally {
+      this._suppressClubPush = false;
+    }
+    this._clubUpdatedAt = remote.updatedAt;
+    this._freshInstall = false;
+    if (!opts || !opts.quiet) {
+      try { Toast.show('Дані клубу оновлено', 'ok'); } catch (_) {}
+    }
+    try { if (typeof App !== 'undefined') { App.applyBranding(); App.renderCurrent(); } } catch (_) {}
+    try { if (typeof AuthManager !== 'undefined') { AuthManager._resolveRole(); AuthManager._applyUiRole(); } } catch (_) {}
+    try {
+      if (typeof CoachTools !== 'undefined' && CoachTools.noticeNewGifts) CoachTools.noticeNewGifts(migrated.gifts || []);
+    } catch (_) {}
+    this._setClubSyncLine('Клубний обмін: отримано ' + String(remote.updatedAt).slice(0, 16).replace('T', ' '));
+    return true;
+  },
+
+  _fileIsNewer(remote) {
+    if (this._freshInstall) return true;
+    const localAt = this._clubStamp(Store.get() && Store.get().updatedAt);
+    const remoteAt = this._clubStamp(remote && remote.updatedAt);
+    if (!localAt) return true;
+    return remoteAt > localAt;
+  },
+
+  async pullClub() {
+    if (this._holdRemote) return false;
+    const remote = await this.fetchClub();
+    if (!remote || remote.error || remote.empty || !remote.payload || !remote.updatedAt) return false;
+    if (this._clubUpdatedAt && remote.updatedAt === this._clubUpdatedAt) return false;
+    if (this._staticClubOnly()) {
+      if (!this._fileIsNewer(remote)) {
+        this._setClubSyncLine('Локальні зміни новіші. Експортуйте JSON і замініть club.json');
+        return false;
+      }
+      const applied = this.applyClubPayload(remote);
+      if (applied) this._setClubSyncLine('Клуб з файлу club.json');
+      return applied;
+    }
+    if (this._clubDirty && this._isCoachWriter()) {
+      await this.pushClub();
+      return false;
+    }
+    return this.applyClubPayload(remote);
+  },
+
+  _bindClubWatchers() {
+    if (this._clubWatchers || typeof document === 'undefined') return;
+    this._clubWatchers = true;
+    const kick = () => {
+      try {
+        if (document.visibilityState === 'hidden') return;
+      } catch (_) {}
+      this.pullClub().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', kick);
+    window.addEventListener('focus', kick);
+  },
+
+  async bootstrapClubSync() {
+    let remote = null;
+    try { remote = await this.fetchClub(); } catch (_) { remote = { error: true }; }
+    const offline = !remote || remote.error;
+    if (this._staticClubOnly()) {
+      if (!offline && remote.payload && remote.updatedAt && this._fileIsNewer(remote)) {
+        this.applyClubPayload(remote, { quiet: true });
+        this._setClubSyncLine('Клуб з файлу club.json');
+      } else if (!offline && remote.payload && remote.updatedAt && this._clubStamp(Store.get() && Store.get().updatedAt) > this._clubStamp(remote.updatedAt)) {
+        this._setClubSyncLine('Локальні зміни новіші. Експортуйте JSON і замініть club.json');
+      } else if (!offline && remote.payload) {
+        this._setClubSyncLine('Клуб з файлу club.json');
+      }
+      clearTimeout(this._clubPushTimer);
+      this._clubReady = true;
+      this._freshInstall = false;
+      if (this._clubPoll) clearInterval(this._clubPoll);
+      this._clubPoll = setInterval(() => { this.pullClub().catch(() => {}); }, 20000);
+      this._bindClubWatchers();
+      return;
+    }
+    if (!offline && remote.payload && remote.updatedAt) {
+      this.applyClubPayload(remote, { quiet: true });
+      this._clubDirty = false;
+    }
+    clearTimeout(this._clubPushTimer);
+    this._clubReady = true;
+    if (!offline && this._isCoachWriter() && !remote.payload) {
+      await this.pushClub();
+    } else if (!offline && this._clubDirty && this._isCoachWriter()) {
+      await this.pushClub();
+    }
+    this._freshInstall = false;
+    if (this._clubPoll) clearInterval(this._clubPoll);
+    this._clubPoll = setInterval(() => { this.pullClub().catch(() => {}); }, 4000);
+    this._bindClubWatchers();
+    if (offline) this._setClubSyncLine('Клубний обмін: немає зв’язку');
+    else this._setClubSyncLine(remote.updatedAt ? 'Клубний обмін: підключено' : 'Клубний обмін: очікує перший запис тренера');
+  },
+
+  _setClubSyncLine(text) {
+    this._clubSyncText = text;
+    try {
+      const el = document.getElementById('clubSyncLine');
+      if (el) el.textContent = text;
+    } catch (_) {}
+  },
+
+  save(opts) {
     /* DATA INTEGRITY: never wipe keys on error */
+    /* Файл club.json — джерело правди. Автозбереження не зсуває updatedAt, інакше файл виглядає старішим. */
+    const localOnly = !!(opts && opts.localOnly) || this._staticClubOnly();
     try {
       const s = Store.get();
       if (!s) return;
-      s.updatedAt = new Date().toISOString();
+      if (!localOnly) s.updatedAt = new Date().toISOString();
       const payload = this._buildLocalPayload();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-      this._scheduleCloudPush(payload);
+      if (!localOnly) {
+        this._scheduleCloudPush(payload);
+        this._clubDirty = true;
+        this.scheduleClubPush();
+      }
     } catch (e) {
       ErrorManager.log('Storage.save', e);
       Toast.show('Не вдалося зберегти (квота storage?)', 'err');
@@ -48,6 +307,7 @@ const StorageManager = {
       animations: s.animations || [],
       gifts: s.gifts || [],
       moments: s.moments || [],
+      chat: s.chat || [],
       activeBoard: {
         objects: (s.activeBoard && s.activeBoard.objects) || [],
         fieldView: (s.activeBoard && s.activeBoard.fieldView) || 'full'
@@ -63,6 +323,7 @@ const StorageManager = {
 
   _cloudApi() {
     try {
+      if (typeof TelegramManager !== 'undefined' && !TelegramManager.isTelegram) return null;
       const tg = window.Telegram && window.Telegram.WebApp;
       return tg && tg.CloudStorage ? tg.CloudStorage : null;
     } catch (_) { return null; }
@@ -212,7 +473,7 @@ const StorageManager = {
           if (!Array.isArray(migrated.diary)) migrated.diary = [];
         if (!Array.isArray(migrated.myExercises)) migrated.myExercises = [];
         if (!Array.isArray(migrated.animations)) migrated.animations = [];
-        Store.set(migrated);
+        Store.set(migrated, { keepStamp: true });
           this.save();
           localStorage.removeItem(LEGACY_KEY);
           Toast.show('Дані мігровано з v1', 'ok');
@@ -224,7 +485,7 @@ const StorageManager = {
       if (!data || typeof data !== 'object') throw new Error('Invalid data');
       const version = data.schemaVersion || 1;
       const migrated = this.migrate(data, version);
-      Store.set(migrated);
+      Store.set(migrated, { keepStamp: true });
       return true;
     } catch (e) {
       ErrorManager.log('Storage.load', e);
@@ -290,7 +551,11 @@ const StorageManager = {
     if (!Array.isArray(base.gifts)) base.gifts = [];
     if (!Array.isArray(base.moments)) base.moments = [];
     else base.moments = base.moments || [];
+    if (Array.isArray(data.chat)) base.chat = data.chat;
+    else if (!Array.isArray(base.chat)) base.chat = [];
     base.schemaVersion = SCHEMA_VERSION;
+    if (data.updatedAt) base.updatedAt = data.updatedAt;
+    else if (data.exportedAt) base.updatedAt = data.exportedAt;
     return base;
   },
 
@@ -302,9 +567,18 @@ const StorageManager = {
     // photoUrl / birthDate ОБОВ'ЯЗКОВО зберігаємо (раніше губились при load/migrate)
     let photoUrl = p.photoUrl || p.photo || p.avatar || '';
     if (photoUrl && typeof photoUrl === 'string' && photoUrl.length > 1200000) {
-      // захист від гігантських dataURL у storage
-      photoUrl = photoUrl.slice(0, 0); // drop — буде перезавантажено
+      photoUrl = '';
     }
+    let profilePhoto = (typeof p.profilePhoto === 'string') ? p.profilePhoto : '';
+    if (profilePhoto.length > 400000) profilePhoto = '';
+    const srcProfile = (p.profile && typeof p.profile === 'object') ? p.profile : null;
+    const profile = srcProfile ? {
+      phone: srcProfile.phone || '',
+      social: srcProfile.social || '',
+      status: srcProfile.status || '',
+      bio: srcProfile.bio || '',
+      birthDate: srcProfile.birthDate || p.birthDate || p.birthday || ''
+    } : null;
     return {
       id: p.id || uid(),
       firstName: p.firstName || '',
@@ -326,7 +600,11 @@ const StorageManager = {
       telegramId: p.telegramId || p.tgId || null,
       phone: p.phone || '',
       photoUrl: photoUrl || '',
+      profilePhoto: profilePhoto || '',
       birthDate: p.birthDate || p.birthday || '',
+      bio: p.bio || (profile && profile.bio) || '',
+      statusText: p.statusText || (profile && profile.status) || '',
+      profile: profile || undefined,
       isStarter: p.isStarter !== false && (p.group !== 'reserve'),
       squadRole: p.squadRole || (p.group === 'reserve' ? 'reserve' : 'starter')
     };
@@ -402,6 +680,7 @@ const StorageManager = {
       animations: s.animations || [],
       gifts: s.gifts || [],
       moments: s.moments || [],
+      chat: s.chat || [],
       activeBoard: {
         objects: (s.activeBoard && s.activeBoard.objects) || [],
         fieldView: (s.activeBoard && s.activeBoard.fieldView) || 'full'
@@ -441,7 +720,7 @@ const StorageManager = {
       type: 'metalist_full_migration',
       schemaVersion: s.schemaVersion || 2,
       updatedAt: new Date().toISOString(),
-      club: (s.settings && s.settings.clubName) || 'МЕТАЛІСТ ШТУТГАРТ',
+      club: (s.settings && s.settings.clubName) || 'МЕТАЛІСТ ШТУТТГАРТ',
       // повний стан (без UI-ефемерного, якщо є)
       players: JSON.parse(JSON.stringify(s.players || [])),
       trainings: JSON.parse(JSON.stringify(s.trainings || [])),
@@ -450,6 +729,7 @@ const StorageManager = {
       schemes: JSON.parse(JSON.stringify(s.schemes || [])),
       diary: JSON.parse(JSON.stringify(s.diary || [])),
       gifts: JSON.parse(JSON.stringify(s.gifts || [])),
+      chat: JSON.parse(JSON.stringify(s.chat || [])),
       exercises: JSON.parse(JSON.stringify(s.exercises || [])),
       myExercises: JSON.parse(JSON.stringify(s.myExercises || [])),
       animations: JSON.parse(JSON.stringify(s.animations || [])),
@@ -561,7 +841,7 @@ const StorageManager = {
     const sizeKb = Math.round(new Blob([text]).size / 1024);
     const body = `
       <p style="font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.45">
-        Експорт даних МЕТАЛІСТ ШТУТГАРТ · <strong>${sizeKb} КБ</strong><br>
+        Експорт даних МЕТАЛІСТ ШТУТТГАРТ · <strong>${sizeKb} КБ</strong><br>
         У Telegram найнадійніше — <strong>скопіювати</strong> і зберегти в «Вибране» або надіслати собі в Saved Messages.
       </p>
       <div class="export-actions" style="display:flex;flex-direction:column;gap:8px">
@@ -645,7 +925,7 @@ const StorageManager = {
     try {
       const file = new File([text], filename, { type: 'application/json' });
       if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'МЕТАЛІСТ ШТУТГАРТ', text: 'Експорт тренерських даних' });
+        await navigator.share({ files: [file], title: 'МЕТАЛІСТ ШТУТТГАРТ', text: 'Експорт тренерських даних' });
         Toast.show('Надіслано', 'ok');
         return;
       }
@@ -724,23 +1004,28 @@ const StorageManager = {
   isIoLocked() { return !!this._ioLock; },
 
   /**
-   * Єдиний прихований input для iOS / Telegram.
-   * id="ios-json-input" — поза будь-яким view, ніколи не remount-иться.
+   * Єдиний input для iOS / Telegram. Лежить на body, не всередині екрана:
+   * інакше перемальовка налаштувань губила обробник і файл не застосовувався.
    */
   _ensureImportInput() {
-    let inp = document.getElementById('ios-json-input');
+    document.querySelectorAll('#ios-json-input').forEach((el) => {
+      if (el.parentElement !== document.body) el.remove();
+    });
+    let inp = document.getElementById('ms-json-import-input');
+    if (inp && inp.parentElement !== document.body) {
+      try { document.body.appendChild(inp); } catch (_) {}
+    }
     if (inp) return inp;
     inp = document.createElement('input');
     inp.type = 'file';
-    inp.id = 'ios-json-input';
-    inp.accept = '.json,application/json,text/json,text/plain,*/*';
+    inp.id = 'ms-json-import-input';
+    inp.accept = '.json,.txt,application/json,text/plain,text/json,*/*';
     inp.setAttribute('aria-hidden', 'true');
     inp.tabIndex = -1;
-    inp.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;opacity:0;pointer-events:none;border:0;padding:0;margin:0;';
+    inp.style.cssText = 'position:fixed;left:8px;bottom:8px;width:44px;height:44px;opacity:0.02;z-index:2147483000;border:0;padding:0;margin:0;';
     document.body.appendChild(inp);
     inp.addEventListener('change', (event) => {
       try {
-        if (event && event.preventDefault) event.preventDefault();
         if (event && event.stopPropagation) event.stopPropagation();
       } catch (_) {}
       const file = event.target.files && event.target.files[0];
@@ -750,10 +1035,9 @@ const StorageManager = {
         this.endIoLock();
         return;
       }
-      this.beginIoLock(4000);
+      this.beginIoLock(8000);
       this.importJSON(file).finally(() => {
         clear();
-        // тримаємо lock ще трохи, поки iOS повертає фокус
         setTimeout(() => this.endIoLock(), 800);
       });
     });
@@ -804,10 +1088,25 @@ const StorageManager = {
   },
 
   importJSON(fileOrText) {
+    if (!this._isCoachWriter()) {
+      try { Toast.show('Імпорт лише для тренера', 'warn'); } catch (_) {}
+      return;
+    }
+    this._holdRemote = true;
+    const publishImport = () => {
+      this._clubDirty = true;
+      this._clubReady = true;
+      const finish = () => { this._holdRemote = false; };
+      this.pushClub({ force: true }).then(finish, finish);
+    };
+
     const applyData = (raw) => {
       try {
-        const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        let data = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (!data || typeof data !== 'object') throw new Error('Невірний формат JSON');
+        if (data.payload && typeof data.payload === 'object' && (data.payload.players || data.payload.trainings || data.payload.schemaVersion)) {
+          data = data.payload;
+        }
 
         // ── Повна міграція всіх даних від тренера ──
         if (data.type === 'metalist_full_migration' || data.type === 'metalist_roster_migration') {
@@ -866,6 +1165,7 @@ const StorageManager = {
           try { App.applyBranding && App.applyBranding(); } catch (_) {}
           try { App.renderCurrent(); } catch (_) {}
           try { App.updateHeader && App.updateHeader(); } catch (_) {}
+          publishImport();
 
           // якщо поточний користувач отримав нові подарунки — святкова анімація
           try {
@@ -904,6 +1204,7 @@ const StorageManager = {
         try { App.renderCurrent(); } catch (_) {}
         try { App.updateHeader && App.updateHeader(); } catch (_) {}
         try { this.pushToCloud(this._buildLocalPayload()); } catch (_) {}
+        publishImport();
         let roleMsg = '';
         try {
           if (typeof AuthManager !== 'undefined') {
@@ -924,7 +1225,10 @@ const StorageManager = {
     };
 
     return new Promise((resolve) => {
-      const done = (ok) => resolve(!!ok);
+      const done = (ok) => {
+        if (!ok) this._holdRemote = false;
+        resolve(!!ok);
+      };
 
       // Рядок JSON напряму
       if (typeof fileOrText === 'string') {

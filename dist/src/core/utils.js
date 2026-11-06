@@ -1,7 +1,7 @@
 /** Extracted module: src/core/utils.js lines 1-45 — DO NOT rewrite business logic */
 
 /* ═══════════════════════════════════════════════════════════
-   МЕТАЛІСТ ШТУТГАРТ — Coach Board v2 (Production Prototype)
+   МЕТАЛІСТ ШТУТТГАРТ — Coach Board v2 (Production Prototype)
    Architecture: UI → AppState → Domain → StorageManager
    Schema Version: 2
    ═══════════════════════════════════════════════════════════ */

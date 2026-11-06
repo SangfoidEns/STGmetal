@@ -1,7 +1,7 @@
 /** Auth & RBAC — тренер / гравець / гість */
 const AuthManager = {
   user: null,
-  role: 'coach', // coach | player | guest
+  role: 'guest', // coach | player | guest. Невідомий користувач не є тренером.
   linkedPlayerId: null,
 
   /** Єдиний тренер за замовчуванням */
@@ -19,7 +19,8 @@ const AuthManager = {
       }
     } catch (e) {
       console.warn('[Auth] init', e);
-      this.role = 'coach';
+      this.user = null;
+      this.role = this._isLocalCoachHost() ? 'coach' : 'guest';
     }
     return this;
   },
@@ -91,6 +92,27 @@ const AuthManager = {
     return String(v || '').trim().replace(/^@/, '').toLowerCase();
   },
 
+  /** Браузер на цій машині. Публічне посилання без Telegram — не тренер. */
+  _isLocalCoachHost() {
+    try {
+      const host = String(location.hostname || '').toLowerCase();
+      return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+    } catch (_) {
+      return false;
+    }
+  },
+
+  /** Повний запис клубного файлу: лише @Serdiuk_Artem або локальний браузер. */
+  _canWriteClub() {
+    if (this.role !== 'coach') return false;
+    if (this.user) {
+      const nick = this._normNick(this.user.username);
+      if (nick === 'artem_serdyuk') return false;
+      return nick === 'serdiuk_artem';
+    }
+    return this._isLocalCoachHost();
+  },
+
   _ensureRbacDefaults() {
     try {
       const s = Store.get();
@@ -127,9 +149,9 @@ const AuthManager = {
 
   _resolveRole() {
     this.linkedPlayerId = null;
-    // Поза Telegram (браузер / dev) — тренер
+    // Без акаунта Telegram на публічному посиланні — гість, тільки перегляд.
     if (!this.user) {
-      this.role = 'coach';
+      this.role = this._isLocalCoachHost() ? 'coach' : 'guest';
       return;
     }
 
@@ -281,7 +303,7 @@ const AuthManager = {
   },
 
   displayName() {
-    if (!this.user) return 'Локальний режим (тренер)';
+    if (!this.user) return this._isLocalCoachHost() ? 'Локальний режим (тренер)' : 'Гість';
     const n = [this.user.first_name, this.user.last_name].filter(Boolean).join(' ');
     return n || (this.user.username ? '@' + this.user.username : 'ID ' + this.user.id);
   },
@@ -306,7 +328,7 @@ const AuthManager = {
       if (el) {
         const name = typeof sanitize === 'function' ? sanitize(this.displayName()) : this.displayName();
         el.innerHTML = '<span class="auth-role">' + this.roleLabel() + '</span>: ' + name;
-        el.title = this.user ? ('Telegram ID: ' + this.user.id) : 'Без Telegram — режим тренера';
+        el.title = this.user ? ('Telegram ID: ' + this.user.id) : (this._isLocalCoachHost() ? 'Локальний режим тренера' : 'Без Telegram — лише перегляд');
       }
     } catch (_) {}
   },

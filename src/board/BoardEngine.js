@@ -431,16 +431,14 @@ const BoardEngine = {
         ab.paletteOpen = false;
       }
       document.body.classList.remove('tools-tray-open');
-      const tray = document.getElementById('btbToolsTray');
-      if (tray) {
+      document.querySelectorAll('#btbToolsTray').forEach((tray, index) => {
         tray.classList.remove('open');
         tray.setAttribute('aria-hidden', 'true');
-        // повернути в bottom toolbar якщо був portal
+        tray.style.cssText = '';
         const bottom = document.getElementById('boardToolbarBottom');
-        if (bottom && tray.parentElement === document.body) {
-          bottom.appendChild(tray);
-        }
-      }
+        if (index === 0 && bottom && tray.parentElement === document.body) bottom.appendChild(tray);
+        else if (index > 0) tray.remove();
+      });
       if (!skipRender) {
         try { this.renderToolbar && this.renderToolbar(); } catch (_) {}
       }
@@ -1033,7 +1031,7 @@ const BoardEngine = {
       </button>`;
     }).join('');
     Modal.open(
-      'Склад МЕТАЛІСТ ШТУТГАРТ',
+      'Склад МЕТАЛІСТ ШТУТТГАРТ',
       `<p class="note-sm" style="margin-bottom:8px">Оберіть гравця на поле · або відправте всіх вільних на лавку</p>
        <button type="button" class="btn btn-p" id="rosterAllToBenchBtn" style="width:100%;margin-bottom:10px;min-height:44px">
          ⬇ Усіх зі списку на лавку (${available.length})
@@ -2395,7 +2393,7 @@ const BoardEngine = {
     const file = new File([blob], filename, { type: 'image/gif' });
     try {
       if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'МЕТАЛІСТ ШТУТГАРТ', text: 'Тактична схема' });
+        await navigator.share({ files: [file], title: 'МЕТАЛІСТ ШТУТТГАРТ', text: 'Тактична схема' });
         Toast.show('GIF надіслано', 'ok');
         return;
       }
@@ -2475,6 +2473,8 @@ const BoardEngine = {
   },
 
   renderToolbar() {
+    // Прибрати залиплі копії лотка (portal на body + новий HTML = кілька видимих панелей)
+    try { document.querySelectorAll('#btbToolsTray').forEach(el => el.remove()); } catch (_) {}
     const top = document.getElementById('boardToolbarTop') || document.getElementById('boardToolbar');
     const bottom = document.getElementById('boardToolbarBottom');
     if (!top && !bottom) return;
@@ -2535,7 +2535,10 @@ const BoardEngine = {
         </div>
       </div>
       <div class="btb-tray ${trayOpen?'open':''}" id="btbToolsTray" aria-hidden="${trayOpen?'false':'true'}">
-        <div class="btb-tray-handle"></div>
+        <div class="btb-tray-head">
+          <div class="btb-tray-handle"></div>
+          <button type="button" class="tb tb-tray-close" data-action="close-tools-tray" aria-label="Закрити панель">✕</button>
+        </div>
         <div class="btb-tray-grid">
           <div class="btb-tray-sec">
             <div class="btb-tray-label">Стрілки</div>
@@ -2645,17 +2648,23 @@ const BoardEngine = {
         try { Toast.show('Схема: ' + ss.value, 'ok'); } catch (_) {}
       }
     };
-    // Sync tray / palette body classes after every toolbar re-render
+    // Одна панель: якщо відкрита — один portal на body, інакше ховаємо без inline-стилів
     try {
       document.body.classList.toggle('tools-tray-open', !!ab.toolsTrayOpen);
-      try {
-        const tray = document.getElementById('btbToolsTray');
-        if (tray) {
-          tray.classList.toggle('open', !!ab.toolsTrayOpen);
-          tray.setAttribute('aria-hidden', ab.toolsTrayOpen ? 'false' : 'true');
-        }
-      } catch (_) {}
       document.body.classList.toggle('palette-open', !!ab.paletteOpen);
+      const tray = document.getElementById('btbToolsTray');
+      if (tray) {
+        if (ab.toolsTrayOpen) {
+          if (tray.parentElement !== document.body) document.body.appendChild(tray);
+          tray.classList.add('open');
+          tray.setAttribute('aria-hidden', 'false');
+          tray.style.cssText = 'transform:translateY(0)!important;opacity:1!important;visibility:visible!important;pointer-events:auto!important;display:block!important;z-index:99990!important;';
+        } else {
+          tray.classList.remove('open');
+          tray.setAttribute('aria-hidden', 'true');
+          tray.style.cssText = '';
+        }
+      }
     } catch (_) {}
   },
 

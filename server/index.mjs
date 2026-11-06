@@ -23,6 +23,7 @@
 import http from 'node:http';
 import { validateInitData } from './validateInitData.mjs';
 import * as Bot from './telegramBot.mjs';
+import { handleClubRequest, clubWriteAllowed } from './clubData.mjs';
 
 const PORT = Number(process.env.PORT || 8787);
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
@@ -233,6 +234,11 @@ const server = http.createServer(async (req, res) => {
         return { ok: true, sent, skipped, hoursBefore };
       }
     };
+
+    if (url.pathname === '/api/club-data') {
+      const handled = await handleClubRequest(req, res, clubWriteAllowed);
+      if (handled) return;
+    }
 
     if (req.method === 'POST' && botPost[url.pathname]) {
       if (!requireBotSecret(req, res)) return;

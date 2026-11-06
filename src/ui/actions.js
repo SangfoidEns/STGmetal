@@ -205,6 +205,10 @@ const Actions = {
   },
 
   openTrainingBoard(id) {
+    if (typeof AuthManager !== 'undefined' && !(AuthManager.isCoach && AuthManager.isCoach())) {
+      try { Toast.show('Дошка тренера доступна лише тренеру', 'warn'); } catch (_) {}
+      return;
+    }
     const t = (Store.get().trainings || []).find(x => x.id === id);
     Modal.close();
     if (t && t.board && typeof BoardLink !== 'undefined') {
@@ -274,6 +278,10 @@ const Actions = {
   },
 
   newTraining() {
+    if (typeof AuthManager !== 'undefined' && !(AuthManager.isCoach && AuthManager.isCoach())) {
+      try { Toast.show('Редагувати може лише тренер', 'warn'); } catch (_) {}
+      return;
+    }
     const s = Store.get().settings;
     Modal.open('Нове тренування', `
       <div class="fg">
@@ -299,6 +307,10 @@ const Actions = {
   },
 
   createTraining() {
+    if (typeof AuthManager !== 'undefined' && !(AuthManager.isCoach && AuthManager.isCoach())) {
+      try { Toast.show('Редагувати може лише тренер', 'warn'); } catch (_) {}
+      return;
+    }
     const name = document.getElementById('tName')?.value?.trim();
     if (!name) { Toast.show((typeof I18n!=='undefined'?I18n.t('toast_need_name','Вкажіть назву'):'Вкажіть назву'), 'warn'); return; }
     const structure = [
@@ -330,6 +342,11 @@ const Actions = {
   },
 
   editTraining(id) {
+    if (typeof AuthManager !== 'undefined' && !(AuthManager.isCoach && AuthManager.isCoach())) {
+      try { Toast.show('Редагувати може лише тренер', 'warn'); } catch (_) {}
+      return;
+    }
+    if (typeof App !== 'undefined' && App._chatBlocksTraining && App._chatBlocksTraining()) return;
     const t = Store.get().trainings.find(x => x.id === id);
     if (!t) return;
     const structHtml = (t.structure || []).map((b, i) => `
@@ -435,6 +452,10 @@ const Actions = {
   },
 
   saveTraining(id) {
+    if (typeof AuthManager !== 'undefined' && !(AuthManager.isCoach && AuthManager.isCoach())) {
+      try { Toast.show('Редагувати може лише тренер', 'warn'); } catch (_) {}
+      return;
+    }
     const t = Store.get().trainings.find(x => x.id === id);
     if (!t) return;
     t.name = document.getElementById('teName')?.value || t.name;

@@ -3,6 +3,11 @@ const App = {
   init() {
     try { (typeof CoachTools !== "undefined" && CoachTools.loadCustomArtifacts && CoachTools.loadCustomArtifacts());
     TelegramManager.init(); } catch (e) { console.warn('Telegram', e); }
+    window.__msTgReady = () => {
+      try { window.__msDropSw && window.__msDropSw(); } catch (_) {}
+      this._refreshIdentity();
+    };
+    this._watchTelegramIdentity();
     try { StorageManager.init(); } catch (e) {
       console.error('Storage init failed', e);
       try { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(BACKUP_KEY); } catch (_) {}
@@ -20,6 +25,7 @@ const App = {
     } catch (_) {}
     try { /* плаваюча навігація вимкнена — статичний сайдбар справа */ } catch (e) { console.warn('nav', e); }
     try { if (typeof AuthManager !== 'undefined') AuthManager.init(); } catch (e) { console.warn('Auth', e); }
+    this._refreshIdentity();
     try { if (typeof AuthManager !== 'undefined') { AuthManager._resolveRole(); AuthManager._applyUiRole(); } } catch (_) {}
     // Server HMAC validation of Telegram initData (async — does not block first paint)
     try {
@@ -41,6 +47,7 @@ const App = {
     const view = (Store.get().ui && Store.get().ui.view) || 'dashboard';
     if (view === 'board') this.allowBoardOnce('logo');
     this.navigate(view);
+    this._booted = true;
     this.updateClock();
     setInterval(() => this.updateClock(), 1000);
     try {
@@ -50,8 +57,43 @@ const App = {
         b.historyIdx = 0;
       }
     } catch (_) {}
-    try { Toast.show('МЕТАЛІСТ ШТУТГАРТ — тренерська платформа', 'ok'); } catch (_) {}
+    try { Toast.show('МЕТАЛІСТ ШТУТТГАРТ — тренерська платформа', 'ok'); } catch (_) {}
     try { this.initSwipeNav(); } catch (_) {}
+  },
+
+  _refreshIdentity() {
+    try {
+      if (typeof TelegramManager !== 'undefined' && TelegramManager.init) TelegramManager.init();
+      if (typeof AuthManager === 'undefined' || !AuthManager._readTelegramUser) return;
+      const prev = AuthManager.role;
+      const prevId = AuthManager.user && AuthManager.user.id;
+      const user = AuthManager._readTelegramUser();
+      if (user) AuthManager.user = user;
+      if (AuthManager._ensureRbacDefaults) AuthManager._ensureRbacDefaults();
+      AuthManager._resolveRole();
+      AuthManager._applyUiRole();
+      const nextId = AuthManager.user && AuthManager.user.id;
+      if (prev !== AuthManager.role || String(prevId || '') !== String(nextId || '')) {
+        this.syncRoleClass && this.syncRoleClass();
+        if (this._booted) this.renderCurrent && this.renderCurrent();
+      }
+    } catch (e) { console.warn('identity', e); }
+  },
+
+  _watchTelegramIdentity() {
+    if (this._idWatch) return;
+    let tries = 0;
+    this._idWatch = setInterval(() => {
+      tries += 1;
+      let user = null;
+      try { user = AuthManager._readTelegramUser(); } catch (_) {}
+      const known = !!(user && AuthManager.user && String(AuthManager.user.id) === String(user.id));
+      if (user && !known) this._refreshIdentity();
+      if (known || tries >= 24) {
+        clearInterval(this._idWatch);
+        this._idWatch = null;
+      }
+    }, 250);
   },
 
   initSwipeNav() {
@@ -151,6 +193,11 @@ const App = {
       logo._msBound = true;
       let armed = false;
       const openBoard = (e) => {
+        if (typeof AuthManager !== 'undefined' && AuthManager.isGuest && AuthManager.isGuest()) {
+          if (e) { e.preventDefault(); e.stopPropagation(); }
+          this.openPhoto('assets/metalist-crest.png', { save: true, name: 'Metalist-Shtuttgart.png' });
+          return;
+        }
         if (typeof StorageManager !== 'undefined' && StorageManager.isIoLocked && StorageManager.isIoLocked()) {
           if (e) { e.preventDefault(); e.stopPropagation(); }
           return;
@@ -194,7 +241,7 @@ const App = {
         const imp = e.target.closest('#btnImportJson, [data-io="import"], [data-action="import-trigger"]');
         if (!exp && !imp) return;
 
-        e.preventDefault();
+        if (exp) e.preventDefault();
         e.stopPropagation();
         if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
 
@@ -218,7 +265,10 @@ const App = {
         }
 
         if (imp) {
-          // Імпорт — для всіх (тренер / гравець / гість)
+          if (typeof AuthManager !== 'undefined' && AuthManager._canWriteClub && !AuthManager._canWriteClub()) {
+            Toast.show('Імпорт лише для тренера', 'warn');
+            return;
+          }
           try {
             StorageManager.pickAndImportJSON();
           } catch (err) {
@@ -239,7 +289,8 @@ const App = {
     try {
       const s = Store.get().settings;
       s.theme = t;
-      StorageManager.save();
+      const canWrite = typeof AuthManager !== 'undefined' && AuthManager._canWriteClub && AuthManager._canWriteClub();
+      StorageManager.save(canWrite ? undefined : { localOnly: true });
     } catch (_) {}
     try {
       if (typeof TelegramManager !== 'undefined' && TelegramManager.tg) {
@@ -309,6 +360,61 @@ const App = {
       if (e.target === backdrop || e.target.closest('[data-sw="close"]')) close();
     });
     try { TelegramManager.haptic && TelegramManager.haptic('light'); } catch (_) {}
+  },
+
+  openPhoto(src, opts) {
+    opts = opts || {};
+    if (!src) return;
+    const prev = document.getElementById('photoLightbox');
+    if (prev) prev.remove();
+    const ov = document.createElement('div');
+    ov.id = 'photoLightbox';
+    ov.className = 'photo-lightbox';
+    ov.innerHTML = '<div class="photo-lightbox-bar">' +
+      '<button type="button" class="photo-lightbox-x" data-photo-close="1">Закрити</button>' +
+      (opts.save ? '<button type="button" class="photo-lightbox-save" data-photo-download="1">Зберегти</button>' : '') +
+      '</div><img class="photo-lightbox-img" alt="" src="' + String(src).replace(/"/g, '&quot;') + '"/>';
+    document.body.appendChild(ov);
+    requestAnimationFrame(() => ov.classList.add('show'));
+    const close = () => {
+      ov.classList.remove('show');
+      setTimeout(() => { if (ov.parentNode) ov.remove(); }, 180);
+    };
+    ov.addEventListener('click', (ev) => {
+      if (ev.target === ov || (ev.target.closest && ev.target.closest('[data-photo-close]'))) close();
+      const save = ev.target.closest && ev.target.closest('[data-photo-download]');
+      if (save) {
+        ev.preventDefault();
+        this._downloadPhoto(src, opts.name);
+      }
+    });
+  },
+
+  async _downloadPhoto(src, name) {
+    const filename = name || 'Metalist-Shtuttgart.png';
+    try {
+      const res = await fetch(src);
+      if (!res.ok) throw new Error('fetch');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1200);
+      try { Toast.show('Емблему збережено', 'ok'); } catch (_) {}
+    } catch (_) {
+      const a = document.createElement('a');
+      a.href = src;
+      a.download = filename;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
   },
 
   openCoachCard() {
@@ -635,13 +741,15 @@ const App = {
     document.documentElement.style.setProperty('--club-accent', s.accent);
     const logo = document.getElementById('clubLogo');
     if (logo) {
-      if (s.logoData && String(s.logoData).startsWith('data:image/')) {
-        logo.innerHTML = '<img src="' + s.logoData + '" alt="logo">';
-      } else {
-        logo.textContent = s.clubShort || 'МШ';
-      }
+      logo.innerHTML = '<img src="assets/metalist-crest.png" alt="Металіст Штуттгарт">';
     }
-    const parts = (s.clubName || 'МЕТАЛІСТ ШТУТГАРТ').split(' ');
+    const build = document.getElementById('appBuild');
+    if (build) {
+      const id = (typeof Views !== 'undefined' && Views.APP_BUILD) || 'z24';
+      const when = (typeof Views !== 'undefined' && Views.APP_UPDATED) || '30.10.2026';
+      build.textContent = id + ' · ' + when;
+    }
+    const parts = (s.clubName || 'МЕТАЛІСТ ШТУТТГАРТ').split(' ');
     const cn = document.getElementById('clubName');
     if (cn) {
       cn.innerHTML = parts.length > 1
@@ -943,7 +1051,32 @@ const App = {
     }
   },
 
+  _chatBlocksTraining() {
+    return !!(this._chatGuardUntil && Date.now() < this._chatGuardUntil);
+  },
+
+  _armChatGuard() {
+    this._chatGuardUntil = Date.now() + 1600;
+    this._chatPointerDown = true;
+  },
+
+  _chatHitOpensTraining(node) {
+    return !!(node && node.closest && node.closest(
+      '[data-view="trainings"], [data-edit-training], [data-training-id], [data-next-training], .card-training, [data-action="open-training"], [data-action="new-training"], [data-sheet-act="edit"], [data-nsheet="edit"]'
+    ));
+  },
+
+  /** Поле лишається в блоці чату. Копію, яка була приклеєна до екрана, прибираємо. */
+  _mountTeamChatForm() {
+    document.querySelectorAll('body > #teamChatForm, body > .team-chat-form').forEach(n => n.remove());
+    const section = document.getElementById('teamChat');
+    const form = section && section.querySelector('.team-chat-form');
+    if (form) form.id = 'teamChatForm';
+  },
+
   navigate(view) {
+    if (view === 'trainings' && this._chatBlocksTraining()) return;
+    if (view === 'trainings' && typeof AuthManager !== 'undefined' && AuthManager.isGuest && AuthManager.isGuest()) view = 'analytics';
     // Aliases for dashboard pills / legacy links
     if (view === 'schemes' || view === 'scheme') view = 'tactics';
     if (view === 'stats' || view === 'statistics') view = 'analytics';
@@ -1147,7 +1280,7 @@ const App = {
         <div class="bday-balloon">🎂</div>
         <h2>З Днем народження!</h2>
         <p>${sanitize(names)}</p>
-        <p class="note-sm">МЕТАЛІСТ ШТУТГАРТ вітає</p>
+        <p class="note-sm">МЕТАЛІСТ ШТУТТГАРТ вітає</p>
       </div>`;
       if (typeof Modal !== 'undefined' && Modal.open) {
         Modal.open('Свято', html, [{ label: '🎉 Дякуємо', cls: 'btn-p', action: 'cancel' }]);
@@ -1173,7 +1306,7 @@ const App = {
         // тихе збереження раз на ~2 хв
         if (!this._usageSaveAt || Date.now() - this._usageSaveAt > 120000) {
           this._usageSaveAt = Date.now();
-          try { StorageManager.save(); } catch (_) {}
+          try { StorageManager.save({ localOnly: true }); } catch (_) {}
         }
       } catch (_) {}
     };
@@ -1208,15 +1341,19 @@ const App = {
           if (isPlayer) {
             el.style.display = isCore ? 'flex' : 'none';
           } else if (isGuest) {
-            const guestOk = v === 'dashboard' || v === 'trainings' || v === 'players' || v === 'calendar';
-            el.style.display = (guestOk || el.classList.contains('mni-more')) ? 'flex' : 'none';
+            const guestOk = v === 'dashboard' || v === 'analytics' || v === 'players';
+            el.style.display = guestOk ? 'flex' : 'none';
           } else {
             el.style.display = '';
           }
         });
         // rename players label for player role
         const team = mn.querySelector('.mni[data-view="players"] .mni-label');
-        if (team) team.textContent = isPlayer ? 'Команда' : 'Склад';
+        if (team) team.textContent = isGuest ? 'Гравці' : (isPlayer ? 'Команда' : 'Склад');
+        const home = mn.querySelector('.mni[data-view="dashboard"] .mni-label');
+        if (home && isGuest) home.textContent = 'Клуб';
+        const stats = mn.querySelector('.mni[data-view="analytics"] .mni-label');
+        if (stats && isGuest) stats.textContent = 'Статистика';
       }
     } catch (_) {}
   },
@@ -1310,8 +1447,31 @@ const App = {
       el.innerHTML = '<div class="card"><div class="ct">Розділ недоступний</div></div>';
       return;
     }
+    let chatKeep = null;
+    if (view === 'players') {
+      const prevInput = document.getElementById('teamChatInput');
+      const prevLog = document.getElementById('teamChatLog');
+      if (prevInput) {
+        const atEnd = prevLog ? (prevLog.scrollHeight - prevLog.scrollTop - prevLog.clientHeight < 28) : true;
+        chatKeep = { value: prevInput.value, focused: document.activeElement === prevInput, scroll: prevLog ? prevLog.scrollTop : 0, atEnd };
+      }
+    }
     try {
       el.innerHTML = Views[view]();
+      if (view === 'players') {
+        const log = document.getElementById('teamChatLog');
+        const inp = document.getElementById('teamChatInput');
+        if (log) log.scrollTop = (chatKeep && !chatKeep.atEnd) ? chatKeep.scroll : log.scrollHeight;
+        if (inp && chatKeep && chatKeep.value) inp.value = chatKeep.value;
+        if (inp && chatKeep && chatKeep.focused) {
+          try { inp.focus({ preventScroll: true }); } catch (_) { try { inp.focus(); } catch (__) {} }
+          const n = inp.value.length;
+          try { inp.setSelectionRange(n, n); } catch (_) {}
+        }
+        try { this._mountTeamChatForm(); } catch (_) {}
+      } else {
+        try { this._mountTeamChatForm(); } catch (_) {}
+      }
       if (view === 'settings' || view === 'dashboard') {
         try {
           const tgLine = document.getElementById('tgStatusLine');
@@ -1339,6 +1499,74 @@ const App = {
     try { this._bindPlayerCompare(); } catch (_) {}
     try { this.bindSquadViewButtons(); } catch (_) {}
     try { this.bindCoachCardButtons(); } catch (_) {}
+  },
+
+  async sendTeamChat() {
+    const input = document.getElementById('teamChatInput');
+    const text = String((input && input.value) || '').trim().slice(0, 500);
+    if (!text || this._chatSending) return;
+    if (typeof AuthManager !== 'undefined' && AuthManager.isGuest && AuthManager.isGuest()) {
+      try { Toast.show('Гість лише переглядає клуб', 'warn'); } catch (_) {}
+      return;
+    }
+    this._chatSending = true;
+    const sm = StorageManager;
+    try {
+      try { await sm.pullClub(); } catch (_) {}
+      sm._holdRemote = true;
+      const append = () => {
+        const s = Store.get();
+        if (!s.chat || !Array.isArray(s.chat)) s.chat = [];
+        let role = 'guest';
+        let name = 'Гість';
+        let playerId = null;
+        try {
+          if (AuthManager.isCoach && AuthManager.isCoach()) {
+            role = 'coach';
+            name = (s.settings && s.settings.coachName) || (AuthManager.displayName && AuthManager.displayName()) || 'Тренер';
+          } else if (AuthManager.isPlayer && AuthManager.isPlayer()) {
+            role = 'player';
+            const me = AuthManager.getLinkedPlayer && AuthManager.getLinkedPlayer();
+            playerId = me && me.id;
+            name = me
+              ? ([me.firstName, me.lastName].filter(Boolean).join(' ') || me.name || 'Гравець')
+              : ((AuthManager.displayName && AuthManager.displayName()) || 'Гравець');
+          } else if (AuthManager.displayName) {
+            name = AuthManager.displayName();
+          }
+        } catch (_) {}
+        const id = (typeof uid === 'function') ? uid() : ('c_' + Date.now());
+        s.chat.push({
+          id,
+          text,
+          authorName: String(name || 'Учасник').slice(0, 80),
+          authorRole: role,
+          playerId: playerId || null,
+          createdAt: new Date().toISOString()
+        });
+        if (s.chat.length > 300) s.chat = s.chat.slice(-300);
+        return id;
+      };
+      const id = append();
+      sm.save();
+      let ok = false;
+      try { ok = await sm.pushClub({ force: true }); } catch (_) { ok = false; }
+      if (!ok) {
+        const still = ((Store.get() && Store.get().chat) || []).some(m => m && m.id === id);
+        if (!still) append();
+        sm.save();
+        try { await sm.pushClub({ force: true }); } catch (_) {}
+      }
+      if (input) input.value = '';
+      try { this.renderCurrent(); } catch (_) {}
+      try { if (typeof TelegramManager !== 'undefined' && TelegramManager.haptic) TelegramManager.haptic('light'); } catch (_) {}
+    } catch (err) {
+      console.error('[sendTeamChat]', err);
+      try { Toast.show('Не вдалося надіслати', 'err'); } catch (_) {}
+    } finally {
+      sm._holdRemote = false;
+      this._chatSending = false;
+    }
   },
 
   updateClock() {
@@ -1383,6 +1611,7 @@ const App = {
   _lpMoved: false,
 
   openTrainingActionSheet(trainingId) {
+    if (this._chatBlocksTraining()) return;
     const t = (Store.get().trainings || []).find(x => x.id === trainingId);
     if (!t) return;
     const cancelled = t.status === 'cancelled' || t.status === 'canceled';
@@ -1441,9 +1670,7 @@ const App = {
         ? `<button type="button" class="tg-sheet-btn" data-sheet-act="restore" data-tid="${t.id}">↩ ${(typeof I18n!=='undefined'?I18n.t('planned','Відновити'):'Відновити')}</button>`
         : `<button type="button" class="tg-sheet-btn tg-sheet-warn" data-sheet-act="cancel" data-tid="${t.id}">🚫 ${(typeof I18n!=='undefined'?I18n.t('sheet_cancel_tr','Скасувати тренування'):'Скасувати тренування')}</button>`}
       <button type="button" class="tg-sheet-btn tg-sheet-danger" data-sheet-act="delete" data-tid="${t.id}">🗑 ${typeof I18n!=='undefined'?I18n.t('sheet_delete','Видалити'):'Видалити'}</button>
-    ` : `
-      <button type="button" class="tg-sheet-btn" data-sheet-act="open-board" data-tid="${t.id}">⚽ ${(typeof I18n!=='undefined'?I18n.t('open_board','Переглянути дошку'):'Переглянути дошку')}</button>
-    `;
+    ` : '';
     sheet.innerHTML = `
       <div class="tg-sheet-handle"></div>
       <div class="tg-sheet-title">${typeof sanitize === 'function' ? sanitize(t.name) : t.name}</div>
@@ -1474,6 +1701,10 @@ const App = {
       const tid = btn.dataset.tid;
       close();
       if (act === 'close') return;
+      if (!isCoach) {
+        try { Toast.show('Редагувати може лише тренер', 'warn'); } catch (_) {}
+        return;
+      }
       if (act === 'edit') return Actions.editTraining(tid);
       if (act === 'attendance') return Actions.openAttendance(tid);
       if (act === 'dup') return Actions.dupTraining(tid);
@@ -1708,6 +1939,7 @@ const App = {
   },
 
   openNextTrainingPreview(trainingId) {
+    if (this._chatBlocksTraining()) return;
     const t = (Store.get().trainings || []).find(x => x.id === trainingId);
     if (!t) return;
     document.querySelectorAll('.tg-sheet-backdrop').forEach(el => el.remove());
@@ -1718,14 +1950,18 @@ const App = {
     backdrop.className = 'tg-sheet-backdrop';
     const tname = (typeof sanitize === 'function') ? sanitize(t.name) : t.name;
     const goal = t.mainGoal ? ('🎯 ' + ((typeof sanitize === 'function') ? sanitize(t.mainGoal) : t.mainGoal) + '<br><br>') : '';
+    const isCoach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+    const coachBtns = isCoach
+      ? ('<button type="button" class="tg-sheet-btn" data-nsheet="edit" data-tid="' + t.id + '">✏️ ' + (typeof I18n!=='undefined'?I18n.t('sheet_edit','Редагувати'):'Редагувати') + '</button>' +
+        '<button type="button" class="tg-sheet-btn" data-nsheet="share" data-tid="' + t.id + '">📤 Поділитися планом</button>' +
+        '<button type="button" class="tg-sheet-btn" data-nsheet="board" data-tid="' + t.id + '">⚽ Дошка</button>')
+      : '';
     backdrop.innerHTML = '<div class="tg-sheet" role="dialog">' +
       '<div class="tg-sheet-handle"></div>' +
       '<div class="tg-sheet-title">' + tname + '</div>' +
       '<div class="tg-sheet-sub">' + (t.date || '') + ' ' + (t.time || '') + ' · ' + (t.duration || 0) + ' хв · RPE ' + (t.intensity || '—') + '</div>' +
       '<div class="tg-sheet-preview">' + goal + blocks + '</div>' +
-      '<button type="button" class="tg-sheet-btn" data-nsheet="edit" data-tid="' + t.id + '">✏️ ' + (typeof I18n!=='undefined'?I18n.t('sheet_edit','Редагувати'):'Редагувати') + '</button>' +
-      '<button type="button" class="tg-sheet-btn" data-nsheet="share" data-tid="' + t.id + '">📤 Поділитися планом</button>' +
-      '<button type="button" class="tg-sheet-btn" data-nsheet="board" data-tid="' + t.id + '">⚽ Дошка</button>' +
+      coachBtns +
       '<button type="button" class="tg-sheet-btn tg-sheet-cancel" data-nsheet="close">Закрити</button></div>';
     document.body.appendChild(backdrop);
     requestAnimationFrame(function() { backdrop.classList.add('show'); });
@@ -1737,6 +1973,11 @@ const App = {
       e.preventDefault(); e.stopPropagation();
       const act = btn.dataset.nsheet;
       close();
+      const coach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+      if (!coach && (act === 'edit' || act === 'share' || act === 'board')) {
+        try { Toast.show('Редагувати може лише тренер', 'warn'); } catch (_) {}
+        return;
+      }
       if (act === 'edit') return Actions.editTraining(btn.dataset.tid);
       if (act === 'share') {
         try { if (typeof CoachTools !== 'undefined' && CoachTools.shareNextTraining) CoachTools.shareNextTraining(); } catch (_) {}
@@ -1763,6 +2004,7 @@ const App = {
     };
 
     root.addEventListener('pointerdown', e => {
+      if (e.target.closest && e.target.closest('#teamChat, #teamChatForm, .team-chat, .team-chat-form')) return;
       const row = e.target.closest(
         '.card-training[data-training-id], .tg-row[data-training-id], .pl-row[data-player-id], .scheme-row[data-board-id], .sc-next-training[data-next-training], .coach-tools-handle, .sc-tap[data-view="players"]'
       );
@@ -1812,6 +2054,59 @@ const App = {
   },
 
   bindEvents() {
+    if (!this._chatCaptureBound) {
+      this._chatCaptureBound = true;
+      const inChatBox = (e) => {
+        const nodes = [
+          document.getElementById('teamChatForm'),
+          document.getElementById('teamChat'),
+          document.getElementById('teamChatInput')
+        ];
+        for (let i = 0; i < nodes.length; i++) {
+          const n = nodes[i];
+          if (!n) continue;
+          const r = n.getBoundingClientRect();
+          if (r.width < 2 || r.height < 2) continue;
+          if (e.clientX >= r.left - 8 && e.clientX <= r.right + 8 && e.clientY >= r.top - 8 && e.clientY <= r.bottom + 8) return true;
+        }
+        return false;
+      };
+      const onChatCapture = (e) => {
+        const t = e.target;
+        const closestOk = t && t.closest && t.closest('#teamChat, #teamChatForm, #teamChatInput, .team-chat, .team-chat-form');
+        const inBox = inChatBox(e);
+        if (!closestOk && !inBox) {
+          if ((App._chatPointerDown || (App._chatBlocksTraining && App._chatBlocksTraining())) && App._chatHitOpensTraining && App._chatHitOpensTraining(t)) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+          }
+          return;
+        }
+        App._armChatGuard();
+        const input = t && t.closest && t.closest('#teamChatInput, .team-chat-form input');
+        if (input) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        if (e.type === 'click') {
+          const send = t && t.closest && t.closest('[data-action="team-chat-send"]');
+          if (send) {
+            try { App.sendTeamChat(); } catch (err) { console.error('[team-chat]', err); }
+            return;
+          }
+          const field = document.getElementById('teamChatInput');
+          if (field) {
+            try { field.focus({ preventScroll: true }); } catch (_) { try { field.focus(); } catch (__) {} }
+          }
+        }
+      };
+      document.addEventListener('pointerdown', onChatCapture, true);
+      document.addEventListener('click', onChatCapture, true);
+      document.addEventListener('focusin', (e) => {
+        if (e.target && e.target.id === 'teamChatInput') App._armChatGuard();
+      }, true);
+    }
     try {
       document.addEventListener('click', function(ev) {
         var el = ev.target.closest && ev.target.closest('[data-action="open-coach-card"],[data-action="coach-easter"],[data-coach-card],.coach-public-card,.coach-pub-row,#coachPublicCard');
@@ -1833,6 +2128,24 @@ const App = {
 
     // Event delegation — single listener
     document.addEventListener('click', e => {
+      // Чат команди не є карткою тренування і не відкриває редактор
+      if (e.target.closest && e.target.closest('#teamChat, #teamChatForm, .team-chat, .team-chat-form')) {
+        const send = e.target.closest('[data-action="team-chat-send"]');
+        if (send) {
+          e.preventDefault();
+          e.stopPropagation();
+          try { App.sendTeamChat(); } catch (err) { console.error('[team-chat]', err); }
+        }
+        return;
+      }
+      const coachHit = e.target.closest && e.target.closest('[data-coach-card], .coach-public-card, .coach-squad-card, [data-action="open-coach-card"], [data-action="coach-easter"]');
+      if (coachHit && !e.target.closest('input, select, textarea, a[href], [data-action="open-photo"]')) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        try { App.openCoachCard(); } catch (err) { console.error('[coach-card]', err); }
+        return;
+      }
       // ── Ізоляція: кліки всередині модалки / меню не повинні «випадково» відкривати дошку ──
       const inModal = e.target.closest('#modal, .md, .modal-content, #modalBody, #modalFooter');
       const inSidebarNav = e.target.closest('#sidebar .nav, .sidebar .nav, .sb-scroll');
@@ -2035,6 +2348,10 @@ const App = {
       if (action === 'open-default-board' && !e.target.closest('.auth-role-btn, [data-action="coach-easter"]')) {
         e.preventDefault();
         e.stopPropagation();
+        if (typeof AuthManager !== 'undefined' && !(AuthManager.isCoach && AuthManager.isCoach())) {
+          try { Toast.show('Дошка тренера доступна лише тренеру', 'warn'); } catch (_) {}
+          return;
+        }
         App.openDefaultBoard();
         return;
       }
@@ -2231,6 +2548,15 @@ const App = {
           const me = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer) ? AuthManager.getLinkedPlayer() : null;
           if (!me) { Toast.show('Акаунт не прив\'язано', 'warn'); return; }
           const pr = me.profile || {};
+          const mineGifts = ((Store.get().gifts) || []).filter(g => g && String(g.playerId) === String(me.id) && String(g.ico || g.label || g.giftId || '').trim());
+          const giftPicks = mineGifts.length
+            ? mineGifts.map(function (g) {
+              const key = g.uid || g.id || '';
+              const label = (typeof CoachTools !== 'undefined' && CoachTools.giftLabel) ? CoachTools.giftLabel(g) : (g.label || '');
+              return '<label class="pp-gift-pick"><input type="radio" name="ppFeatured" value="' + sanitize(key) + '"' + (g.featured ? ' checked' : '') + '><span>' + sanitize(g.ico || '★') + ' ' + sanitize(label || 'Подарунок') + '</span></label>';
+            }).join('')
+            : '<p class="note-sm">Поки немає подарунків, які можна поставити біля імені.</p>';
+          const currentPhoto = me.profilePhoto || me.photoUrl || '';
           const body = '<div class="soc-edit-form player-profile-form">' +
             '<p class="note-sm">Профіль клубу. Позицію, номер і склад змінює лише тренер.</p>' +
             '<label class="fld"><span>Ім\'я</span><input id="ppFirst" class="inp" value="' + sanitize(me.firstName || '') + '"/></label>' +
@@ -2240,7 +2566,10 @@ const App = {
             '<label class="fld"><span>Соцмережі (посилання)</span><input id="ppSocial" class="inp" placeholder="https://…" value="' + sanitize(pr.social || '') + '"/></label>' +
             '<label class="fld"><span>Статус</span><input id="ppStatus" class="inp" maxlength="80" value="' + sanitize(pr.status || me.statusText || '') + '"/></label>' +
             '<label class="fld"><span>Про себе</span><textarea id="ppBio" class="inp" rows="3" maxlength="400">' + sanitize(pr.bio || me.bio || '') + '</textarea></label>' +
-            '<label class="fld"><span>Фото (URL)</span><input id="ppPhoto" class="inp" value="' + sanitize(me.profilePhoto || me.photoUrl || '') + '"/></label>' +
+            '<label class="fld"><span>Фото</span><input id="ppPhotoFile" class="inp" type="file" accept="image/*"><input id="ppPhotoPicked" type="hidden" value="">' +
+            (currentPhoto ? '<img class="pp-photo-preview" alt="" src="' + sanitize(currentPhoto) + '">' : '<img class="pp-photo-preview" alt="" hidden>') +
+            '</label>' +
+            '<div class="fld"><span>Подарунок біля імені</span><div class="pp-gift-picks">' + giftPicks + '</div></div>' +
             '</div>';
           Modal.open('Мій профіль', body, [
             { label: 'Скасувати', cls: 'btn-s', action: 'cancel' },
@@ -2251,22 +2580,77 @@ const App = {
             const p = (s.players || []).find(x => x.id === me.id);
             if (!p) return;
             if (!p.profile) p.profile = {};
-            p.firstName = ((r.values&&r.values.ppFirst)!=null?r.values.ppFirst:(document.getElementById('ppFirst')||{}).value) || p.firstName;
-            p.lastName = ((r.values&&r.values.ppLast)!=null?r.values.ppLast:(document.getElementById('ppLast')||{}).value) || p.lastName;
-            const bd = ((r.values&&r.values.ppBirth)!=null?r.values.ppBirth:(document.getElementById('ppBirth')||{}).value) || '';
-            if (bd) { p.birthDate = bd; p.profile.birthDate = bd; }
-            p.profile.phone = (((r.values&&r.values.ppPhone)!=null?r.values.ppPhone:(document.getElementById('ppPhone')||{}).value) || '').slice(0, 40);
-            p.profile.social = ((document.getElementById('ppSocial') || {}).value || '').slice(0, 200);
-            p.profile.status = (((r.values&&r.values.ppStatus)!=null?r.values.ppStatus:(document.getElementById('ppStatus')||{}).value) || '').slice(0, 80);
-            p.profile.bio = (((r.values&&r.values.ppBio)!=null?r.values.ppBio:(document.getElementById('ppBio')||{}).value) || '').slice(0, 400);
+            const field = function (id) {
+              if (r.values && r.values[id] != null) return r.values[id];
+              const el = document.getElementById(id);
+              return el ? el.value : '';
+            };
+            p.firstName = field('ppFirst') || p.firstName;
+            p.lastName = field('ppLast') || p.lastName;
+            const bd = String(field('ppBirth') || '').trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(bd)) {
+              p.birthDate = bd;
+              p.profile.birthDate = bd;
+            }
+            p.profile.phone = String(field('ppPhone') || '').slice(0, 40);
+            p.profile.social = String(field('ppSocial') || '').slice(0, 200);
+            p.profile.status = String(field('ppStatus') || '').slice(0, 80);
+            p.profile.bio = String(field('ppBio') || '').slice(0, 400);
             p.statusText = p.profile.status;
             p.bio = p.profile.bio;
-            const ph = ((document.getElementById('ppPhoto') || {}).value || '').trim();
-            if (ph) { p.profilePhoto = ph; p.photoUrl = p.photoUrl || ph; }
+            p.phone = p.profile.phone;
+            const photo = String(field('ppPhotoPicked') || '');
+            if (photo.indexOf('data:image/') === 0 && photo.length <= 400000) {
+              p.profilePhoto = photo;
+              p.photoUrl = photo;
+            }
+            const picked = document.querySelector('#modalBody input[name="ppFeatured"]:checked');
+            if (picked && picked.value) {
+              (s.gifts || []).forEach(function (g) {
+                if (!g || String(g.playerId) !== String(p.id)) return;
+                g.featured = String(g.uid || g.id || '') === picked.value;
+                if (g.featured) {
+                  const gh = (typeof CoachTools !== 'undefined' && CoachTools.giftHue) ? CoachTools.giftHue(g) : g.hue;
+                  p.themeHue = gh;
+                  p.profile.themeHue = gh;
+                  p.featuredGiftId = g.giftId || '';
+                }
+              });
+            }
             try { StorageManager.save(); } catch (_) {}
             Toast.show('Профіль збережено', 'ok');
             try { App.renderCurrent && App.renderCurrent(); } catch (_) {}
           });
+          setTimeout(function () {
+            const file = document.getElementById('ppPhotoFile');
+            if (!file || file.dataset.bound) return;
+            file.dataset.bound = '1';
+            file.addEventListener('change', function () {
+              const chosen = file.files && file.files[0];
+              if (!chosen) return;
+              const reader = new FileReader();
+              reader.onload = function () {
+                const img = new Image();
+                img.onload = function () {
+                  const max = 256;
+                  const scale = Math.min(1, max / Math.max(img.width || 1, img.height || 1));
+                  const canvas = document.createElement('canvas');
+                  canvas.width = Math.max(1, Math.round(img.width * scale));
+                  canvas.height = Math.max(1, Math.round(img.height * scale));
+                  const ctx = canvas.getContext('2d');
+                  if (!ctx) return;
+                  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                  const url = canvas.toDataURL('image/jpeg', 0.72);
+                  const hidden = document.getElementById('ppPhotoPicked');
+                  const preview = document.querySelector('#modalBody .pp-photo-preview');
+                  if (hidden) hidden.value = url;
+                  if (preview) { preview.src = url; preview.hidden = false; }
+                };
+                img.src = reader.result;
+              };
+              reader.readAsDataURL(chosen);
+            });
+          }, 40);
         } catch (err) { console.warn(err); }
         return;
       }
@@ -2420,28 +2804,11 @@ const App = {
         const pid = (t.dataset && t.dataset.playerId) || t.getAttribute('data-player-id');
         if (!pid) return;
         try { TelegramManager.haptic && TelegramManager.haptic('light'); } catch (_) {}
-        // На себе → головна (свій акаунт)
-        try {
-          const me = AuthManager.getLinkedPlayer && AuthManager.getLinkedPlayer();
-          if (me && String(me.id) === String(pid)) {
-            try { App.navigate('dashboard'); } catch (_) { try { App.navigate('home'); } catch (__) {} }
-            return;
-          }
-        } catch (_) {}
         const p = (Store.get().players || []).find(x => String(x.id) === String(pid));
         if (!p) return;
-        try { if (CoachTools && CoachTools.ensureWornGift) CoachTools.ensureWornGift(p.id); } catch (_) {}
-        const asCoach = (typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach());
-        if (asCoach && Views.coachPlayerDetail) {
-          window.__coachCardPlayerId = p.id;
-          const html = Views.coachPlayerDetail(p.id);
-          Modal.open('Картка гравця · ' + (p.lastName || p.firstName || ''), '<div class="fifa-modal-wrap" data-compare-host="' + p.id + '">' + html + '</div>', [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
-          setTimeout(() => { try { const s2 = document.getElementById('playerCompareSel'); if (s2) s2._msCmpBound = false; App._bindPlayerCompare(); } catch (_) {} }, 40);
-        } else if (Views._playerProfileCard) {
-          Modal.open((p.lastName || p.firstName || 'Гравець'), '<div class="player-profile-modal" data-player-id="' + p.id + '">' + Views._playerProfileCard(p) + '</div>', [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
-        } else if (Views._fifaCard) {
-          const st = Views._playerStats ? Views._playerStats(p.id) : {};
-          Modal.open('FIFA · ' + (p.lastName || p.firstName || ''), Views._fifaCard(p, st), [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
+        const who = [p.firstName, p.lastName].filter(Boolean).join(' ') || 'Гравець';
+        if (Views._playerProfileCard) {
+          Modal.open('Акаунт · ' + who, '<div class="player-profile-modal" data-player-id="' + p.id + '">' + Views._playerProfileCard(p) + '</div>', [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
         }
         return;
       }
@@ -2476,12 +2843,33 @@ const App = {
                 : ('<span class="glr-ico">' + (g.ico || '★') + '</span>');
               return '<div class="gift-list-row rarity-' + rar + '" data-action="inspect-artifact" data-gift-uid="' + (g.uid || g.id || '') + '">' +
                 '<span class="glr-art">' + art + '</span>' +
-                '<div class="glr-body"><b>' + sanitize(g.label || 'Подарунок') + '</b>' +
+                '<div class="glr-body"><b>' + sanitize((typeof CoachTools !== 'undefined' && CoachTools.giftLabel) ? (CoachTools.giftLabel(g) || 'Подарунок') : (g.label || 'Подарунок')) + '</b>' +
                 '<span class="note-sm">' + sanitize(g.note || g.momentHint || rar) + '</span></div></div>';
             }).join('')
           : '<div class="es">Подарунків ще немає</div>';
         Modal.open('🎁 ' + name, '<div class="gifts-modal">' + stories + '<div class="gifts-list">' + list + '</div></div>',
           [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
+        return;
+      }
+      if (action === 'open-photo') {
+        e.preventDefault();
+        e.stopPropagation();
+        const img = t.querySelector && t.querySelector('img');
+        let src = t.dataset.photo || (img && (img.getAttribute('src') || img.src)) || '';
+        if (!src && t.dataset.playerId && typeof Views !== 'undefined' && Views._resolvePlayerAvatar) {
+          const person = (Store.get().players || []).find(p => String(p.id) === String(t.dataset.playerId));
+          if (person) src = Views._resolvePlayerAvatar(person) || '';
+        }
+        if (!src) {
+          const set = (Store.get().settings) || {};
+          src = set.coachPhoto || set.coachPhotoUrl || '';
+        }
+        if (!src) return;
+        const guest = typeof AuthManager !== 'undefined' && AuthManager.isGuest && AuthManager.isGuest();
+        this.openPhoto(src, {
+          save: t.dataset.photoSave === '1' || (guest && String(src).indexOf('metalist-crest') !== -1),
+          name: t.dataset.photoName || 'Metalist-Shtuttgart.png'
+        });
         return;
       }
       if (action === 'open-fifa-card') {
@@ -2492,13 +2880,13 @@ const App = {
         const p = (Store.get().players || []).find(x => String(x.id) === String(pid));
         if (!p) { Toast.show('Гравця не знайдено', 'warn'); return; }
         try { TelegramManager.haptic && TelegramManager.haptic('light'); } catch (_) {}
-        try { if (CoachTools && CoachTools.ensureWornGift) CoachTools.ensureWornGift(p.id); } catch (_) {}
         window.__coachCardPlayerId = p.id;
         // не підставляти compare за замовчуванням
         try { window.__fifaCompareId = ''; window.__playerCompareId = ''; } catch (_) {}
         const st = Views._playerStats ? Views._playerStats(p.id) : {};
-        const html = Views._fifaCard(p, st);
-        Modal.open('FIFA-картка · ' + (p.lastName || p.firstName || ''),
+        const asCoach = (typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach());
+        const html = (asCoach && Views.coachPlayerDetail) ? Views.coachPlayerDetail(p.id) : Views._fifaCard(p, st);
+        Modal.open('Картка гравця · ' + (p.lastName || p.firstName || ''),
           '<div class="fifa-modal-wrap fifa-modal-anim" data-compare-host="' + p.id + '">' + html + '</div>',
           [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
         setTimeout(() => {
@@ -2584,27 +2972,30 @@ const App = {
             '<button type="button" class="btn btn-s btn-sm" data-action="edit-gift-note" data-gift-uid="' + u + '">✏️ Момент</button>' +
             '<button type="button" class="btn btn-s btn-sm" data-action="toggle-attach-gift" data-gift-uid="' + u + '">' +
               (attached ? '📎 Зняти з профілю' : '📌 На профіль') + '</button>' +
-            (g.playerId ? ('<button type="button" class="btn btn-s btn-sm" data-action="set-featured-gift" data-player-id="' +
-              g.playerId + '" data-gift-uid="' + u + '">⭐ Біля імені</button>') : '') +
             '<button type="button" class="btn btn-s btn-sm btn-danger" data-action="delete-gift" data-gift-uid="' + u + '">🗑 ' + (typeof I18n!=='undefined'?I18n.t('sheet_delete','Видалити'):'Видалити') + '</button>' +
             '</div>';
         }
-        const html = '<div class="artifact-inspect' + (isNeural ? ' neural-inspect' : '') + (isGolden ? ' golden-inspect' : '') + (isCrest ? ' crest-inspect' : '') + '">' +
+        const storedGift = (g.uid || g.id) && (s.gifts || []).some(x => x && (String(x.uid || '') === String(g.uid || g.id) || String(x.id || '') === String(g.uid || g.id)));
+        const canFeature = !!(storedGift && g.playerId && typeof CoachTools !== 'undefined' && CoachTools.canFeatureGift && CoachTools.canFeatureGift(g));
+        const serial = (typeof CoachTools !== 'undefined' && CoachTools.giftSerial) ? CoachTools.giftSerial(g) : (g.serial || '');
+        const art = (typeof CoachTools !== 'undefined' && CoachTools.giftBackdropHtml)
+          ? CoachTools.giftBackdropHtml(g, 'lg')
+          : ('<span class="nft-art-ico" style="font-size:48px">' + (g.ico || '★') + '</span>');
+        const html = '<div class="artifact-inspect artifact-collectible' + (isNeural ? ' neural-inspect' : '') + (isGolden ? ' golden-inspect' : '') + (isCrest ? ' crest-inspect' : '') + '">' +
           '<div class="artifact-inspect-stage">' +
-          '<div class="artifact-hologram' + (isNeural ? ' art-neural-horse' : (isGolden ? ' art-golden-ball' : (isCrest ? ' art-crest-seal' : ''))) + '" style="--art-hue:' + (g.hue != null ? g.hue : 42) + '">' +
-          '<span class="nft-art-core"></span><span class="nft-art-ico" style="font-size:48px">' + (g.ico || '★') + '</span>' +
-          '<span class="nft-art-wave"></span></div></div>' +
+          '<div class="artifact-hologram' + (isNeural ? ' art-neural-horse' : (isGolden ? ' art-golden-ball' : (isCrest ? ' art-crest-seal' : ''))) + '" style="--art-hue:' + ((typeof CoachTools !== 'undefined' && CoachTools.giftHue) ? CoachTools.giftHue(g) : (g.hue != null ? g.hue : 42)) + '">' +
+          art + '</div></div>' +
           '<div class="artifact-inspect-meta">' +
-          '<div class="artifact-title">' + (typeof sanitize === 'function' ? sanitize(g.label) : g.label) + '</div>' +
-          '<div class="artifact-rar rarity-' + (g.rarity || 'common') + '">' + rar + (g.serial ? (' · ' + g.serial) : '') +
+          '<div class="artifact-title">' + (typeof sanitize === 'function' ? sanitize((typeof CoachTools !== 'undefined' && CoachTools.giftLabel) ? (CoachTools.giftLabel(g) || g.label) : g.label) : g.label) + '</div>' +
+          '<div class="artifact-rar rarity-' + (g.rarity || 'common') + '">' + rar + (serial ? (' · екземпляр ' + serial) : '') +
+            ' · свій візерунок' +
             (attached ? ' · на профілі' : ' · у інвентарі') + '</div>' +
           (g.description ? ('<p class="artifact-desc">' + (typeof sanitize === 'function' ? sanitize(g.description) : g.description) + '</p>') : '') +
           (g.note ? ('<p class="artifact-note">«' + (typeof sanitize === 'function' ? sanitize(g.note) : g.note) + '»</p>') : '') +
           (g.momentHint && !g.note ? ('<p class="artifact-hint">' + (typeof sanitize === 'function' ? sanitize(g.momentHint) : g.momentHint) + '</p>') : '') +
           coachBtns +
           '<div class="artifact-player-actions">' +
-          '<button type="button" class="btn btn-p btn-sm" data-action="use-gift-status" data-gift-uid="' + (g.uid || g.id || '') + '">✨ Статус біля імені</button>' +
-          '<button type="button" class="btn btn-s btn-sm" data-action="wear-gift" data-gift-uid="' + (g.uid || g.id || '') + '">👕 Надягнути (макс. 10)</button>' +
+          (canFeature ? ('<button type="button" class="btn btn-p btn-sm" data-action="use-gift-status" data-gift-uid="' + (g.uid || g.id || '') + '">✨ Статус біля імені</button>') : '') +
           '<button type="button" class="btn btn-s btn-sm" data-action="comment-gift" data-gift-uid="' + (g.uid || g.id || '') + '">💬 Коментар</button>' +
           '</div>' +
           ((g.comments && g.comments.length) ? ('<div class="gift-comments">' + g.comments.slice(-5).map(function(c) {
@@ -2678,7 +3069,10 @@ const App = {
         const pid = t.dataset.playerId;
         const gid = t.dataset.giftUid;
         if (pid && gid && typeof CoachTools !== 'undefined' && CoachTools.setFeaturedGift) {
-          CoachTools.setFeaturedGift(pid, gid);
+          if (!CoachTools.setFeaturedGift(pid, gid)) {
+            Toast.show('Статус біля імені змінює тренер або сам гравець — лише свій', 'warn');
+            return;
+          }
           Toast.show('Подарунок біля імені оновлено', 'ok');
           // refresh open FIFA modal if any
           try {
@@ -2731,9 +3125,13 @@ const App = {
         const s = Store.get();
         if (!s.activeBoard) s.activeBoard = {};
         s.activeBoard.useAvatars = !s.activeBoard.useAvatars;
+        s.activeBoard.toolsTrayOpen = false;
+        s.activeBoard.paletteOpen = false;
         try { document.body.classList.toggle('board-avatars', !!s.activeBoard.useAvatars); } catch (_) {}
+        try { document.body.classList.remove('tools-tray-open'); } catch (_) {}
         try { StorageManager.save(); } catch (_) {}
         if (typeof BoardEngine !== 'undefined') {
+          if (BoardEngine.closeToolsTray) BoardEngine.closeToolsTray(true);
           if (BoardEngine.renderTokens) BoardEngine.renderTokens();
           if (BoardEngine.renderToolbar) BoardEngine.renderToolbar();
         }
@@ -2749,6 +3147,25 @@ const App = {
         }
         return;
       }
+      if (action === 'open-gift-catalog') {
+        e.preventDefault(); e.stopPropagation();
+        if (typeof AuthManager !== 'undefined' && AuthManager.isCoach && !AuthManager.isCoach()) {
+          Toast.show('Подарунки дарує тренер', 'warn'); return;
+        }
+        const pid = t.dataset.playerId || t.getAttribute('data-player-id');
+        const p = (Store.get().players || []).find(x => String(x.id) === String(pid));
+        if (!p || typeof Views === 'undefined' || !Views.coachPlayerDetail) return;
+        window.__coachCardPlayerId = p.id;
+        Modal.open('Картка гравця · ' + (p.lastName || p.firstName || ''),
+          '<div class="fifa-modal-wrap" data-compare-host="' + p.id + '">' + Views.coachPlayerDetail(p.id) + '</div>',
+          [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
+        return;
+      }
+      if (action === 'team-chat-send') {
+        e.preventDefault(); e.stopPropagation();
+        try { App.sendTeamChat(); } catch (err) { console.error('[team-chat]', err); }
+        return;
+      }
       if (action === 'award-gift') {
         e.preventDefault(); e.stopPropagation();
         if (typeof AuthManager !== 'undefined' && AuthManager.isCoach && !AuthManager.isCoach()) {
@@ -2757,11 +3174,9 @@ const App = {
         const pid = t.dataset.playerId;
         const gid = t.dataset.giftId;
         if (pid && gid && typeof CoachTools !== 'undefined' && CoachTools.awardGift) {
-          // Памʼятний підпис — ТІЛЬКИ разом із подарунком
           let note = '';
-          try {
-            note = window.prompt('Підпис до подарунка (памʼятний момент, необовʼязково):', '') || '';
-          } catch (_) { note = ''; }
+          const noteEl = document.getElementById('giftMomentNote');
+          if (noteEl) note = String(noteEl.value || '').trim();
           const gift = CoachTools.awardGift(pid, gid, note);
           if (note && gift && typeof CoachTools.addMoment === 'function') {
             try { CoachTools.addMoment(pid, note, gift.id); } catch (_) {}
@@ -2808,17 +3223,10 @@ const App = {
         if (!s.gifts) s.gifts = [];
         const g = s.gifts.find(x => String(x.id) === String(uid) || String(x.uid) === String(uid));
         if (!g) { Toast.show('Подарунок не знайдено', 'warn'); return; }
-        s.gifts.forEach(x => { if (x.playerId === g.playerId) x.featured = false; });
-        g.featured = true;
-        if (!g.id) g.id = g.uid || ('g_' + Date.now());
-        if (!g.uid) g.uid = g.id;
-        const p = (s.players || []).find(x => x.id === g.playerId);
-        if (p) {
-          if (!p.profile) p.profile = {};
-          if (g.hue != null) p.profile.themeHue = g.hue;
-          p.profile.featuredGiftId = g.id;
+        if (typeof CoachTools === 'undefined' || !CoachTools.setFeaturedGift || !CoachTools.setFeaturedGift(g.playerId, uid)) {
+          Toast.show('Статус біля імені змінює тренер або сам гравець — лише свій', 'warn');
+          return;
         }
-        try { StorageManager.save(); } catch (_) {}
         try { if (StorageManager.syncCloud) StorageManager.syncCloud(); } catch (_) {}
         Toast.show('Статус біля імені оновлено', 'ok');
         try { Modal.close && Modal.close({ action: 'cancel' }); App.renderCurrent && App.renderCurrent(); } catch (_) {}
@@ -2927,6 +3335,14 @@ const App = {
         } catch (_) {}
         return;
       }
+      if (action === 'close-tools-tray') {
+        e.preventDefault(); e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        const ab = Store.get().activeBoard;
+        if (ab) { ab.toolsTrayOpen = false; ab.paletteOpen = false; }
+        try { BoardEngine.closeToolsTray(true); } catch (_) {}
+        return;
+      }
       if (action === 'toggle-tools-tray') {
         e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
         const ab = Store.get().activeBoard;
@@ -2937,7 +3353,14 @@ const App = {
         try { BoardEngine.renderToolbar && BoardEngine.renderToolbar(); } catch (_) {}
         const forceTray = () => {
           const tray = document.getElementById('btbToolsTray');
-          if (!tray) return;
+          if (!tray || !ab.toolsTrayOpen) {
+            if (tray && !ab.toolsTrayOpen) {
+              tray.classList.remove('open');
+              tray.setAttribute('aria-hidden', 'true');
+              tray.style.cssText = '';
+            }
+            return;
+          }
           if (ab.toolsTrayOpen) {
             if (tray.parentElement !== document.body) document.body.appendChild(tray);
             tray.classList.add('open');
@@ -3056,8 +3479,18 @@ const App = {
       if (action === 'anim-pause') return BoardEngine.animPause();
       if (action === 'anim-stop') return BoardEngine.animStop();
       if (action === 'anim-restart') return BoardEngine.animRestart();
-      if (action === 'cal-prev') { const d = new Date(Store.get().ui.calDate); d.setMonth(d.getMonth() - 1); Store.get().ui.calDate = d.toISOString().slice(0, 10); App.renderCurrent(); try { App._bindPlayerCompare(); } catch (_) {} return; }
-      if (action === 'cal-next') { const d = new Date(Store.get().ui.calDate); d.setMonth(d.getMonth() + 1); Store.get().ui.calDate = d.toISOString().slice(0, 10); App.renderCurrent(); return; }
+      if (action === 'cal-prev' || action === 'cal-next') {
+        const s = Store.get();
+        s.ui = s.ui || {};
+        const base = s.ui.calDate ? new Date(s.ui.calDate + 'T12:00:00') : new Date();
+        base.setMonth(base.getMonth() + (action === 'cal-next' ? 1 : -1));
+        const y = base.getFullYear();
+        const m = String(base.getMonth() + 1).padStart(2, '0');
+        const d = String(base.getDate()).padStart(2, '0');
+        s.ui.calDate = y + '-' + m + '-' + d;
+        App.renderCurrent();
+        return;
+      }
       if (action === 'microcycle') return Actions.applyMicrocycle();
       if (action === 'export-stats') return StorageManager.exportJSON();
 
@@ -3087,6 +3520,10 @@ const App = {
       }
       if (t.dataset.nextTraining) {
         e.preventDefault(); e.stopPropagation();
+        if (e.target.closest('[data-coach-card], .coach-public-card, .coach-squad-card, [data-action="open-coach-card"]')) {
+          try { App.openCoachCard(); } catch (_) {}
+          return;
+        }
         if (this._lpSuppressClick) return;
         return this.openNextTrainingPreview(t.dataset.nextTraining);
       }
@@ -3402,6 +3839,11 @@ const App = {
 
     // Keyboard shortcuts
     document.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && e.target && e.target.id === 'teamChatInput') {
+        e.preventDefault();
+        try { App.sendTeamChat(); } catch (_) {}
+        return;
+      }
       if (isInput(e.target)) return;
       if (e.key === 'Escape') {
         if (BoardEngine.isBoardOnly) { BoardEngine.exitFullscreen(); return; }
@@ -3514,3 +3956,4 @@ const App = {
     return out;
   };
 })();
+try { window.App = App; } catch (_) {}
