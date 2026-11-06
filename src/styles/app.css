@@ -11937,3 +11937,68 @@ body.role-guest .team-chat { display: none !important; }
 .player-profile-hero .gift-status-badge .tg-gift-art-ico {
   font-size: 22px !important;
 }
+
+.sheet-mini-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 2px 6px;
+}
+.sms-cell {
+  background: rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 6px 2px;
+  text-align: center;
+}
+.sms-cell b { display: block; font-size: 14px; color: #e8c547; }
+.sms-cell span { font-size: 10px; color: rgba(255,255,255,0.66); }
+.sheet-mini-note {
+  margin: 0 8px 8px;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(255,255,255,0.62);
+}
+.club-player-card.fifa-classic {
+  background:
+    linear-gradient(180deg, rgba(16,12,6,0.42) 0%, rgba(8,10,16,0.94) 34%, rgba(8,10,16,0.9) 68%, rgba(8,10,16,0.62) 100%),
+    radial-gradient(80% 42% at 50% 0%, rgba(232,197,71,0.48), transparent 68%),
+    repeating-linear-gradient(90deg, #16315c 0 16px, #d4b15e 16px 32px) !important;
+  border: 2px solid #e8c547 !important;
+  color: #f4efe2 !important;
+}
+.club-player-card.fifa-classic::before,
+.club-player-card.fifa-classic::after { content: none !important; background: none !important; }
+.cc-crest, .settings-crest {
+  display: block;
+  width: 148px;
+  height: auto;
+  margin: 0 auto 8px;
+  object-fit: contain;
+  background: #0c0c0c;
+  border-radius: 16px;
+}
+.settings-crest { width: 112px; }
+.coach-av-crest { padding: 3px !important; overflow: hidden; background: #0c0c0c !important; }
+.coach-av-crest .coach-crest {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  border-radius: 12px;
+}
+.staff-list { max-height: 340px; overflow: auto; margin: 8px 0 12px; }
+.staff-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) repeat(3, auto);
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  font-size: 13px;
+}
+.staff-name { font-weight: 700; }
+.staff-row label { display: flex; gap: 4px; align-items: center; white-space: nowrap; }
+@media (max-width: 720px) {
+  .staff-row { grid-template-columns: 1fr 1fr; }
+  .staff-name { grid-column: 1 / -1; }
+}

@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z57',
+  APP_BUILD: 'z58',
   APP_UPDATED: '06.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -241,16 +241,7 @@ const Views = {
     const s = Store.get();
     const set = s.settings || {};
     // Картка тренера ЗАВЖДИ з налаштувань клубу — НЕ з сесії поточного гравця
-    let name = (set.coachName && String(set.coachName).trim()) || 'Artem Serdiuk';
-    let photo = set.coachPhoto || set.coachPhotoUrl || '';
-    try {
-      // Фото з Telegram — лише якщо поточний користувач реально тренер
-      const isCoachSession = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
-      if (!photo && isCoachSession && typeof TelegramManager !== 'undefined' && TelegramManager.getUser) {
-        const u = TelegramManager.getUser();
-        if (u && u.photo_url) photo = u.photo_url;
-      }
-    } catch (_) {}
+    const name = (set.coachName && String(set.coachName).trim()) || 'Artem Serdiuk';
     const ach = (typeof CoachTools !== 'undefined' && CoachTools.getCoachAchievements)
       ? CoachTools.getCoachAchievements()
       : { attendancePct: 100, appMs: 0, boardMs: 0, trainingsDone: 0, boards: 0 };
@@ -260,12 +251,9 @@ const Views = {
       if (m < 60) return m + 'хв';
       return (Math.round(m / 6) / 10) + 'г';
     };
-    const initials = (name || 'AS').split(/\s+/).map(p => p[0] || '').join('').slice(0, 2).toUpperCase();
-    const ph = photo
-      ? '<img src="' + sanitize(photo) + '" alt="" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'"/>'
-      : '<span class="cp-avatar-ph">' + sanitize(initials) + '</span>';
+    const ph = '<img class="coach-crest" src="assets/coach-crest.jpg" alt="Емблема тренера">';
     return '<div class="pl-card glass coach-squad-card is-coach" data-action="open-coach-card" role="button" tabindex="0">' +
-      '<div class="pl-card-av-wrap"><div class="pl-card-av coach-av" style="border-color:#f0c14b;background:linear-gradient(145deg,#3d2e0a,#1a1408)">' + ph + '</div></div>' +
+      '<div class="pl-card-av-wrap"><div class="pl-card-av coach-av coach-av-crest" style="border-color:#e8c547;background:#0c0c0c">' + ph + '</div></div>' +
       '<div class="pl-card-body">' +
       '<div class="pl-card-name">★ ' + sanitize(name) + '</div>' +
       '<div class="pl-card-meta">' + (typeof t==='function'?t('head_coach','Головний тренер'):'Головний тренер') + ' · METALIST</div>' +
@@ -807,7 +795,7 @@ const Views = {
     const gs = this._playerGiftStyle ? this._playerGiftStyle(p.id) : { ring: posColor, bg: 'linear-gradient(165deg,#241c10,#12100c)' };
     const photoAction = photo ? ' data-action="open-photo" data-player-id="' + p.id + '"' : '';
     return `
-      <div class="fifa-card club-player-card ${this._playerBackdrop(p).className}" style="--pos-color:${posColor};--gift-ring:${gs.ring || posColor};--acc-ring:${gs.ring || posColor};${this._playerBackdrop(p).style}" data-fifa-player="${p.id}" data-compare-host="${p.id}">
+      <div class="fifa-card club-player-card fifa-classic" style="--pos-color:${posColor};--gift-ring:#e8c547;--acc-ring:#e8c547" data-fifa-player="${p.id}" data-compare-host="${p.id}">
         <div class="cpc-brand">
           <div class="cpc-brand-name"><span>МЕТАЛІСТ</span> <b>ШТУТТГАРТ</b></div>
         </div>
@@ -2250,6 +2238,67 @@ trainings() {
       '<div class="an-body">' + (rows || '<div class="es">Немає даних</div>') + '</div></div>';
   },
 
+  playerMiniStats(p) {
+    if (!p) return '';
+    let st = { attPct: null, avgRpe: null, load28: null, present: 0, absent: 0 };
+    try { st = this._playerStats(p.id) || st; } catch (_) {}
+    const cond = p.readiness != null ? p.readiness : (p.condition != null ? p.condition : '—');
+    const cell = (value, label) => '<div class="sms-cell"><b>' + value + '</b><span>' + label + '</span></div>';
+    return '<div class="sheet-mini-stats" aria-label="Статистика гравця">' +
+      cell((cond === '—' ? cond : cond + '%'), 'Готовність') +
+      cell(st.attPct != null ? (st.attPct + '%') : '—', 'Відвідування') +
+      cell(st.avgRpe != null ? st.avgRpe : '—', 'RPE') +
+      cell(p.load != null ? p.load : '—', 'Load') +
+      '</div><p class="sheet-mini-note">Був ' + (st.present || 0) + ' · пропуск ' + (st.absent || 0) +
+      ' · load 28д ' + (st.load28 != null ? st.load28 : '—') + '</p>';
+  },
+
+  _staffCard() {
+    const s = Store.get();
+    const set = s.settings || {};
+    const staff = set.staff || {};
+    const players = (s.players || []).slice().sort((a, b) => (a.number || 0) - (b.number || 0));
+    const head = typeof AuthManager !== 'undefined' && AuthManager._canWriteClub && AuthManager._canWriteClub();
+    const nameOf = (p) => '#' + (p.number || '—') + ' ' + sanitize(p.lastName || p.firstName || 'Гравець');
+    const cap = players.find(p => p && p.isCaptain) || null;
+    const assistants = Array.isArray(staff.assistants) ? staff.assistants.map(String) : [];
+    const crest = '<img class="settings-crest" src="assets/coach-crest.jpg" alt="Емблема тренера">';
+    if (!head) {
+      const pres = players.find(p => p && String(p.id) === String(staff.presidentId || ''));
+      const asst = assistants.map(id => players.find(p => p && String(p.id) === id)).filter(Boolean).map(nameOf);
+      return '<div class="card glass settings-card"><div class="ct">Склад тренерів</div>' + crest +
+        '<p class="note-sm">Помічників, президента і капітана призначає головний тренер.</p>' +
+        '<p>Президент: ' + sanitize(staff.presidentName || (pres ? nameOf(pres) : '—')) + '</p>' +
+        '<p>Помічники: ' + sanitize(asst.join(', ') || '—') + '</p>' +
+        '<p>Капітан: ' + sanitize(cap ? nameOf(cap) : '—') + '</p></div>';
+    }
+    const presId = String(staff.presidentId || '');
+    const capId = cap ? String(cap.id) : '';
+    const row = (p) => {
+      const id = sanitize(String(p.id));
+      return '<div class="staff-row">' +
+        '<span class="staff-name">' + nameOf(p) + '</span>' +
+        '<label><input type="checkbox" data-assistant value="' + id + '"' + (assistants.indexOf(String(p.id)) >= 0 ? ' checked' : '') + '> помічник</label>' +
+        '<label><input type="radio" name="setPresident" value="' + id + '"' + (presId === String(p.id) ? ' checked' : '') + '> президент</label>' +
+        '<label><input type="radio" name="setCaptain" value="' + id + '"' + (capId === String(p.id) ? ' checked' : '') + '> капітан</label>' +
+      '</div>';
+    };
+    return '<div class="card glass settings-card"><div class="ct">Склад тренерів</div>' + crest +
+      '<p class="note-sm">Головний тренер — Artem Serdiuk. Помічник входить як тренер, коли в картці гравця є Telegram. Капітана обирають лише тут.</p>' +
+      '<div class="staff-list">' +
+        '<div class="staff-row staff-row-clear">' +
+          '<span class="staff-name">Не призначено</span><span></span>' +
+          '<label><input type="radio" name="setPresident" value=""' + (presId ? '' : ' checked') + '> президент</label>' +
+          '<label><input type="radio" name="setCaptain" value=""' + (capId ? '' : ' checked') + '> капітан</label>' +
+        '</div>' +
+        players.map(row).join('') +
+      '</div>' +
+      '<label class="fl"><span class="fl-label">Президент не зі складу</span>' +
+        '<input type="text" id="setPresidentName" class="fl-input" value="' + sanitize(staff.presidentName || '') + '" placeholder="Ім’я, якщо це не гравець">' +
+      '</label>' +
+      '<button type="button" class="btn btn-p" data-action="save-settings">Зберегти склад</button></div>';
+  },
+
   settings() {
     const s = Store.get();
     const set = s.settings || {};
@@ -2301,6 +2350,7 @@ trainings() {
           </label>
         </div>
       </div>
+      ${this._staffCard()}
       <div class="card glass settings-card">
         <div class="ct">Тренування</div>
         <div class="settings-form">

@@ -523,6 +523,7 @@ const App = {
       <div class="coach-card-fifa" role="dialog" aria-label="Картка тренера">
         <div class="cc-glow"></div>
         <div class="cc-frame">
+          <img class="cc-crest" src="assets/coach-crest.jpg" alt="Емблема Металіст Штуттгарт">
           <div class="cc-rating">${rating}</div>
           <div class="cc-pos">HEAD COACH</div>
           <div class="cc-photo">${photoHtml}</div>
@@ -768,13 +769,16 @@ const App = {
     document.documentElement.style.setProperty('--club-accent', s.accent);
     const logo = document.getElementById('clubLogo');
     if (logo) {
-      logo.innerHTML = '<img src="assets/metalist-crest.png" alt="Металіст Штуттгарт">';
+      const crest = (typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach())
+        ? 'assets/coach-crest.jpg'
+        : 'assets/metalist-crest.png';
+      logo.innerHTML = '<img src="' + crest + '" alt="Металіст Штуттгарт">';
     }
     const build = document.getElementById('appBuild');
     if (build) {
       const letter = (typeof Views !== 'undefined' && Views.versionLetter) ? Views.versionLetter() : 'А';
       const when = (typeof Views !== 'undefined' && Views.APP_UPDATED) || '06.11.2026';
-      build.textContent = letter + ' • ' + when;
+      build.textContent = letter + ': ' + when;
     }
     const parts = (s.clubName || 'МЕТАЛІСТ ШТУТТГАРТ').split(' ');
     const cn = document.getElementById('clubName');
@@ -1855,6 +1859,7 @@ const App = {
       '<div class="tg-sheet-handle"></div>' +
       '<div class="tg-sheet-title">' + title + '</div>' +
       '<div class="tg-sheet-sub">' + (p.position || '') + ' · ' + (p.status || 'available') + '</div>' +
+      ((typeof Views !== 'undefined' && Views.playerMiniStats) ? Views.playerMiniStats(p) : '') +
       '<button type="button" class="tg-sheet-btn" data-psheet="edit" data-pid="' + p.id + '">✏️ ' + (typeof I18n!=='undefined'?I18n.t('sheet_edit','Редагувати'):'Редагувати') + '</button>' +
       '<button type="button" class="tg-sheet-btn" data-psheet="board" data-pid="' + p.id + '">⚽ ' + (typeof I18n!=='undefined'?I18n.t('sheet_attach','Прикріпити поточну дошку'):'Прикріпити поточну дошку') + '</button>' +
       '<button type="button" class="tg-sheet-btn" data-psheet="diary" data-pid="' + p.id + '">📓 ' + (typeof I18n!=='undefined'?I18n.t('diary_title','Запис у щоденник'):'Запис у щоденник') + '</button>' +

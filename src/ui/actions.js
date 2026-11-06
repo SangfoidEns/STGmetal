@@ -698,7 +698,6 @@ const Actions = {
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_condition','Стан %'):'Стан %')}</label><input type="number" id="plC" value="90" min="0" max="100"></div>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_readiness','Готовність %'):'Готовність %')}</label><input type="number" id="plR" value="95" min="0" max="100"></div>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_group','Група'):'Група')}</label><select id="plG"><option value="main">${(typeof I18n!=='undefined'?I18n.t('group_main','Основний'):'Основний')}</option><option value="reserve">${(typeof I18n!=='undefined'?I18n.t('group_reserve','Резерв'):'Резерв')}</option><option value="gk">${(typeof I18n!=='undefined'?I18n.t('group_gk','Воротарі'):'Воротарі')}</option></select></div>
-        <div class="fgr full"><label class="chk-label"><input type="checkbox" id="plCap"> ${(typeof I18n!=='undefined'?I18n.t('label_captain','Капітан команди'):'Капітан команди')}</label></div>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_birth','Дата народження'):'Дата народження')}</label><input type="date" id="plBirth"></div>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_telegram','Telegram'):'Telegram')}</label><input id="plTg" placeholder="@username" autocomplete="off"></div>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_phone','Телефон'):'Телефон')}</label><input id="plPhone" type="tel" placeholder="+49..." autocomplete="off"></div>
@@ -715,8 +714,6 @@ const Actions = {
     if (!firstName && !lastName) { Toast.show('Вкажіть ім\'я', 'warn'); return; }
     const st = document.getElementById('plS')?.value || 'available';
     const status = st === 'healthy' ? 'available' : (st === 'recovery' ? 'rehab' : st);
-    const isCaptain = !!document.getElementById('plCap')?.checked;
-    if (isCaptain) Store.get().players.forEach(x => { x.isCaptain = false; });
     Store.get().players.push({
       id: uid(), firstName, lastName,
       number: +document.getElementById('plN')?.value || 99,
@@ -724,7 +721,7 @@ const Actions = {
       secondaryPositions: [], age: +document.getElementById('plA')?.value || 20,
       status,
       healthStatus: status,
-      isCaptain,
+      isCaptain: false,
       condition: +document.getElementById('plC')?.value || 90,
       readiness: +document.getElementById('plR')?.value || 90,
       load: 0, notes: document.getElementById('plNo')?.value || '',
@@ -760,10 +757,7 @@ const Actions = {
           <option value="suspended" ${st==='suspended'?'selected':''}>Дискваліфікація</option>
           <option value="unavailable" ${st==='unavailable'?'selected':''}>Недоступний</option>
         </select></div>
-        <div class="fgr full"><label class="chk-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
-          <input type="checkbox" id="peCap" ${p.isCaptain?'checked':''} style="width:18px;height:18px">
-          <span><strong>Капітан команди (C)</strong></span>
-        </label></div>
+        <p class="note-sm" style="grid-column:1/-1;margin:0">Капітана призначає головний тренер у Налаштування → Склад тренерів.</p>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_condition','Стан %'):'Стан %')}</label><input type="number" id="peC" value="${p.condition}"></div>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_readiness','Готовність %'):'Готовність %')}</label><input type="number" id="peR" value="${p.readiness}"></div>
         <div class="fgr"><label>Load (0-10)</label><input type="number" id="peLoad" value="${p.load||0}" min="0" max="10"></div>
@@ -813,11 +807,13 @@ const Actions = {
 
     const pePhotoVal = document.getElementById('pePhoto')?.value?.trim();
     if (pePhotoVal) p.photoUrl = pePhotoVal;
-    const wantCap = !!document.getElementById('peCap')?.checked;
-    if (wantCap) {
-      Store.get().players.forEach(x => { x.isCaptain = (x.id === p.id); });
-    } else {
-      p.isCaptain = false;
+    const capBox = document.getElementById('peCap');
+    let wantCap = !!p.isCaptain;
+    if (capBox) {
+      wantCap = !!capBox.checked;
+      if (wantCap && typeof Store.setCaptain === 'function') Store.setCaptain(p.id);
+      else if (wantCap) Store.get().players.forEach(x => { x.isCaptain = (x.id === p.id); });
+      else p.isCaptain = false;
     }
     p.healthStatus = p.status;
     try {
@@ -1210,6 +1206,40 @@ const Actions = {
     if (gm != null) {
       s.guestMedia = gm.split(/\n/).map(x => x.trim()).filter(Boolean);
       s.social.media = s.guestMedia;
+    }
+
+    const capPick = document.querySelector('input[name="setCaptain"]:checked');
+    if (capPick) {
+      const capId = capPick.value || '';
+      if (typeof Store.setCaptain === 'function') Store.setCaptain(capId);
+      s.staff = s.staff || {};
+      s.staff.captainId = capId;
+    }
+    const presPick = document.querySelector('input[name="setPresident"]:checked');
+    const presNameEl = document.getElementById('setPresidentName');
+    const asstBoxes = document.querySelectorAll('input[data-assistant]');
+    if (presPick || presNameEl || (asstBoxes && asstBoxes.length)) {
+      s.staff = s.staff || {};
+      if (presPick) s.staff.presidentId = presPick.value || '';
+      if (presNameEl) s.staff.presidentName = String(presNameEl.value || '').trim();
+      if (asstBoxes && asstBoxes.length) {
+        s.staff.assistants = Array.from(asstBoxes).filter(b => b.checked).map(b => b.value);
+        if (!s.rbac) s.rbac = { coaches: ['Serdiuk_Artem'], playerLinks: {} };
+        const nicks = s.staff.assistants.map(id => {
+          const pl = (Store.get().players || []).find(x => String(x.id) === String(id));
+          return pl && pl.telegramUsername ? String(pl.telegramUsername).replace(/^@/, '') : '';
+        }).filter(n => {
+          const low = n.toLowerCase();
+          return low && low !== 'artem_serdyuk' && low !== 'serdiuk_artem';
+        });
+        const seen = {};
+        s.rbac.coaches = ['Serdiuk_Artem'].concat(nicks).filter(n => {
+          const key = n.toLowerCase();
+          if (seen[key]) return false;
+          seen[key] = true;
+          return true;
+        });
+      }
     }
 
     s.sound = document.getElementById('setSound')?.checked !== false;
