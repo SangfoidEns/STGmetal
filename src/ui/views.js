@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z51',
+  APP_BUILD: 'z52',
   APP_UPDATED: '06.11.2026',
 
   _buildLine() {
@@ -1969,7 +1969,14 @@ trainings() {
       '<div class="cal-month">' + sanitize(monthName) + '</div>' +
       '<button type="button" class="btn btn-s btn-sm cal-nav-btn" data-action="cal-next" aria-label="Наступний місяць">›</button>' +
       '</div>' +
-      '<div class="cal-weekdays cg"><span class="cdn">Пн</span><span class="cdn">Вт</span><span class="cdn">Ср</span><span class="cdn">Чт</span><span class="cdn">Пт</span><span class="cdn">Сб</span><span class="cdn">Нд</span></div>' +
+      '<div class="cal-weekdays cg">' +
+      '<span class="cdn" title="Понеділок">А</span>' +
+      '<span class="cdn" title="Вівторок">Б</span>' +
+      '<span class="cdn" title="Середа">В</span>' +
+      '<span class="cdn" title="Четвер">Г</span>' +
+      '<span class="cdn" title="П\'ятниця">Ґ</span>' +
+      '<span class="cdn" title="Субота">Д</span>' +
+      '<span class="cdn" title="Неділя">Е</span></div>' +
       '<div class="cal-grid cg">' + cells + '</div></div>' +
       dayDetail +
       '<p class="note-sm">● заплановане · ✓ проведено · ✕ скасовано</p>';

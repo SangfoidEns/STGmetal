@@ -10443,6 +10443,9 @@ div.card-training {
 .cal-weekdays > span {
   display: block !important;
   padding: 4px 0 !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0 !important;
 }
 .cal-grid,
 .cal-card .cal-grid {
