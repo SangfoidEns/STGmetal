@@ -448,8 +448,9 @@ CoachTools.footballPatternIndex = function (g) {
   } catch (_) {}
   return base;
 };
-CoachTools._footballSymbol = function (id, ink) {
-  const g = '<g fill="' + ink + '" stroke="none" opacity="0.26">';
+CoachTools._footballSymbol = function (id, ink, opacity) {
+  const op = opacity == null ? 0.26 : opacity;
+  const g = '<g fill="' + ink + '" stroke="none" opacity="' + op + '">';
   const z = '</g>';
   const e = ' fill-rule="evenodd"';
   if (id === 'ball') {
@@ -525,6 +526,52 @@ CoachTools.giftPatternSvg = function (g) {
   const body = CoachTools._footballSymbolTile(def.id, ink);
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="168" height="168" viewBox="0 0 168 168">' + body + '</svg>';
   return { svg: svg, hue: hue, seed: seed, patternId: def.id, patternLabel: def.label };
+};
+/** Колекційні фони лише для футболістів: радіальний градієнт, дрібний силует, герб клубу. */
+CoachTools.PLAYER_BACKDROPS = [
+  { id: 'pistachio', name: 'Фісташка', center: '#91AE7C', edge: '#668653', ink: '#58794D', symbol: 'ball', tone: 'light' },
+  { id: 'metalist', name: 'Металіст', center: '#E4D09A', edge: '#C4A86A', ink: '#7A6234', symbol: 'shield', tone: 'light' },
+  { id: 'shtuttgart', name: 'Штуттгарт', center: '#5E7EA6', edge: '#314E70', ink: '#243C58', symbol: 'jersey', tone: 'dark' },
+  { id: 'pitch', name: 'Газон', center: '#7EAE78', edge: '#4E7A52', ink: '#3E6244', symbol: 'boot', tone: 'light' },
+  { id: 'cup', name: 'Кубок', center: '#E6C98A', edge: '#B8924C', ink: '#7A5E2C', symbol: 'cup', tone: 'light' },
+  { id: 'captain', name: 'Капітан', center: '#D9C48A', edge: '#8A7344', ink: '#5C4A28', symbol: 'captain', tone: 'light' }
+];
+CoachTools.playerBackdrop = function (player) {
+  const list = CoachTools.PLAYER_BACKDROPS;
+  const key = String((player && (player.id || player.number)) || 'club');
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (Math.imul(h, 33) + key.charCodeAt(i)) >>> 0;
+  const def = list[h % list.length];
+  const ink = def.ink;
+  const main = CoachTools._footballSymbol(def.symbol, ink, 0.22);
+  const club = CoachTools._footballSymbol('shield', ink, 0.22);
+  const gap = 30;
+  const parts = [];
+  for (let row = 0; row <= 6; row++) {
+    const y = 6 + row * gap;
+    const odd = row % 2 === 1;
+    for (let col = -1; col <= 6; col++) {
+      const x = (odd ? gap / 2 : 0) + col * gap;
+      if (x < -8 || x > 158 || y > 158) continue;
+      const rot = ((row + col) % 2 === 0) ? -7 : 6;
+      const mark = ((row + col) % 4 === 0) ? club : main;
+      parts.push('<g transform="translate(' + x + ' ' + y + ') rotate(' + rot + ') scale(0.52)">' + mark + '</g>');
+    }
+  }
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="150" height="150" viewBox="0 0 150 150">' +
+    '<filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/></filter>' +
+    '<rect width="150" height="150" filter="url(#grain)" opacity="0.045"/>' +
+    parts.join('') + '</svg>';
+  const pat = 'url(\'data:image/svg+xml,' + encodeURIComponent(svg) + '\')';
+  return {
+    id: def.id,
+    name: def.name,
+    tone: def.tone,
+    center: def.center,
+    edge: def.edge,
+    className: 'player-collectible ' + (def.tone === 'light' ? 'pb-light' : 'pb-dark'),
+    style: '--pb-center:' + def.center + ';--pb-edge:' + def.edge + ';--pb-pat:' + pat + ';'
+  };
 };
 CoachTools.homePatternVars = function (gifts) {
   const list = (gifts || []).filter(Boolean).slice()

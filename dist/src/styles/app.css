@@ -10913,6 +10913,76 @@ body.mode-board-focus .team-chat-form { display: none !important; }
   background-repeat: no-repeat, repeat;
 }
 .home-pattern > * { position: relative; z-index: 1; }
+.pl-card.player-collectible,
+.pl-card.player-collectible.is-me,
+.cp-hero.player-collectible,
+.club-player-card.player-collectible,
+.player-profile-sheet.player-collectible,
+.player-collectible {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: radial-gradient(ellipse 88% 78% at 50% 40%, var(--pb-center, #91AE7C), var(--pb-edge, #668653) 84%) !important;
+}
+.player-collectible::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: var(--pb-pat);
+  background-size: 150px 150px;
+  background-repeat: repeat;
+}
+.player-collectible::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 62% 48% at 50% 38%, rgba(255,255,255,0.16), transparent 58%),
+    radial-gradient(ellipse 130% 110% at 50% 50%, transparent 52%, rgba(0,0,0,0.16) 100%);
+}
+.player-collectible > * { position: relative; z-index: 1; }
+.player-collectible.pb-light,
+.player-collectible.pb-light .cp-title,
+.player-collectible.pb-light .cp-title-name,
+.player-collectible.pb-light .pl-card-name,
+.player-collectible.pb-light .pl-card-name-txt,
+.player-collectible.pb-light .pps-name,
+.player-collectible.pb-light .pps-meta,
+.player-collectible.pb-light .cpc-name,
+.player-collectible.pb-light .cpc-pos,
+.player-collectible.pb-light .cpc-brand-name b {
+  color: #1b2616;
+  text-shadow: none;
+}
+.player-collectible.pb-light .cp-status,
+.player-collectible.pb-light .pl-card-meta,
+.player-collectible.pb-light .cpc-meta,
+.player-collectible.pb-light .cpc-ovr-label,
+.player-collectible.pb-light .pps-tap-hint {
+  color: #31402c;
+}
+.player-collectible.pb-light .cpc-brand-name span,
+.player-collectible.pb-light .cpc-num,
+.player-collectible.pb-light .pl-card-att,
+.player-collectible.pb-light .fifa-stat b {
+  color: #5c4a12 !important;
+}
+.player-collectible.pb-light .fifa-stat {
+  background: rgba(255,255,255,0.28);
+  border-color: rgba(27,38,22,0.12);
+}
+.player-collectible.pb-dark,
+.player-collectible.pb-dark .cp-title,
+.player-collectible.pb-dark .pl-card-name,
+.player-collectible.pb-dark .cpc-name,
+.player-collectible.pb-dark .cpc-pos {
+  color: #f4efe2;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.35);
+}
 .player-profile-sheet.home-pattern {
   background: var(--sheet-bg, #16141c) !important;
   overflow: hidden;

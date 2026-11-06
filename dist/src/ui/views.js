@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z50',
+  APP_BUILD: 'z51',
   APP_UPDATED: '06.11.2026',
 
   _buildLine() {
@@ -415,7 +415,6 @@ const Views = {
       : 'Немає запланованих тренувань';
 
     const coachXp = (typeof CoachTools !== 'undefined' && CoachTools.coachProgress) ? CoachTools.coachProgress() : null;
-    const heroPat = this._heroPatternVars(s.gifts || []);
     return `
       <div class="club-profile">
         ${this._buildLine()}
@@ -433,7 +432,7 @@ const Views = {
             ? `<img src="${sanitize(pc.photo)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling&&(this.nextElementSibling.style.display='flex')"/><span class="cp-avatar-ph" style="display:none">${sanitize(pc.initials || '??')}</span>`
             : `<span class="cp-avatar-ph">${sanitize(pc.initials || '??')}</span>`;
           return `
-        <div class="cp-hero cp-person cp-clean home-pattern" style="--pos-bg:${pc.accent.bg};--pos-ring:${pc.accent.ring};${heroPat}">
+        <div class="cp-hero cp-person cp-clean" style="--pos-bg:${pc.accent.bg};--pos-ring:${pc.accent.ring};">
           <div class="cp-avatar-wrap">
             <button type="button" class="cp-avatar" ${avAction}
               title="${pc.photo ? 'Фото на весь екран' : (pc.kind === 'coach' ? 'Дошка' : 'FIFA-картка')}"
@@ -718,7 +717,8 @@ const Views = {
       : '<span>' + sanitize(initials.toUpperCase()) + '</span>';
     const stories = (typeof this._playerStoriesStrip === 'function') ? this._playerStoriesStrip(p.id) : '';
     const pat = this._playerPatternStyle ? this._playerPatternStyle(p) : '';
-    return '<div class="player-profile-sheet home-pattern profile-tinted" style="' + pat + '--sheet-bg:' + (gs.bg || acc.bg) + ';border-color:' + (gs.ring || acc.ring) + '">' +
+    const bd = this._playerBackdrop ? this._playerBackdrop(p) : { className: '', style: pat };
+    return '<div class="player-profile-sheet profile-tinted ' + (bd.className || '') + '" style="' + (bd.style || pat) + 'border-color:' + (gs.ring || acc.ring) + '">' +
       '<button type="button" class="pps-account" data-action="open-fifa-card" data-player-id="' + p.id + '">' +
       '<span class="pps-avatar" data-action="open-fifa-card" data-player-id="' + p.id + '" style="border-color:' + (gs.ring || acc.ring) + ';background:' + (gs.bg || acc.bg) + '">' + ph + '</span>' +
       '<span class="pps-name">#' + (p.number||'—') + ' ' + sanitize(name) + ' ' + badge + '</span>' +
@@ -793,7 +793,7 @@ const Views = {
     const gs = this._playerGiftStyle ? this._playerGiftStyle(p.id) : { ring: posColor, bg: 'linear-gradient(165deg,#241c10,#12100c)' };
     const photoAction = photo ? ' data-action="open-photo" data-player-id="' + p.id + '"' : '';
     return `
-      <div class="fifa-card club-player-card" style="--pos-color:${posColor};--gift-ring:${gs.ring || posColor};--acc-ring:${gs.ring || posColor};background:${gs.bg || 'linear-gradient(165deg,#241c10,#12100c)'}" data-fifa-player="${p.id}" data-compare-host="${p.id}">
+      <div class="fifa-card club-player-card ${this._playerBackdrop(p).className}" style="--pos-color:${posColor};--gift-ring:${gs.ring || posColor};--acc-ring:${gs.ring || posColor};${this._playerBackdrop(p).style}" data-fifa-player="${p.id}" data-compare-host="${p.id}">
         <div class="cpc-brand">
           <div class="cpc-brand-name"><span>МЕТАЛІСТ</span> <b>ШТУТТГАРТ</b></div>
         </div>
@@ -1101,7 +1101,7 @@ const Views = {
         <button type="button" class="btn btn-s btn-sm" data-action="edit-self-player">Профіль</button>
       </div>
       ${me ? `
-        <div class="cp-hero cp-person cp-clean player-profile-hero home-pattern" style="${themeStyle};${this._heroPatternVars(meGifts)}">
+        <div class="cp-hero cp-person cp-clean player-profile-hero ${this._playerBackdrop(me).className}" style="${themeStyle};${this._playerBackdrop(me).style}">
           <div class="cp-avatar-wrap" data-stop-nav="1">
             <button type="button" class="cp-avatar" data-action="${photo ? 'open-photo' : 'open-fifa-card'}" data-player-id="${me.id}"
               title="${photo ? 'Фото на весь екран' : 'FIFA-картка'}" style="border-color:var(--pos-ring);background:var(--pos-bg)">
@@ -1308,7 +1308,7 @@ const Views = {
 
     return '<div class="club-public">' +
       this._buildLine() +
-      '<div class="club-hero home-pattern" style="' + this._heroPatternVars(s.gifts || []) + '">' +
+      '<div class="club-hero">' +
         '<button type="button" class="club-crest-btn" data-action="open-photo" data-photo="assets/metalist-crest.png" data-photo-save="1" data-photo-name="Metalist-Shtuttgart.png" title="Емблема на весь екран">' +
         '<img class="club-crest" src="assets/metalist-crest.png" alt="Емблема Металіст Штуттгарт"/></button>' +
         '<div class="club-hero-copy"><div class="club-kicker">Одна команда</div><h1>Металіст Штуттгарт</h1>' +
@@ -1556,13 +1556,15 @@ trainings() {
     return '--acc-ring:' + a.ring + ';--acc-bg:' + a.bg;
   },
 
-  _playerPatternStyle(p) {
-    let mine = [];
+  _playerBackdrop(p) {
     try {
-      mine = (Store.get().gifts || []).filter(g => g && p && String(g.playerId) === String(p.id));
+      if (typeof CoachTools !== 'undefined' && CoachTools.playerBackdrop) return CoachTools.playerBackdrop(p || {});
     } catch (_) {}
-    const featured = mine.find(g => g.featured) || mine.find(g => g.attached !== false) || mine[0] || null;
-    return this._heroPatternVars(featured ? [featured] : []);
+    return { className: '', style: '' };
+  },
+
+  _playerPatternStyle(p) {
+    return (this._playerBackdrop(p).style) || '';
   },
 
   _squadPlaque(p, att, roleText) {
@@ -1580,7 +1582,8 @@ trainings() {
     const orbit = featured ? mine.filter(g => g !== featured) : mine;
     const cloud = this._tgGiftCloud(orbit, 1, 'card');
     const badge = this._giftStatusBadge(mine);
-    return '<div class="pl-card glass pl-card-tint pl-acc home-pattern" data-player-id="' + p.id + '" data-action="open-player-card" role="button" tabindex="0" style="' + this._accAttr(p) + ';' + this._playerPatternStyle(p) + '">' +
+    const bd = this._playerBackdrop(p);
+    return '<div class="pl-card glass pl-card-tint pl-acc ' + bd.className + '" data-player-id="' + p.id + '" data-action="open-player-card" role="button" tabindex="0" style="' + this._accAttr(p) + ';' + bd.style + '">' +
       '<div class="pl-card-av-wrap">' + (photo
         ? ('<button type="button" class="pl-card-av" data-action="open-fifa-card" data-player-id="' + p.id + '">' + ph + '</button>')
         : ('<div class="pl-card-av">' + ph + '</div>')) +
