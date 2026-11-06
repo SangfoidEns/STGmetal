@@ -94,6 +94,175 @@ const Actions = {
   saveBoardToDiary() {
     this.newDiary({ withBoard: true });
   },
+
+  _schemeCoach() {
+    return typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+  },
+
+  _refreshSchemeSurfaces() {
+    try {
+      const view = (Store.get().ui && Store.get().ui.view) || '';
+      if (view === 'board') {
+        if (typeof BoardEngine !== 'undefined' && BoardEngine.renderToolbar) BoardEngine.renderToolbar();
+        return;
+      }
+      if (typeof App !== 'undefined' && App.renderCurrent) App.renderCurrent();
+    } catch (_) {}
+  },
+
+  editScheme(id) {
+    if (!this._schemeCoach()) {
+      try { Toast.show('Редагувати схеми може лише тренер', 'warn'); } catch (_) {}
+      return;
+    }
+    const b = (Store.get().boards || []).find(x => String(x.id) === String(id));
+    if (!b) { try { Toast.show('Схему не знайдено', 'warn'); } catch (_) {} return; }
+    const types = ['тактика', 'тренування', 'фаза', 'стандарт'];
+    const cur = String(b.type || b.kind || 'тактика');
+    if (types.indexOf(cur) < 0) types.unshift(cur);
+    const opts = types.map(tp => '<option' + (tp === cur ? ' selected' : '') + '>' + sanitize(tp) + '</option>').join('');
+    Modal.open('Редагування схеми',
+      '<div class="fg">' +
+        '<div class="fgr full"><label>Назва</label><input id="schName" value="' + sanitize(b.name || '') + '"></div>' +
+        '<div class="fgr full"><label>Тип</label><select id="schType">' + opts + '</select></div>' +
+        '<div class="fgr full"><label>Опис</label><textarea id="schDesc" rows="6" placeholder="Повний опис: ідея, фаза, завдання гравцям">' + sanitize(b.description || b.notes || '') + '</textarea></div>' +
+      '</div>',
+      [
+        { label: 'Скасувати', cls: 'btn-s', action: 'cancel' },
+        { label: 'На дошці', cls: 'btn-s', action: 'edit-scheme-board' },
+        { label: 'Зберегти', cls: 'btn-p', action: 'save-scheme' }
+      ]
+    );
+    ['save-scheme', 'edit-scheme-board'].forEach(action => {
+      const btn = document.querySelector('[data-modal-action="' + action + '"]');
+      if (btn) btn.dataset.boardId = String(b.id);
+    });
+  },
+
+  saveScheme(id, opts) {
+    const b = (Store.get().boards || []).find(x => String(x.id) === String(id));
+    if (!b) return;
+    const nameEl = document.getElementById('schName');
+    const typeEl = document.getElementById('schType');
+    const descEl = document.getElementById('schDesc');
+    const name = nameEl ? String(nameEl.value || '').trim() : '';
+    if (name) b.name = name;
+    b.type = typeEl ? (typeEl.value || b.type || 'тактика') : (b.type || 'тактика');
+    b.kind = b.type;
+    b.description = descEl ? String(descEl.value || '') : (b.description || '');
+    b.updatedAt = new Date().toISOString();
+    StorageManager.save();
+    try { Modal.close(); } catch (_) {}
+    try { Toast.show('Схему оновлено', 'ok'); } catch (_) {}
+    if (opts && opts.openBoard) {
+      this.openSchemeOnBoard(b.id);
+      return;
+    }
+    this._refreshSchemeSurfaces();
+  },
+
+  openSchemeOnBoard(id) {
+    if (typeof BoardEngine !== 'undefined' && BoardEngine.loadBoard) BoardEngine.loadBoard(id);
+    if (typeof App !== 'undefined') {
+      if (App.allowBoardOnce) App.allowBoardOnce('scheme');
+      App.navigate('board');
+    }
+  },
+
+  deleteScheme(id) {
+    if (!this._schemeCoach()) {
+      try { Toast.show('Видаляти схеми може лише тренер', 'warn'); } catch (_) {}
+      return;
+    }
+    Modal.confirm('Видалити схему?', () => {
+      const s = Store.get();
+      s.boards = (s.boards || []).filter(x => String(x.id) !== String(id));
+      if (s.activeBoard && String(s.activeBoard.sourceBoardId || '') === String(id)) s.activeBoard.sourceBoardId = null;
+      StorageManager.save();
+      try { Toast.show('Схему видалено', 'ok'); } catch (_) {}
+      Actions._refreshSchemeSurfaces();
+    });
+  },
+
+  saveSchemeDrawing(id) {
+    if (!this._schemeCoach()) {
+      try { Toast.show('Зберігати схеми може лише тренер', 'warn'); } catch (_) {}
+      return;
+    }
+    const s = Store.get();
+    const b = (s.boards || []).find(x => String(x.id) === String(id));
+    if (!b) { try { Toast.show('Схему не знайдено', 'warn'); } catch (_) {} return; }
+    const ab = s.activeBoard || {};
+    b.objects = JSON.parse(JSON.stringify(ab.objects || []));
+    if (typeof BoardEngine !== 'undefined' && BoardEngine.camera) b.camera = Object.assign({}, BoardEngine.camera);
+    b.updatedAt = new Date().toISOString();
+    ab.sourceBoardId = b.id;
+    StorageManager.save();
+    try { Toast.show('Малюнок схеми збережено', 'ok'); } catch (_) {}
+    this._refreshSchemeSurfaces();
+  },
+
+  startNewScheme() {
+    if (!this._schemeCoach()) {
+      try { Toast.show('Нову схему створює тренер', 'warn'); } catch (_) {}
+      return;
+    }
+    const s = Store.get();
+    if (!s.activeBoard) s.activeBoard = { objects: [], tool: 'select', fieldView: 'full' };
+    s.activeBoard.objects = [];
+    s.activeBoard.selectedId = null;
+    s.activeBoard.sourceBoardId = null;
+    if (typeof App !== 'undefined') {
+      if (App.allowBoardOnce) App.allowBoardOnce('scheme');
+      App.navigate('board');
+    }
+    this.createSchemeFromBoard();
+  },
+
+  createSchemeFromBoard() {
+    if (!this._schemeCoach()) return;
+    const preset = 'Схема ' + new Date().toLocaleString('uk-UA');
+    Modal.open('Нова схема',
+      '<div class="fg">' +
+        '<div class="fgr full"><label>Назва</label><input id="schName" value="' + sanitize(preset) + '"></div>' +
+        '<div class="fgr full"><label>Тип</label><select id="schType"><option>тактика</option><option>тренування</option><option>фаза</option><option>стандарт</option></select></div>' +
+        '<div class="fgr full"><label>Опис</label><textarea id="schDesc" rows="5" placeholder="Повний опис: ідея, фаза, завдання"></textarea></div>' +
+      '</div>',
+      [
+        { label: 'Скасувати', cls: 'btn-s', action: 'cancel' },
+        { label: 'Створити', cls: 'btn-p', action: 'create-scheme' }
+      ]
+    );
+  },
+
+  commitNewScheme() {
+    const s = Store.get();
+    const nameEl = document.getElementById('schName');
+    const name = nameEl ? String(nameEl.value || '').trim() : '';
+    if (!name) { try { Toast.show('Вкажіть назву', 'warn'); } catch (_) {} return; }
+    const typeEl = document.getElementById('schType');
+    const descEl = document.getElementById('schDesc');
+    const type = typeEl ? (typeEl.value || 'тактика') : 'тактика';
+    const snap = {
+      id: (typeof uid === 'function' ? uid() : ('b' + Date.now())),
+      name,
+      type,
+      kind: type,
+      description: descEl ? String(descEl.value || '') : '',
+      objects: JSON.parse(JSON.stringify((s.activeBoard && s.activeBoard.objects) || [])),
+      camera: (typeof BoardEngine !== 'undefined' && BoardEngine.camera) ? Object.assign({}, BoardEngine.camera) : {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    s.boards = s.boards || [];
+    s.boards.push(snap);
+    if (!s.activeBoard) s.activeBoard = { objects: snap.objects };
+    s.activeBoard.sourceBoardId = snap.id;
+    StorageManager.save();
+    try { Modal.close(); } catch (_) {}
+    try { Toast.show('Схему створено', 'ok'); } catch (_) {}
+    this._refreshSchemeSurfaces();
+  },
   createDiary() {
     try {
       const title = document.getElementById('dyT')?.value?.trim() || 'Запис';

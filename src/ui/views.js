@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z56',
+  APP_BUILD: 'z57',
   APP_UPDATED: '06.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -1472,16 +1472,7 @@ trainings() {
         : (s.boards || []).filter(b => b && this._isTacticalBoard && this._isTacticalBoard(b));
       const schemesHtml = boards.length
         ? boards.slice(0, 60).map(b => {
-            const title = sanitize(b.name || b.title || 'Схема');
-            const typ = sanitize(b.type || b.kind || b.schemeType || 'тактика');
-            const date = b.updatedAt || b.createdAt ? sanitize(String(b.updatedAt || b.createdAt).slice(0, 10)) : '';
-            const thumb = (typeof this._schemeThumbSvg === 'function') ? this._schemeThumbSvg(b) : '📐';
-            return '<button type="button" class="scheme-card glass" data-action="load-scheme-board" data-board-id="' + sanitize(String(b.id || '')) + '">' +
-              '<div class="scheme-card-thumb">' + thumb + '</div>' +
-              '<div class="scheme-card-body">' +
-                '<div class="scheme-card-title">' + title + '</div>' +
-                '<div class="scheme-card-meta">' + typ + (date ? ' · ' + date : '') + '</div>' +
-              '</div></button>';
+            return this._schemeCard(b, { editable: false });
           }).join('')
         : '<div class="es note-sm">Немає тактичних схем. Тренер збереже схему на дошці.</div>';
       _schemesBlock = '<div class="player-schemes-block"><div class="scheme-cards">' + schemesHtml + '</div></div>';
@@ -1494,7 +1485,9 @@ trainings() {
       '</div>'
     ) : '';
     if (_isPlayerRole && _tab === 'schemes') {
-      return '<div class="st">Тренування · Схеми</div>' + _tabsHtml + (_schemesBlock || '<div class="es">Немає схем</div>');
+      return '<div class="st">Тренування · Схеми</div>' + _tabsHtml +
+        '<p class="note-sm">Утримуйте мініатюру, щоб прочитати повний опис.</p>' +
+        (_schemesBlock || '<div class="es">Немає схем</div>');
     }
 
     const statusLabel = (st) => {
@@ -1860,22 +1853,44 @@ trainings() {
       this._teamChat();
   },
 
+  _schemeCard(b, opts) {
+    const editable = !!(opts && opts.editable);
+    const title = sanitize((b && (b.name || b.title)) || 'Схема');
+    const typ = sanitize((b && (b.type || b.kind || b.schemeType)) || 'тактика');
+    const desc = String((b && (b.description || b.notes || b.text)) || '').trim();
+    const id = sanitize(String((b && b.id) || ''));
+    const thumb = (typeof this._schemeThumbSvg === 'function') ? this._schemeThumbSvg(b) : '📐';
+    const actions = editable
+      ? '<div class="scheme-card-actions">' +
+          '<button type="button" class="btn btn-s btn-sm" data-action="edit-scheme" data-board-id="' + id + '">Редагувати</button>' +
+          '<button type="button" class="btn btn-s btn-sm scheme-card-del" data-action="delete-scheme" data-board-id="' + id + '">Видалити</button>' +
+        '</div>'
+      : '';
+    return '<article class="scheme-card glass" data-board-id="' + id + '">' +
+      '<button type="button" class="scheme-card-openbtn" data-action="load-scheme-board" data-board-id="' + id + '">' +
+        '<div class="scheme-card-thumb">' + thumb + '</div>' +
+        '<div class="scheme-card-body">' +
+          '<div class="scheme-card-title">' + title + '</div>' +
+          '<div class="scheme-card-meta">' + typ + (desc ? ' · є опис' : '') + '</div>' +
+        '</div></button>' +
+      '<div class="scheme-card-detail">' +
+        '<p class="scheme-card-desc">' + (desc ? sanitize(desc) : 'Опису ще немає.') + '</p>' +
+        actions +
+      '</div></article>';
+  },
+
   tactics() {
     const s = Store.get();
     const boards = (s.boards || []).slice().sort((a, b) =>
       String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))
     );
     const canEdit = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
-    const cards = boards.map(b => {
-      const title = sanitize(b.name || 'Схема');
-      const typ = sanitize(b.type || b.kind || 'тактика');
-      const thumb = (typeof this._schemeThumbSvg === 'function') ? this._schemeThumbSvg(b) : '📐';
-      return '<button type="button" class="scheme-card glass" data-action="load-scheme-board" data-board-id="' + sanitize(String(b.id || '')) + '">' +
-        '<div class="scheme-card-thumb">' + thumb + '</div>' +
-        '<div class="scheme-card-body"><div class="scheme-card-title">' + title + '</div>' +
-        '<div class="scheme-card-meta">' + typ + '</div></div></button>';
-    }).join('');
+    const cards = boards.map(b => this._schemeCard(b, { editable: canEdit })).join('');
+    const hint = canEdit
+      ? '<p class="note-sm">Утримуйте мініатюру — повний опис, редагування і видалення. Короткий тап відкриває схему на дошці.</p>'
+      : '<p class="note-sm">Утримуйте мініатюру, щоб прочитати повний опис. Короткий тап відкриває схему на дошці.</p>';
     return '<div class="st">Схеми' + (canEdit ? ' <button class="btn btn-p btn-sm" data-action="new-board">+ Схема</button>' : '') + '</div>' +
+      hint +
       '<div class="scheme-cards">' + (cards || '<div class="es">Немає збережених схем</div>') + '</div>';
   },
 

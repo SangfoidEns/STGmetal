@@ -774,7 +774,7 @@ const App = {
     if (build) {
       const letter = (typeof Views !== 'undefined' && Views.versionLetter) ? Views.versionLetter() : 'А';
       const when = (typeof Views !== 'undefined' && Views.APP_UPDATED) || '06.11.2026';
-      build.textContent = letter + ' — ' + when;
+      build.textContent = letter + ' • ' + when;
     }
     const parts = (s.clubName || 'МЕТАЛІСТ ШТУТТГАРТ').split(' ');
     const cn = document.getElementById('clubName');
@@ -1910,6 +1910,17 @@ const App = {
     try { TelegramManager.haptic && TelegramManager.haptic('medium'); } catch (_) {}
   },
 
+  expandSchemeCard(boardId) {
+    const id = String(boardId || '');
+    const cards = document.querySelectorAll('.scheme-card[data-board-id]');
+    cards.forEach(card => {
+      const same = String(card.dataset.boardId || '') === id;
+      if (!same) card.classList.remove('scheme-card-open');
+      else card.classList.toggle('scheme-card-open');
+    });
+    try { TelegramManager.haptic && TelegramManager.haptic('medium'); } catch (_) {}
+  },
+
   openSchemeActionSheet(boardId) {
     const b = (Store.get().boards || []).find(x => x.id === boardId);
     if (!b) return;
@@ -2069,7 +2080,7 @@ const App = {
   },
 
   bindTrainingLongPress() {
-    const root = document.getElementById('app') || document.body;
+    const root = document;
     if (root._lpBound) return;
     root._lpBound = true;
     const LP_MS = 480;
@@ -2084,28 +2095,31 @@ const App = {
     };
 
     root.addEventListener('pointerdown', e => {
-      if (e.target.closest && e.target.closest('#teamChat, #teamChatForm, .team-chat, .team-chat-form')) return;
-      const row = e.target.closest(
+      if (e.target.closest && e.target.closest('#teamChat, #teamChatForm, .team-chat, .team-chat-form, .scheme-card-detail, #modal')) return;
+      const schemeCard = e.target.closest && e.target.closest('.scheme-card[data-board-id]');
+      if (!schemeCard && e.target.closest && e.target.closest('button:not(.coach-tools-handle), a, input, select, textarea')) return;
+      const row = schemeCard || (e.target.closest && e.target.closest(
         '.card-training[data-training-id], .tg-row[data-training-id], .pl-row[data-player-id], .scheme-row[data-board-id], .sc-next-training[data-next-training], .coach-tools-handle, .sc-tap[data-view="players"]'
-      );
+      ));
       if (!row) return;
-      if (e.target.closest('button:not(.coach-tools-handle), a, input, select, textarea')) return;
       this._lpMoved = false;
       this._lpTarget = row;
       row.classList.add('tg-row-holding');
-      const kind = row.classList.contains('pl-row') ? 'player'
+      const kind = schemeCard ? 'scheme-card'
+        : row.classList.contains('pl-row') ? 'player'
         : (row.matches && row.matches('.sc-tap[data-view="players"]')) ? 'squad'
         : row.classList.contains('scheme-row') ? 'scheme'
         : row.classList.contains('sc-next-training') ? 'next-training'
         : row.classList.contains('coach-tools-handle') ? 'coach-tools'
         : 'training';
-      const id = row.dataset.trainingId || row.dataset.editTraining || row.dataset.playerId || row.dataset.boardId || row.dataset.nextTraining || '';
+      const id = (schemeCard && schemeCard.dataset.boardId) || row.dataset.trainingId || row.dataset.editTraining || row.dataset.playerId || row.dataset.boardId || row.dataset.nextTraining || '';
       this._lpTimer = setTimeout(() => {
         this._lpTimer = null;
         if (this._lpTarget && !this._lpMoved) {
           this._lpTarget.classList.remove('tg-row-holding');
           if (kind === 'squad') this.openSquadDialog();
           else if (kind === 'player') this.openPlayerActionSheet(id);
+          else if (kind === 'scheme-card') this.expandSchemeCard(id);
           else if (kind === 'scheme') this.openSchemeActionSheet(id);
           else if (kind === 'next-training') this.openNextTrainingPreview(id);
           else if (kind === 'coach-tools') {
@@ -2337,8 +2351,32 @@ const App = {
         try { App.navigate('home'); } catch (_) {}
         return;
       }
+      if (action === 'edit-scheme') {
+        e.preventDefault(); e.stopPropagation();
+        const bid = t.dataset.boardId || (t.closest('.scheme-card') && t.closest('.scheme-card').dataset.boardId);
+        return Actions.editScheme(bid);
+      }
+      if (action === 'delete-scheme') {
+        e.preventDefault(); e.stopPropagation();
+        const bid = t.dataset.boardId || (t.closest('.scheme-card') && t.closest('.scheme-card').dataset.boardId);
+        return Actions.deleteScheme(bid);
+      }
+      if (action === 'save-scheme-drawing') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.saveSchemeDrawing(t.dataset.boardId);
+      }
+      if (action === 'save-scheme-as-new') {
+        e.preventDefault(); e.stopPropagation();
+        if (Store.get().activeBoard) Store.get().activeBoard.sourceBoardId = null;
+        return Actions.createSchemeFromBoard();
+      }
+      if (action === 'new-board') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.startNewScheme();
+      }
       if (action === 'load-scheme-board') {
         e.preventDefault(); e.stopPropagation();
+        if (this._lpSuppressClick) return;
         if (e.stopImmediatePropagation) e.stopImmediatePropagation();
         const bid = (t.dataset && t.dataset.boardId) || t.getAttribute('data-board-id');
         if (!bid) { Toast.show('Схему не знайдено', 'warn'); return; }
@@ -2394,7 +2432,7 @@ const App = {
         e.stopPropagation();
       }
       // після long-press не відкривати деталі коротким «відпусканням»
-      if (this._lpSuppressClick && e.target.closest('.card-training, .tg-row')) {
+      if (this._lpSuppressClick && e.target.closest('.card-training, .tg-row, .scheme-card')) {
         e.preventDefault();
         e.stopPropagation();
         return;
@@ -2458,6 +2496,7 @@ const App = {
       }
 
       if (action === 'new-training') return Actions.newTraining();
+      if (action === 'new-board') return Actions.startNewScheme();
       if (action === 'new-myex') return Actions.newMyEx();
       if (action === 'myex-from-board') return Actions.myExFromBoard();
       if (action === 'new-diary') return Actions.newDiary();
@@ -3918,6 +3957,9 @@ const App = {
       if (t.dataset.modalAction === 'create-exercise') return Actions.createExercise();
       if (t.dataset.modalAction === 'create-match') return Actions.createMatch();
       if (t.dataset.modalAction === 'create-event') return Actions.createEvent();
+      if (t.dataset.modalAction === 'save-scheme') return Actions.saveScheme(t.dataset.boardId);
+      if (t.dataset.modalAction === 'edit-scheme-board') return Actions.saveScheme(t.dataset.boardId, { openBoard: true });
+      if (t.dataset.modalAction === 'create-scheme') return Actions.commitNewScheme();
     });
 
     // Filters

@@ -1180,6 +1180,7 @@ const BoardEngine = {
     const scheme = SCHEMES[name];
     if (!scheme) return;
     const s = Store.get();
+    if (s.activeBoard) s.activeBoard.sourceBoardId = null;
     const tool = s.activeBoard.tool || 'select';
     // Режим суперника або явний forceTeam
     const asOpp = forceTeam === 'opp' || forceTeam === 'opponent' || tool === 'opponent';
@@ -1198,6 +1199,7 @@ const BoardEngine = {
       });
       this.pushHistory();
       this.render();
+      try { this.renderToolbar(); } catch (_) {}
       Toast.show('Суперник: схема ' + name + ' (дзеркало)', 'ok');
       return;
     }
@@ -1290,9 +1292,19 @@ const BoardEngine = {
     const nReh = benchList.filter(isRehab).length;
     const nRes = benchList.filter(isRes).length;
     Toast.show((typeof t==='function'?t('starters_bench_toast'):'Основа')+' 11 · '+(typeof t==='function'?t('bench_label'):'Лавка')+' ' + benchList.length + (nRes ? ' · рез. ' + nRes : '') + (nInj + nReh ? ' · мед. ' + (nInj + nReh) : ''), 'ok');
+    try { this.renderToolbar(); } catch (_) {}
   },
 
   saveBoard() {
+    const linked = Store.get().activeBoard && Store.get().activeBoard.sourceBoardId;
+    if (linked && typeof Actions !== 'undefined' && Actions.saveSchemeDrawing) {
+      Actions.saveSchemeDrawing(linked);
+      return;
+    }
+    if (typeof Actions !== 'undefined' && Actions.createSchemeFromBoard) {
+      Actions.createSchemeFromBoard();
+      return;
+    }
     const ctx = (Store.get().ui && Store.get().ui.boardContext) || null;
     Modal.prompt('Назва схеми / заготовки', 'Схема ' + new Date().toLocaleString('uk-UA'), name => {
       if (!name) return;
@@ -1342,10 +1354,50 @@ const BoardEngine = {
     this._migratedLeft = false;
     try { this.migrateLeftEdgeToBench && this.migrateLeftEdgeToBench(); } catch (_) {}
     try { this.pushHistory && this.pushHistory(); } catch (_) {}
+    if (b.id) s.activeBoard.sourceBoardId = b.id;
     try { this.render && this.render(); } catch (_) {}
     try { this.renderTokens && this.renderTokens(); } catch (_) {}
     try { this.renderDrawings && this.renderDrawings(); } catch (_) {}
+    try { this.renderToolbar && this.renderToolbar(); } catch (_) {}
     return true;
+  },
+
+  _schemeEditBar() {
+    const s = Store.get();
+    const ab = s.activeBoard || {};
+    if (!ab.sourceBoardId) return '';
+    const b = (s.boards || []).find(x => String(x.id) === String(ab.sourceBoardId));
+    if (!b) return '';
+    const name = (typeof sanitize === 'function') ? sanitize(b.name || 'Схема') : (b.name || 'Схема');
+    const descRaw = String(b.description || b.notes || '').trim();
+    const desc = (typeof sanitize === 'function') ? sanitize(descRaw) : descRaw;
+    const id = (typeof sanitize === 'function') ? sanitize(String(b.id)) : String(b.id);
+    const coach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+    const actions = coach
+      ? '<div class="bsb-actions">' +
+          '<button type="button" class="tb" data-action="edit-scheme" data-board-id="' + id + '">Редагувати</button>' +
+          '<button type="button" class="tb" data-action="save-scheme-drawing" data-board-id="' + id + '">Зберегти</button>' +
+          '<button type="button" class="tb" data-action="save-scheme-as-new" data-board-id="' + id + '">Як нову</button>' +
+          '<button type="button" class="tb tb-del-opp" data-action="delete-scheme" data-board-id="' + id + '">Видалити</button>' +
+        '</div>'
+      : '';
+    return '<div class="board-scheme-bar">' +
+      '<div class="bsb-text"><div class="bsb-name">' + name + '</div>' +
+      '<p class="bsb-desc">' + (desc || 'Опису ще немає.') + '</p></div>' +
+      actions + '</div>';
+  },
+
+  _readySchemesHtml() {
+    const boards = (Store.get().boards || []).slice().sort((a, b) =>
+      String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))
+    ).slice(0, 40);
+    const coach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+    if (!boards.length) return '<p class="note-sm">Немає збережених схем. Збережіть поточну дошку.</p>';
+    if (typeof Views === 'undefined' || !Views._schemeCard) return '';
+    return '<p class="note-sm">Утримуйте мініатюру — опис, редагування і видалення.</p>' +
+      '<div class="scheme-cards scheme-cards-tray">' +
+      boards.map(b => Views._schemeCard(b, { editable: coach })).join('') +
+      '</div>';
   },
 
   /* ═══ Анімація фішок уздовж стрілок / рухів ═══ */
@@ -2558,7 +2610,7 @@ const BoardEngine = {
         <button class="tb" data-action="board-clear" title="${typeof t==='function'?t('board_clear','Очистити'):'Очистити'}">🗑</button>
         <button class="tb" data-action="board-save" title="${typeof t==='function'?t('board_save','Зберегти схему'):'Зберегти схему'}">💾</button>
         <button class="tb" data-action="save-board-diary" title="${typeof t==='function'?t('board_save_diary','Зберегти дошку в щоденник'):'Зберегти дошку в щоденник'}">📓</button>
-      </div>`;
+      </div>` + this._schemeEditBar();
     }
 
     // ── НИЗ: компактна док-панель + Telegram-style висувний лоток ──
@@ -2655,6 +2707,10 @@ const BoardEngine = {
               <option value="">Схема…</option>
               ${Object.keys(typeof SCHEMES!=='undefined'?SCHEMES:{}).map(k => '<option value="'+k+'">'+k+'</option>').join('')}
             </select>
+          </div>
+          <div class="btb-tray-sec">
+            <div class="btb-tray-label">Готові схеми</div>
+            ${this._readySchemesHtml()}
           </div>
           <div class="btb-tray-sec">
             <div class="btb-tray-label">Склад на полі</div>
