@@ -10925,7 +10925,8 @@ body.mode-board-focus .team-chat-form { display: none !important; }
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  background: radial-gradient(ellipse 88% 78% at 50% 40%, var(--pb-center, #91AE7C), var(--pb-edge, #668653) 84%) !important;
+  background: var(--acc-bg, linear-gradient(165deg, hsl(42 46% 24%) 0%, hsl(42 38% 11%) 100%)) !important;
+  color: #f4efe2;
 }
 .player-collectible::before {
   content: "";
@@ -10943,48 +10944,24 @@ body.mode-board-focus .team-chat-form { display: none !important; }
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  background:
-    radial-gradient(ellipse 62% 48% at 50% 38%, rgba(255,255,255,0.16), transparent 58%),
-    radial-gradient(ellipse 130% 110% at 50% 50%, transparent 52%, rgba(0,0,0,0.16) 100%);
+  background: radial-gradient(ellipse 130% 110% at 50% 50%, transparent 58%, rgba(0,0,0,0.28) 100%);
 }
 .player-collectible > * { position: relative; z-index: 1; }
-.player-collectible.pb-light,
-.player-collectible.pb-light .cp-title,
-.player-collectible.pb-light .cp-title-name,
-.player-collectible.pb-light .pl-card-name,
-.player-collectible.pb-light .pl-card-name-txt,
-.player-collectible.pb-light .pps-name,
-.player-collectible.pb-light .pps-meta,
-.player-collectible.pb-light .cpc-name,
-.player-collectible.pb-light .cpc-pos,
-.player-collectible.pb-light .cpc-brand-name b {
-  color: #1b2616;
-  text-shadow: none;
-}
-.player-collectible.pb-light .cp-status,
-.player-collectible.pb-light .pl-card-meta,
-.player-collectible.pb-light .cpc-meta,
-.player-collectible.pb-light .cpc-ovr-label,
-.player-collectible.pb-light .pps-tap-hint {
-  color: #31402c;
-}
-.player-collectible.pb-light .cpc-brand-name span,
-.player-collectible.pb-light .cpc-num,
-.player-collectible.pb-light .pl-card-att,
-.player-collectible.pb-light .fifa-stat b {
-  color: #5c4a12 !important;
-}
-.player-collectible.pb-light .fifa-stat {
-  background: rgba(255,255,255,0.28);
-  border-color: rgba(27,38,22,0.12);
-}
-.player-collectible.pb-dark,
-.player-collectible.pb-dark .cp-title,
-.player-collectible.pb-dark .pl-card-name,
-.player-collectible.pb-dark .cpc-name,
-.player-collectible.pb-dark .cpc-pos {
+.player-collectible .pl-card-name,
+.player-collectible .pl-card-name-txt,
+.player-collectible .cp-title,
+.player-collectible .cp-title-name,
+.player-collectible .pps-name,
+.player-collectible .cpc-name,
+.player-collectible .cpc-pos {
   color: #f4efe2;
-  text-shadow: 0 1px 1px rgba(0,0,0,0.35);
+}
+.player-collectible .pl-card-meta,
+.player-collectible .cp-status,
+.player-collectible .cpc-meta,
+.player-collectible .pps-meta,
+.player-collectible .pps-tap-hint {
+  color: rgba(244, 239, 226, 0.72);
 }
 .player-profile-sheet.home-pattern {
   background: var(--sheet-bg, #16141c) !important;

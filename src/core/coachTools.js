@@ -527,7 +527,40 @@ CoachTools.giftPatternSvg = function (g) {
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="168" height="168" viewBox="0 0 168 168">' + body + '</svg>';
   return { svg: svg, hue: hue, seed: seed, patternId: def.id, patternLabel: def.label };
 };
-/** Колекційні фони лише для футболістів: радіальний градієнт, дрібний силует, герб клубу. */
+/** Колір картки футболіста — як раніше, від головного подарунка. */
+CoachTools.playerFieldAccent = function (player) {
+  const byPos = function (pos) {
+    const p = String(pos || '').toUpperCase();
+    if (p === 'GK' || p.includes('GK')) return { hue: 48, ring: '#f1c40f', bg: 'linear-gradient(145deg,#f1c40f33,#f39c1222)' };
+    if (/^CB|^LB|^RB|^LCB|^RCB|^WB|DEF/.test(p)) return { hue: 204, ring: '#3498db', bg: 'linear-gradient(145deg,#3498db33,#2980b922)' };
+    if (/^CM|^CDM|^CAM|^LM|^RM|^DM|MID/.test(p)) return { hue: 145, ring: '#2ecc71', bg: 'linear-gradient(145deg,#2ecc7133,#27ae6022)' };
+    if (/^ST|^CF|^LW|^RW|^SS|ATT|FW/.test(p)) return { hue: 6, ring: '#e74c3c', bg: 'linear-gradient(145deg,#e74c3c33,#c0392b22)' };
+    return { hue: 42, ring: '#e8c547', bg: 'linear-gradient(145deg,#9b59b633,#8e44ad22)' };
+  };
+  if (!player) return { hue: 42, ring: '#c8a84b', bg: 'linear-gradient(160deg,#2a2410,#12100a)' };
+  let hue = null;
+  try {
+    const gifts = ((typeof Store !== 'undefined' && Store.get && Store.get().gifts) || [])
+      .filter(function (g) { return g && String(g.playerId) === String(player.id); });
+    const featured = gifts.find(function (g) { return g.featured; }) || null;
+    if (featured) hue = CoachTools.giftHue(featured);
+  } catch (_) {}
+  if (hue == null) {
+    const profile = player.profile || {};
+    const stored = profile.themeHue != null ? profile.themeHue : player.themeHue;
+    if (stored != null && stored !== '' && isFinite(Number(stored))) hue = Number(stored);
+  }
+  if (hue != null) {
+    hue = (Number(hue) % 360 + 360) % 360;
+    return {
+      hue: hue,
+      ring: 'hsl(' + hue + ' 72% 58%)',
+      bg: 'linear-gradient(165deg, hsl(' + hue + ' 46% 24%) 0%, hsl(' + hue + ' 38% 11%) 100%)'
+    };
+  }
+  return byPos(player.position);
+};
+/** Колекційний візерунок лише для футболістів. Колір поля береться з подарунка. */
 CoachTools.PLAYER_BACKDROPS = [
   { id: 'pistachio', name: 'Фісташка', center: '#91AE7C', edge: '#668653', ink: '#58794D', symbol: 'ball', tone: 'light' },
   { id: 'metalist', name: 'Металіст', center: '#E4D09A', edge: '#C4A86A', ink: '#7A6234', symbol: 'shield', tone: 'light' },
@@ -542,7 +575,8 @@ CoachTools.playerBackdrop = function (player) {
   let h = 0;
   for (let i = 0; i < key.length; i++) h = (Math.imul(h, 33) + key.charCodeAt(i)) >>> 0;
   const def = list[h % list.length];
-  const ink = def.ink;
+  const accent = CoachTools.playerFieldAccent(player);
+  const ink = 'hsl(' + accent.hue + ' 22% 94%)';
   const main = CoachTools._footballSymbol(def.symbol, ink, 0.22);
   const club = CoachTools._footballSymbol('shield', ink, 0.22);
   const gap = 30;
@@ -566,11 +600,10 @@ CoachTools.playerBackdrop = function (player) {
   return {
     id: def.id,
     name: def.name,
-    tone: def.tone,
-    center: def.center,
-    edge: def.edge,
-    className: 'player-collectible ' + (def.tone === 'light' ? 'pb-light' : 'pb-dark'),
-    style: '--pb-center:' + def.center + ';--pb-edge:' + def.edge + ';--pb-pat:' + pat + ';'
+    tone: 'gift',
+    hue: accent.hue,
+    className: 'player-collectible',
+    style: '--acc-ring:' + accent.ring + ';--acc-bg:' + accent.bg + ';--pb-pat:' + pat + ';'
   };
 };
 CoachTools.homePatternVars = function (gifts) {
