@@ -35,11 +35,13 @@ describe('player collectible backgrounds', () => {
       settings: {},
       gifts: [{ uid: 'g_card', id: 'g_card', playerId: 'id_player_1', featured: true, hue: 200, seed: 7 }]
     });
+    const gift = { uid: 'g_card', id: 'g_card', playerId: 'id_player_1', featured: true, hue: 200, seed: 7 };
     const bg = ctx.CoachTools.playerBackdrop({ id: 'id_player_1' });
-    const club = ctx.CoachTools.giftClubBackdrop({ uid: 'g_card', id: 'g_card', playerId: 'id_player_1', featured: true, hue: 200, seed: 7 });
+    const drawn = ctx.CoachTools.giftPatternSvg(gift);
     assert.match(bg.className, /player-collectible/);
-    assert.equal(bg.id, club.id);
-    assert.match(bg.style, new RegExp('--acc-bg:' + club.base.replace('#', '#')));
+    assert.equal(bg.id, drawn.patternId);
+    assert.equal(bg.hue, 200);
+    assert.match(bg.style, /--acc-bg:linear-gradient\(165deg, hsl\(200 /);
     assert.match(bg.style, /--pb-pat:/);
     const raw = decodeURIComponent(bg.style.split('data:image/svg+xml,')[1].replace(/'\)$/, '').replace(/;$/, ''));
     assert.equal(raw.includes('<text'), false);

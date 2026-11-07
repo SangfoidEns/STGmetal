@@ -576,20 +576,19 @@ CoachTools.playerBackdrop = function (player) {
       return g && player && String(g.playerId) === String(player.id) && g.attached !== false;
     });
     const gift = mine.find(function (g) { return g.featured; }) || mine[0] || null;
-    if (gift && CoachTools.GIFT_BACKDROPS && CoachTools.GIFT_BACKDROPS.length && CoachTools._backdropSvg) {
-      const idx = CoachTools.uniqueBackdropIndex ? CoachTools.uniqueBackdropIndex(gift) : (CoachTools.giftSeed(gift) % CoachTools.GIFT_BACKDROPS.length);
-      const club = CoachTools.GIFT_BACKDROPS[idx];
-      const svg = CoachTools._backdropSvg(club);
-      const pat = 'url(\'data:image/svg+xml,' + encodeURIComponent(svg) + '\')';
-      const inkDark = club.ink === 'dark';
-      const ring = inkDark ? '#0d1f4d' : '#e8c547';
+    if (gift && CoachTools.giftPatternSvg && CoachTools.giftHue) {
+      const hue = CoachTools.giftHue(gift);
+      const drawn = CoachTools.giftPatternSvg(gift);
+      const pat = 'url(\'data:image/svg+xml,' + encodeURIComponent(drawn.svg) + '\')';
+      const ring = 'hsl(' + hue + ' 72% 58%)';
+      const bg = 'linear-gradient(165deg, hsl(' + hue + ' 52% 32%) 0%, hsl(' + hue + ' 46% 15%) 100%)';
       return {
-        id: club.id,
-        name: club.name,
-        tone: inkDark ? 'light' : 'dark',
-        hue: CoachTools.giftHue ? CoachTools.giftHue(gift) : 42,
-        className: 'player-collectible gift-field' + (inkDark ? ' tone-ink-dark' : ''),
-        style: '--acc-ring:' + ring + ';--acc-bg:' + club.base_color + ';--pb-pat:' + pat + ';'
+        id: drawn.patternId,
+        name: drawn.patternLabel,
+        tone: 'dark',
+        hue: hue,
+        className: 'player-collectible gift-field',
+        style: '--acc-ring:' + ring + ';--acc-bg:' + bg + ';--pb-pat:' + pat + ';'
       };
     }
   } catch (_) {}

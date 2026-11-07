@@ -12183,13 +12183,13 @@ body.mode-board-focus #boardToolbarTop.btb-top {
   cursor: pointer !important;
 }
 .player-collectible.gift-field::before {
-  background-size: cover;
+  background-size: 132px 132px;
   background-position: center;
-  background-repeat: no-repeat;
+  background-repeat: repeat;
   opacity: 1;
 }
 .player-collectible.gift-field::after {
-  background: linear-gradient(180deg, transparent 0%, transparent 46%, rgba(0, 0, 0, 0.42) 100%);
+  background: radial-gradient(ellipse 130% 100% at 50% 28%, transparent 52%, rgba(0, 0, 0, 0.2) 100%);
 }
 .player-collectible.tone-ink-dark,
 .player-collectible.tone-ink-dark .pl-card-name,
