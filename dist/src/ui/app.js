@@ -758,6 +758,7 @@ const App = {
     if (/^\d{4}-\d{2}-\d{2}$/.test(bd)) {
       p.birthDate = bd;
       p.profile.birthDate = bd;
+      try { if (typeof Views !== 'undefined' && Views.syncBirthdays) Views.syncBirthdays(); } catch (_) {}
     }
     p.profile.phone = String(field('ppPhone') || '').slice(0, 40);
     p.profile.social = String(field('ppSocial') || '').slice(0, 200);
@@ -832,7 +833,7 @@ const App = {
     if (build) {
       const letter = (typeof Views !== 'undefined' && Views.versionLetter) ? Views.versionLetter() : 'А';
       const when = (typeof Views !== 'undefined' && Views.APP_UPDATED) || '07.11.2026';
-      build.textContent = letter + ' · ' + when;
+      build.textContent = letter + ' • ' + when;
     }
     const parts = (s.clubName || 'МЕТАЛІСТ ШТУТТГАРТ').split(' ');
     const cn = document.getElementById('clubName');
@@ -1749,7 +1750,9 @@ const App = {
     if (this._chatBlocksTraining()) return;
     const t = (Store.get().trainings || []).find(x => x.id === trainingId);
     if (!t) return;
-    const cancelled = t.status === 'cancelled' || t.status === 'canceled';
+    const cancelled = (typeof Views !== 'undefined' && Views._trainingCancelled)
+      ? Views._trainingCancelled(t)
+      : (t.status === 'cancelled' || t.status === 'canceled');
     const isCoach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
     // прибрати старий sheet
     document.getElementById('tgActionSheet')?.remove();
@@ -1810,7 +1813,7 @@ const App = {
     sheet.innerHTML = `
       <div class="tg-sheet-handle"></div>
       <div class="tg-sheet-title">${typeof sanitize === 'function' ? sanitize(t.name) : t.name}</div>
-      <div class="tg-sheet-sub">${t.date || ''} · ${Views._trStatusLabel ? Views._trStatusLabel(t.status) : t.status}</div>
+      <div class="tg-sheet-sub">${t.date || ''} · ${cancelled ? 'Скасовано, не пропуск' : (Views._trStatusLabel ? Views._trStatusLabel(t.status) : t.status)}</div>
       ${planBlock}
       ${coachActions}
       <button type="button" class="tg-sheet-btn tg-sheet-cancel" data-sheet-act="close">${(typeof I18n!=='undefined'?I18n.t('close','Закрити'):'Закрити')}</button>
@@ -4107,7 +4110,7 @@ const App = {
         const st = document.getElementById('trStatus')?.value || '';
         const isCoach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
         let list = Store.get().trainings.slice();
-        if (!isCoach) list = list.filter(t => t.status !== 'draft' && t.status !== 'pinned');
+        if (!isCoach) list = list.filter(t => (typeof Views !== 'undefined' && Views._trainingCancelled && Views._trainingCancelled(t)) || (t.status !== 'draft' && t.status !== 'pinned'));
         list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
         if (q) list = list.filter(t => (t.name || '').toLowerCase().includes(q));
         if (st) list = list.filter(t => t.status === st);

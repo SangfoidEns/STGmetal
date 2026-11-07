@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z64',
+  APP_BUILD: 'z65',
   APP_UPDATED: '07.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -1508,7 +1508,8 @@ trainings() {
     let list = (s.trainings || []).slice();
     if (!canEdit) {
       list = list.filter(t => {
-        const st = t.status || 'planned';
+        if (this._trainingCancelled(t)) return true;
+        const st = String(t.status || 'planned').toLowerCase();
         return st !== 'draft' && st !== 'pinned';
       });
     }
@@ -1547,32 +1548,36 @@ trainings() {
         (_schemesBlock || '<div class="es">Немає схем</div>');
     }
 
-    const statusLabel = (st) => {
+    const statusLabel = (tr) => {
+      if (this._trainingCancelled(tr)) return 'Скасовано';
+      const st = tr.status || 'planned';
       if (st === 'done') return 'Проведено';
-      if (st === 'cancelled') return 'Скасовано';
       if (st === 'draft') return 'Чернетка';
       if (st === 'pinned') return 'Закріплене';
       return 'Заплановане';
     };
-    const statusCls = (st) => {
+    const statusCls = (tr) => {
+      if (this._trainingCancelled(tr)) return 'tr-cancelled is-cancelled';
+      const st = tr.status || 'planned';
       if (st === 'done') return 'tr-done';
-      if (st === 'cancelled') return 'tr-cancelled';
       if (st === 'draft') return 'tr-draft';
       return 'tr-planned';
     };
 
     const cards = list.map(tr => {
       const st = tr.status || 'planned';
+      const off = this._trainingCancelled(tr);
       const load = tr.load != null ? tr.load : (tr.rpe != null ? tr.rpe : '—');
       const dur = tr.duration != null ? (tr.duration + ' хв') : '';
       const title = sanitize(tr.name || 'Тренування');
       const date = sanitize(tr.date || '');
-      const bits = (typeof SessionPlay !== 'undefined') ? (SessionPlay.slidesHtml(tr) + SessionPlay.claimHtml(tr)) : '';
-      return '<div class="card glass card-training tg-row ' + statusCls(st) + '" data-training-id="' + (tr.id || '') + '" data-action="open-training">' +
-        '<div class="tr-top"><div class="tr-title">' + title + '</div><span class="tr-badge ' + statusCls(st) + '">' + statusLabel(st) + '</span></div>' +
+      const bits = off ? '' : ((typeof SessionPlay !== 'undefined') ? (SessionPlay.slidesHtml(tr) + SessionPlay.claimHtml(tr)) : '');
+      const note = off ? '<div class="tr-cancel-note">Скасовано · не пропуск</div>' : '';
+      return '<div class="card glass card-training tg-row ' + statusCls(tr) + '" data-training-id="' + (tr.id || '') + '" data-action="open-training">' +
+        '<div class="tr-top"><div class="tr-title">' + title + '</div><span class="tr-badge ' + statusCls(tr) + '">' + statusLabel(tr) + '</span></div>' +
         '<div class="tr-meta"><span>' + date + '</span>' + (dur ? '<span class="tr-dot">·</span><span>' + dur + '</span>' : '') +
-        (load !== '—' ? '<span class="tr-dot">·</span><span>навантаження ' + load + '</span>' : '') + '</div>' +
-        bits +
+        (!off && load !== '—' ? '<span class="tr-dot">·</span><span>навантаження ' + load + '</span>' : '') + '</div>' +
+        note + bits +
         '</div>';
     }).join('');
 
@@ -1973,6 +1978,42 @@ trainings() {
       '<div class="scheme-cards">' + (cards || '<div class="es">Немає збережених схем</div>') + '</div>';
   },
 
+  _trainingCancelled(tr) {
+    if (!tr) return false;
+    if (typeof LoadModel !== 'undefined' && LoadModel.isCancelled) return !!LoadModel.isCancelled(tr);
+    const st = String(tr.status || '').toLowerCase();
+    if (st === 'done' || st === 'completed' || st === 'проведено') return false;
+    if (st === 'cancelled' || st === 'canceled' || st === 'скасовано') return true;
+    return !!tr.cancelledAt;
+  },
+
+  _playerBirth(p) {
+    if (!p) return '';
+    const raw = String(p.birthDate || (p.profile && p.profile.birthDate) || p.birthday || '').slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';
+  },
+
+  syncBirthdays() {
+    const s = Store.get();
+    if (!s) return;
+    const keep = (s.calendar || []).filter(ev => !(ev && (ev.source === 'birthday' || ev.type === 'birthday')));
+    const added = [];
+    (s.players || []).forEach(p => {
+      const raw = this._playerBirth(p);
+      if (!raw) return;
+      const name = [p.firstName, p.lastName].filter(Boolean).join(' ') || p.name || ('#' + (p.number || ''));
+      added.push({
+        id: 'bday-' + p.id,
+        source: 'birthday',
+        type: 'birthday',
+        date: raw,
+        playerId: p.id,
+        title: 'День народження · ' + name
+      });
+    });
+    s.calendar = keep.concat(added);
+  },
+
   calendar() {
     const s = Store.get();
     const ui = s.ui || {};
@@ -2015,6 +2056,19 @@ trainings() {
       if (!mt || !mt.date) return;
       pushEvent({ date: mt.date, type: 'match', status: '', title: mt.opponent ? ('vs ' + mt.opponent) : 'Матч', id: mt.id });
     });
+    (s.players || []).forEach(p => {
+      const raw = this._playerBirth(p);
+      if (!raw) return;
+      const parts = raw.split('-');
+      if (Number(parts[1]) !== m + 1) return;
+      const ds = y + '-' + parts[1] + '-' + parts[2];
+      const name = [p.firstName, p.lastName].filter(Boolean).join(' ') || p.name || ('#' + (p.number || ''));
+      const age = y - Number(parts[0]);
+      pushEvent({
+        date: ds, type: 'birthday', status: '', title: name, id: 'bday-' + p.id, playerId: p.id,
+        age: (age > 0 && age < 100) ? age : 0
+      });
+    });
 
     const byDate = {};
     events.forEach(e => {
@@ -2033,9 +2087,14 @@ trainings() {
       let dots = '';
       dayEv.forEach(e => {
         let cls = 'cal-dot';
-        if (e.type === 'training' && e.status === 'done') cls += ' cal-dot-done';
-        else if (e.type === 'training' && isCancel(e.status)) cls += ' cal-dot-cancel';
-        else if (e.type === 'training') cls += ' cal-dot-plan';
+        if (e.type === 'birthday') cls += ' cal-dot-bday';
+        else if (e.type === 'training') {
+          const tr = (s.trainings || []).find(t => t && t.id === e.id);
+          const off = tr ? this._trainingCancelled(tr) : isCancel(e.status);
+          if (tr && tr.status === 'done') cls += ' cal-dot-done';
+          else if (off) cls += ' cal-dot-cancel';
+          else cls += ' cal-dot-plan';
+        }
         else if (e.type === 'match') cls += ' cal-dot-match';
         else cls += ' cal-dot-ev';
         dots += '<span class="' + cls + '"></span>';
@@ -2050,21 +2109,30 @@ trainings() {
       if (dayEv.length) {
         dayDetail = '<div class="card glass cal-day-detail"><div class="ct">' + sanitize(selDay) + '</div>' +
           dayEv.map(e => {
+            if (e.type === 'birthday') {
+              const years = e.age ? (' · ' + e.age + ' р.') : '';
+              return '<button type="button" class="cal-ev-row cal-bday" data-action="open-player-card" data-player-id="' + sanitize(e.playerId || '') + '">🎂 ' +
+                sanitize(e.title) + years + '</button>';
+            }
             let extra = '';
+            let kind = e.type === 'match' ? 'матч' : (e.type === 'training' ? 'тренування' : 'подія');
+            let state = '';
             if (e.type === 'training') {
               const tr = (s.trainings || []).find(t => t.id === e.id);
-              if (tr) {
+              const off = tr ? this._trainingCancelled(tr) : isCancel(e.status);
+              if (off) state = 'скасовано, не пропуск';
+              else if ((tr && tr.status === 'done') || e.status === 'done') state = 'проведено';
+              else if ((tr && tr.status === 'planned') || e.status === 'planned') state = 'заплановане';
+              if (tr && !off) {
                 const att = tr.attendance || {};
                 const keys = Object.keys(att);
                 let present = 0;
                 keys.forEach(k => { if (att[k] && att[k].present !== false) present++; });
-                const loads = keys.map(k => (att[k] && att[k].intensity) || 0).filter(Boolean);
-                const avgLoad = loads.length ? (loads.reduce((a,b)=>a+b,0)/loads.length).toFixed(1) : '—';
-                extra = ' · відв. ' + present + '/' + (keys.length || '—') + ' · навантаження ' + avgLoad;
+                extra = ' · відв. ' + present + '/' + (keys.length || '—');
               }
             }
             return '<div class="cal-ev-row">' + sanitize(e.title) +
-              ' <span class="note-sm">(' + sanitize(e.type) + (e.status ? ', ' + e.status : '') + extra + ')</span></div>';
+              ' <span class="note-sm">(' + kind + (state ? ', ' + state : '') + extra + ')</span></div>';
           }).join('') + '</div>';
       } else {
         dayDetail = '<div class="card glass cal-day-detail"><div class="ct">' + sanitize(selDay) + '</div><p class="note-sm">Немає подій</p></div>';
@@ -2087,7 +2155,7 @@ trainings() {
       '<span class="cdn" title="Неділя">Нд</span></div>' +
       '<div class="cal-grid cg">' + cells + '</div></div>' +
       dayDetail +
-      '<p class="note-sm">● заплановане · ✓ проведено · ✕ скасовано</p>';
+      '<p class="note-sm">● заплановане · ✓ проведено · ✕ скасовано · 🎂 день народження</p>';
   },
 
   matches() {

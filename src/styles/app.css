@@ -7252,7 +7252,21 @@ body.board-on:not(.mode-board-focus) > #btbToolsTray {
 }
 .card-training.is-cancelled {
   border-left: 3px solid #e57373 !important;
-  opacity: 0.72;
+  opacity: 1 !important;
+}
+.card-training.is-cancelled .tr-title { text-decoration: line-through; }
+.tr-cancel-note { color: #f0b4ae; font-size: 12px; font-weight: 700; }
+.cal-dot-bday { background: #e8c547 !important; }
+.cal-bday {
+  display: flex;
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(232,197,71,.45);
+  background: rgba(232,197,71,.1);
+  color: inherit;
+  text-align: left;
 }
 
 .pl-row.is-me,

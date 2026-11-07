@@ -731,6 +731,7 @@ const Actions = {
       phone: (document.getElementById('plPhone')?.value || '').trim(),
       birthDate: document.getElementById('plBirth')?.value || ''
     });
+    try { if (typeof Views !== 'undefined' && Views.syncBirthdays) Views.syncBirthdays(); } catch (_) {}
     StorageManager.save();
     Modal.close();
     Toast.show((typeof I18n!=='undefined'?I18n.t('toast_player_added','Гравця додано'):'Гравця додано'), 'ok');
@@ -833,6 +834,7 @@ const Actions = {
     } catch (_) {}
 
     const finish = () => {
+      try { if (typeof Views !== 'undefined' && Views.syncBirthdays) Views.syncBirthdays(); } catch (_) {}
       try { StorageManager.save(); } catch (_) {}
       Modal.close();
       Toast.show(wantCap ? 'Збережено · Капітан' : (p.status === 'injured' ? 'Збережено · Травма' : 'Збережено'), 'ok');
