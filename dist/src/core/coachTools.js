@@ -655,15 +655,81 @@ CoachTools.coachProgress = function () {
     attSeries: attSeries.slice(-8)
   };
 };
+CoachTools.GIFT_BACKDROPS = [
+  { id: 'bg_hourglass_dark_green', name: 'Hourglass Dark Green', base_color: '#1e3a2f', objects: [{ type: 'hourglass', pattern: 'repeating_scattered', opacity: 0.25, color: '#a8c4a0', scale: 0.8, rotation: 'random' }] },
+  { id: 'bg_turtle_tactical_pine', name: 'Turtle Tactical Pine', base_color: '#2c4a42', objects: [{ type: 'turtle', pattern: 'repeating_scattered', opacity: 0.3, color: '#8fb8a8', scale: 0.7, rotation: 'random' }] },
+  { id: 'bg_crown_dark_green', name: 'Crown Dark Green', base_color: '#1a3328', objects: [{ type: 'crown', pattern: 'repeating_scattered', opacity: 0.22, color: '#c4b88a', scale: 0.75, rotation: 'random' }] },
+  { id: 'bg_gold_horse_ball', name: 'Gold Horse + Ball', base_color: '#d4af37', objects: [{ type: 'horse_silhouette', pattern: 'repeating_scattered', opacity: 0.25, color: '#0d1f4d', scale: 0.7 }, { type: 'football', pattern: 'repeating_scattered', opacity: 0.2, color: '#0d1f4d', scale: 0.45 }] },
+  { id: 'bg_navy_gold_stripes', name: 'Navy Gold Stripes', base_color: '#0d1f4d', objects: [{ type: 'vertical_stripes', pattern: 'repeating_stripes', opacity: 1, color: '#c9a227' }] },
+  { id: 'bg_crown_burgundy', name: 'Crown Gold on Burgundy', base_color: '#4a1c1c', objects: [{ type: 'crown', pattern: 'repeating_grid', opacity: 0.35, color: '#d4af37', scale: 0.85 }] },
+  { id: 'bg_mixed_metalist_gold', name: 'Mixed Metalist', base_color: '#e8b923', objects: [{ type: 'horse_silhouette', pattern: 'repeating_scattered', opacity: 0.22, color: '#0d1f4d', scale: 0.65 }, { type: 'stylized_m', pattern: 'repeating_scattered', opacity: 0.18, color: '#0d1f4d', scale: 0.5 }, { type: 'football', pattern: 'repeating_scattered', opacity: 0.16, color: '#0d1f4d', scale: 0.4 }] }
+];
+CoachTools._backdropGlyph = function (type, color, opacity) {
+  const op = opacity == null ? 0.25 : opacity;
+  if (type === 'football') return CoachTools._footballSymbol('ball', color, op);
+  if (type === 'horse_silhouette') return CoachTools._footballSymbol('horse', color, op);
+  const g = '<g fill="' + color + '" opacity="' + op + '">';
+  const z = '</g>';
+  if (type === 'hourglass') {
+    return g + '<path d="M-5,-6 H5 L0.7,-0.35 H-0.7 Z"/><path d="M-5,6 H5 L0.7,0.35 H-0.7 Z"/><rect x="-5.2" y="-6.6" width="10.4" height="1.15" rx="0.3"/><rect x="-5.2" y="5.45" width="10.4" height="1.15" rx="0.3"/>' + z;
+  }
+  if (type === 'turtle') {
+    return g + '<ellipse cx="0" cy="0.6" rx="4.4" ry="3.1"/><circle cx="0" cy="-3.3" r="1.45"/><ellipse cx="-3.3" cy="-1.5" rx="1.55" ry="0.85"/><ellipse cx="3.3" cy="-1.5" rx="1.55" ry="0.85"/><ellipse cx="-3.5" cy="2.3" rx="1.55" ry="0.85"/><ellipse cx="3.5" cy="2.3" rx="1.55" ry="0.85"/>' + z;
+  }
+  if (type === 'crown') {
+    return g + '<path d="M-6.2,3.2 L-6.2,-0.6 L-3.1,-4.4 L0,-0.2 L3.1,-4.4 L6.2,-0.6 L6.2,3.2 Z"/><circle cx="-3.1" cy="-4.1" r="0.7"/><circle cx="3.1" cy="-4.1" r="0.7"/><circle cx="0" cy="-0.15" r="0.55"/>' + z;
+  }
+  if (type === 'stylized_m') {
+    return g + '<path d="M-5.6,4.6 L-5.6,-4.2 L-3.9,-4.2 L0,1.2 L3.9,-4.2 L5.6,-4.2 L5.6,4.6 L3.8,4.6 L3.8,-1.1 L0.9,3.1 H-0.9 L-3.8,-1.1 L-3.8,4.6 Z"/>' + z;
+  }
+  return CoachTools._footballSymbol('shield', color, op);
+};
+CoachTools._backdropSvg = function (def) {
+  const w = 168;
+  const h = 168;
+  let body = '<rect width="' + w + '" height="' + h + '" fill="' + def.base_color + '"/>';
+  (def.objects || []).forEach(function (obj, oi) {
+    if (obj.type === 'vertical_stripes' || obj.pattern === 'repeating_stripes') {
+      const stripe = 12;
+      const gap = 24;
+      for (let x = 0; x < w; x += gap) {
+        body += '<rect x="' + x + '" y="0" width="' + stripe + '" height="' + h + '" fill="' + obj.color + '" opacity="' + (obj.opacity == null ? 1 : obj.opacity) + '"/>';
+      }
+      return;
+    }
+    const glyph = CoachTools._backdropGlyph(obj.type, obj.color, obj.opacity);
+    const scale = ((obj.scale == null ? 0.7 : obj.scale) * 1.45).toFixed(2);
+    const gap = obj.pattern === 'repeating_grid' ? 40 : 48;
+    const cols = 4;
+    const rows = 4;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const jitter = obj.pattern === 'repeating_scattered' ? (((r * 3 + c * 5 + oi * 7) % 9) - 4) : 0;
+        const rot = obj.rotation === 'random' ? (((r * 17 + c * 11 + oi * 13) % 46) - 23) : 0;
+        const x = 18 + c * gap + jitter;
+        const y = 20 + r * gap + (obj.pattern === 'repeating_scattered' && c % 2 ? 8 : 0);
+        body += '<g transform="translate(' + x + ' ' + y + ') rotate(' + rot + ') scale(' + scale + ')">' + glyph + '</g>';
+      }
+    }
+  });
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="168" height="168" viewBox="0 0 168 168">' + body + '</svg>';
+};
+CoachTools.giftClubBackdrop = function (g) {
+  const list = CoachTools.GIFT_BACKDROPS;
+  const seed = g ? CoachTools.giftSeed(g) : 1;
+  const def = list[(seed >>> 0) % list.length];
+  return { svg: CoachTools._backdropSvg(def), base: def.base_color, id: def.id, name: def.name };
+};
 CoachTools.giftBackdropHtml = function (g, size) {
-  const pat = CoachTools.giftPatternSvg(g || {});
+  const pat = CoachTools.giftClubBackdrop(g || {});
+  const hue = g ? CoachTools.giftHue(g) : 42;
   const rar = (g && g.rarity) || 'common';
   const ico = (g && g.ico) || '★';
   const media = (g && g.mediaUrl)
     ? ('<img class="tg-emoji-media" src="' + String(g.mediaUrl).replace(/"/g, '') + '" alt="">')
     : ico;
-  return '<span class="tg-gift-art size-' + (size || 'md') + ' rarity-' + rar +
-    '" style="--art-hue:' + pat.hue + ';--home-pat:url(\'data:image/svg+xml,' + encodeURIComponent(pat.svg) + '\')">' +
+  return '<span class="tg-gift-art club-bg size-' + (size || 'md') + ' rarity-' + rar +
+    '" style="--art-hue:' + hue + ';--gift-base:' + pat.base + ';--home-pat:url(\'data:image/svg+xml,' + encodeURIComponent(pat.svg) + '\')">' +
     '<span class="tg-gift-art-ico">' + media + '</span>' +
     '</span>';
 };

@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z66',
+  APP_BUILD: 'z67',
   APP_UPDATED: '07.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -186,8 +186,8 @@ const Views = {
       take = source.slice(0, 3);
       slots = [{ x: 36, y: -30 }, { x: 42, y: 4 }, { x: 34, y: 32 }];
     } else if (mode === 'card') {
-      take = source.slice(0, 6);
-      slots = [{ x: 0, y: 0 }];
+      take = source.slice(0, 3);
+      slots = [{ x: -22, y: -16 }, { x: 22, y: -16 }, { x: 0, y: -24 }];
     } else {
       take = source.slice(0, 8);
       slots = [
@@ -221,7 +221,7 @@ const Views = {
         ' title="' + title +
         '" data-gift-id="' + (g.giftId || '') + '" data-action="inspect-artifact" data-gift-uid="' + (g.uid || g.id || '') + '" role="button" tabindex="0">' +
         art + '</span>';
-      if ((mode || 'full') === 'full' || mode === 'card') {
+      if ((mode || 'full') === 'full') {
         return '<span class="tg-gift-spin" style="--i:' + i + ';--n:' + take.length + '"><span class="tg-gift-counter">' + item + '</span></span>';
       }
       return item;

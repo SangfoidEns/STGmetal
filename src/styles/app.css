@@ -12140,68 +12140,58 @@ body.mode-board-focus #boardToolbarTop.btb-top {
 #playersLayer .pt .pt-assist { background: #3d7ea6 !important; color: #f4efe2 !important; }
 #playersLayer .pt .pt-pres { background: #8b3a4a !important; color: #f4efe2 !important; }
 
-/* z66 — подарунки розгортаються навколо фото і ловлять натискання */
+/* z67 — подарунки лишаються на фото, імена і сусідні картки вільні */
 .pl-cards .pl-card {
-  overflow: visible !important;
+  overflow: hidden !important;
 }
 .pl-cards .pl-card .pl-card-av-wrap,
-.player-profile-hero .cp-avatar-wrap,
-.cp-hero .cp-avatar-wrap {
-  overflow: visible !important;
-  z-index: 8 !important;
+.player-profile-hero .cp-avatar-wrap {
+  overflow: hidden !important;
+  z-index: 3 !important;
 }
-.pl-cards .pl-card .tg-gift-cloud,
-.player-profile-hero .tg-gift-cloud,
-.cp-hero .tg-gift-cloud {
-  z-index: 12 !important;
-  overflow: visible !important;
+.pl-cards .pl-card .pl-card-body {
+  position: relative !important;
+  z-index: 6 !important;
 }
-.pl-card-av-wrap .tg-gift-counter { --fan: -56px; }
-.player-profile-hero .tg-gift-counter { --fan: -84px; }
-.pl-card-av-wrap .tg-gift-counter,
+.pl-cards .pl-card .tg-gift-cloud.mode-card {
+  z-index: 7 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+.pl-cards .pl-card .tg-gift-cloud.mode-card .tg-gift-item,
+.pl-cards .pl-card .tg-gift-cloud.mode-card .tg-gift-item.nft-art {
+  left: 50% !important;
+  top: 50% !important;
+  width: 22px !important;
+  height: 22px !important;
+  margin: -11px 0 0 -11px !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  z-index: 5 !important;
+  animation: tgGiftPop 0.6s cubic-bezier(.2, 1.15, .3, 1) both !important;
+  animation-delay: calc(var(--gi, 0) * 70ms) !important;
+  transform: translate(var(--gx, 0px), var(--gy, 0px)) scale(1) !important;
+}
+.player-profile-hero .tg-gift-counter { --fan: -32px; }
 .player-profile-hero .tg-gift-counter {
-  animation: giftOrbitUpright 22s linear infinite, giftFanOut 0.9s cubic-bezier(.16, 1.15, .3, 1) both !important;
+  animation: giftOrbitUpright 22s linear infinite !important;
+  top: -32px !important;
 }
-@keyframes giftFanOut {
-  0% { top: 0; }
-  100% { top: var(--fan, -56px); }
-}
-@keyframes giftItemIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-.pl-card-av-wrap .tg-gift-spin .tg-gift-item,
-.pl-card-av-wrap .tg-gift-spin .tg-gift-item.nft-art,
-.pl-card-av-wrap .tg-gift-cloud .tg-gift-item.nft-art,
-.pl-card-av-wrap .tg-gift-spin .tg-gift-item.rarity-legendary,
 .player-profile-hero .tg-gift-spin .tg-gift-item,
-.player-profile-hero .tg-gift-spin .tg-gift-item.nft-art,
-.player-profile-hero .tg-gift-spin .tg-gift-item.rarity-legendary,
 .cp-hero .tg-gift-item[data-action="inspect-artifact"] {
   pointer-events: auto !important;
   cursor: pointer !important;
-  z-index: 14 !important;
-  animation: giftItemIn 0.7s ease both !important;
-  animation-delay: calc(var(--gi, 0) * 0.08s) !important;
-  transform: none !important;
 }
-.pl-card-av-wrap .tg-gift-spin .tg-gift-item,
-.pl-card-av-wrap .tg-gift-spin .tg-gift-item.nft-art {
-  width: 34px !important;
-  height: 34px !important;
-  margin: -17px 0 0 -17px !important;
-}
-@media (prefers-reduced-motion: reduce) {
-  .pl-card-av-wrap .tg-gift-counter,
-  .player-profile-hero .tg-gift-counter {
-    animation: none !important;
-    top: var(--fan, -56px) !important;
-  }
-  .pl-card-av-wrap .tg-gift-spin .tg-gift-item,
-  .player-profile-hero .tg-gift-spin .tg-gift-item {
-    animation: none !important;
-    opacity: 1 !important;
-  }
+.tg-gift-art.club-bg,
+.pl-card-av-wrap .tg-gift-item .tg-gift-art.club-bg,
+.player-profile-hero .tg-gift-item .tg-gift-art.club-bg,
+.tg-gift-cloud .tg-gift-item .tg-gift-art.club-bg,
+.artifact-hologram .tg-gift-art.club-bg {
+  background-color: var(--gift-base, #1e3a2f) !important;
+  background-image: var(--home-pat) !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
 }
 .coach-gift-chip {
   display: inline-flex !important;
