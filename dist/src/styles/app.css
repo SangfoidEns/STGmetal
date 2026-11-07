@@ -12182,16 +12182,17 @@ body.mode-board-focus #boardToolbarTop.btb-top {
   pointer-events: auto !important;
   cursor: pointer !important;
 }
-.tg-gift-art.club-bg,
-.pl-card-av-wrap .tg-gift-item .tg-gift-art.club-bg,
-.player-profile-hero .tg-gift-item .tg-gift-art.club-bg,
-.tg-gift-cloud .tg-gift-item .tg-gift-art.club-bg,
-.artifact-hologram .tg-gift-art.club-bg {
-  background-color: var(--gift-base, #1e3a2f) !important;
-  background-image: var(--home-pat) !important;
-  background-size: cover !important;
-  background-position: center !important;
-  background-repeat: no-repeat !important;
+.player-collectible.tone-ink-dark,
+.player-collectible.tone-ink-dark .pl-card-name,
+.player-collectible.tone-ink-dark .pl-card-name-txt,
+.player-collectible.tone-ink-dark .cp-title,
+.player-collectible.tone-ink-dark .cp-title-name {
+  color: #1a1408 !important;
+}
+.player-collectible.tone-ink-dark .pl-card-meta,
+.player-collectible.tone-ink-dark .pl-card-att,
+.player-collectible.tone-ink-dark .cp-status {
+  color: rgba(26, 20, 8, 0.78) !important;
 }
 .coach-gift-chip {
   display: inline-flex !important;

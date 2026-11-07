@@ -27,26 +27,27 @@ function boot() {
 }
 
 describe('player collectible backgrounds', () => {
-  it('keeps the new pattern and paints the field from the featured gift', () => {
+  it('paints the card field with the featured gift backdrop', () => {
     const ctx = boot();
     ctx.Store.get = () => ({
       players: [],
       trainings: [],
       settings: {},
-      gifts: [{ playerId: 'id_player_1', featured: true, hue: 200, seed: 7 }]
+      gifts: [{ uid: 'g_card', id: 'g_card', playerId: 'id_player_1', featured: true, hue: 200, seed: 7 }]
     });
     const bg = ctx.CoachTools.playerBackdrop({ id: 'id_player_1' });
+    const club = ctx.CoachTools.giftClubBackdrop({ uid: 'g_card', id: 'g_card', playerId: 'id_player_1', featured: true, hue: 200, seed: 7 });
     assert.match(bg.className, /player-collectible/);
-    assert.equal(bg.className.includes('pb-light'), false);
-    assert.match(bg.style, /--acc-bg:linear-gradient\(165deg, hsl\(200 46% 24%\)/);
+    assert.equal(bg.id, club.id);
+    assert.match(bg.style, new RegExp('--acc-bg:' + club.base.replace('#', '#')));
     assert.match(bg.style, /--pb-pat:/);
     const raw = decodeURIComponent(bg.style.split('data:image/svg+xml,')[1].replace(/'\)$/, '').replace(/;$/, ''));
     assert.equal(raw.includes('<text'), false);
-    assert.match(raw, /opacity="0\.22"/);
-    assert.match(raw, /rotate\(-7\)/);
-    assert.match(raw, /rotate\(6\)/);
-    assert.match(raw, /hsl\(200 22% 94%\)/);
-    assert.ok(raw.includes('M-5.4,-5.6'), 'club shield is part of the pattern');
+    assert.match(raw, new RegExp(club.base.replace('#', '#'), 'i'));
+    const plain = ctx.CoachTools.playerBackdrop({ id: 'nobody' });
+    const plainSvg = decodeURIComponent(plain.style.split('data:image/svg+xml,')[1].replace(/'\)$/, '').replace(/;$/, ''));
+    assert.match(plainSvg, /rotate\(-7\)/);
+    assert.match(plainSvg, /M-5\.4,-5\.6/);
   });
 
   it('keeps the pistachio reference and a Metalist Stuttgart palette', () => {

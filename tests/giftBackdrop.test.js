@@ -21,8 +21,8 @@ describe('telegram gift backdrops', () => {
       'bg_mixed_metalist_gold'
     ].join(','));
     const html = context.CoachTools.giftBackdropHtml({ uid: 'g1', id: 'g1', ico: '🎁', rarity: 'rare' }, 'lg');
-    assert.match(html, /club-bg/);
-    assert.match(html, /--gift-base:#(?:1e3a2f|2c4a42|1a3328|d4af37|0d1f4d|4a1c1c|e8b923)/);
+    assert.equal(html.includes('club-bg'), false);
+    assert.match(html, /--home-pat:/);
     const stripe = context.CoachTools._backdropSvg(context.CoachTools.GIFT_BACKDROPS[4]);
     assert.match(stripe, /#0d1f4d/);
     assert.match(stripe, /#c9a227/);

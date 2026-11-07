@@ -560,7 +560,7 @@ CoachTools.playerFieldAccent = function (player) {
   }
   return byPos(player.position);
 };
-/** Колекційний візерунок лише для футболістів. Колір поля береться з подарунка. */
+/** Колекційний візерунок картки. Якщо є подарунок — його унікальний фон. Інакше футбольний. */
 CoachTools.PLAYER_BACKDROPS = [
   { id: 'pistachio', name: 'Фісташка', center: '#91AE7C', edge: '#668653', ink: '#58794D', symbol: 'ball', tone: 'light' },
   { id: 'metalist', name: 'Металіст', center: '#E4D09A', edge: '#C4A86A', ink: '#7A6234', symbol: 'shield', tone: 'light' },
@@ -570,6 +570,29 @@ CoachTools.PLAYER_BACKDROPS = [
   { id: 'captain', name: 'Капітан', center: '#D9C48A', edge: '#8A7344', ink: '#5C4A28', symbol: 'captain', tone: 'light' }
 ];
 CoachTools.playerBackdrop = function (player) {
+  try {
+    const gifts = (typeof Store !== 'undefined' && Store.get) ? ((Store.get() || {}).gifts || []) : [];
+    const mine = gifts.filter(function (g) {
+      return g && player && String(g.playerId) === String(player.id) && g.attached !== false;
+    });
+    const gift = mine.find(function (g) { return g.featured; }) || mine[0] || null;
+    if (gift && CoachTools.GIFT_BACKDROPS && CoachTools.GIFT_BACKDROPS.length && CoachTools._backdropSvg) {
+      const idx = CoachTools.uniqueBackdropIndex ? CoachTools.uniqueBackdropIndex(gift) : (CoachTools.giftSeed(gift) % CoachTools.GIFT_BACKDROPS.length);
+      const club = CoachTools.GIFT_BACKDROPS[idx];
+      const svg = CoachTools._backdropSvg(club);
+      const pat = 'url(\'data:image/svg+xml,' + encodeURIComponent(svg) + '\')';
+      const inkDark = club.base_color === '#d4af37' || club.base_color === '#e8b923';
+      const ring = inkDark ? '#0d1f4d' : '#e8c547';
+      return {
+        id: club.id,
+        name: club.name,
+        tone: inkDark ? 'light' : 'dark',
+        hue: CoachTools.giftHue ? CoachTools.giftHue(gift) : 42,
+        className: 'player-collectible' + (inkDark ? ' tone-ink-dark' : ''),
+        style: '--acc-ring:' + ring + ';--acc-bg:' + club.base_color + ';--pb-pat:' + pat + ';'
+      };
+    }
+  } catch (_) {}
   const list = CoachTools.PLAYER_BACKDROPS;
   const key = String((player && (player.id || player.number)) || 'club');
   let h = 0;
@@ -714,22 +737,47 @@ CoachTools._backdropSvg = function (def) {
   });
   return '<svg xmlns="http://www.w3.org/2000/svg" width="168" height="168" viewBox="0 0 168 168">' + body + '</svg>';
 };
+CoachTools.uniqueBackdropIndex = function (g) {
+  const n = (CoachTools.GIFT_BACKDROPS || []).length || 1;
+  const base = (g ? CoachTools.giftSeed(g) : 0) % n;
+  try {
+    if (!g || typeof Store === 'undefined' || !Store.get) return base;
+    const mineId = String(g.playerId || '');
+    const sibs = (Store.get().gifts || []).filter(function (s) { return s && String(s.playerId || '') === mineId; })
+      .slice()
+      .sort(function (a, b) {
+        return String(a.createdAt || '').localeCompare(String(b.createdAt || ''))
+          || String(a.uid || a.id || '').localeCompare(String(b.uid || b.id || ''));
+      });
+    if (sibs.length < 2) return base;
+    const used = new Set();
+    let mine = base;
+    const key = String(g.uid || g.id || '');
+    sibs.forEach(function (s) {
+      let i = CoachTools.giftSeed(s) % n;
+      let guard = 0;
+      while (used.has(i) && guard < n) { i = (i + 1) % n; guard += 1; }
+      used.add(i);
+      if (String(s.uid || s.id || '') === key) mine = i;
+    });
+    return mine;
+  } catch (_) {}
+  return base;
+};
 CoachTools.giftClubBackdrop = function (g) {
   const list = CoachTools.GIFT_BACKDROPS;
-  const seed = g ? CoachTools.giftSeed(g) : 1;
-  const def = list[(seed >>> 0) % list.length];
+  const def = list[CoachTools.uniqueBackdropIndex(g)];
   return { svg: CoachTools._backdropSvg(def), base: def.base_color, id: def.id, name: def.name };
 };
 CoachTools.giftBackdropHtml = function (g, size) {
-  const pat = CoachTools.giftClubBackdrop(g || {});
-  const hue = g ? CoachTools.giftHue(g) : 42;
+  const pat = CoachTools.giftPatternSvg(g || {});
   const rar = (g && g.rarity) || 'common';
   const ico = (g && g.ico) || '★';
   const media = (g && g.mediaUrl)
     ? ('<img class="tg-emoji-media" src="' + String(g.mediaUrl).replace(/"/g, '') + '" alt="">')
     : ico;
-  return '<span class="tg-gift-art club-bg size-' + (size || 'md') + ' rarity-' + rar +
-    '" style="--art-hue:' + hue + ';--gift-base:' + pat.base + ';--home-pat:url(\'data:image/svg+xml,' + encodeURIComponent(pat.svg) + '\')">' +
+  return '<span class="tg-gift-art size-' + (size || 'md') + ' rarity-' + rar +
+    '" style="--art-hue:' + pat.hue + ';--home-pat:url(\'data:image/svg+xml,' + encodeURIComponent(pat.svg) + '\')">' +
     '<span class="tg-gift-art-ico">' + media + '</span>' +
     '</span>';
 };
