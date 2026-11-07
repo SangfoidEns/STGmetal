@@ -581,7 +581,7 @@ CoachTools.playerBackdrop = function (player) {
       const club = CoachTools.GIFT_BACKDROPS[idx];
       const svg = CoachTools._backdropSvg(club);
       const pat = 'url(\'data:image/svg+xml,' + encodeURIComponent(svg) + '\')';
-      const inkDark = club.base_color === '#d4af37' || club.base_color === '#c9a227' || club.base_color === '#e8b923';
+      const inkDark = club.ink === 'dark';
       const ring = inkDark ? '#0d1f4d' : '#e8c547';
       return {
         id: club.id,
@@ -678,40 +678,19 @@ CoachTools.coachProgress = function () {
     attSeries: attSeries.slice(-8)
   };
 };
-CoachTools.BACKDROP_DEFAULTS = {
-  pattern: 'repeating_scattered',
-  opacity: 0.16,
-  scale: 0.58,
-  rotation: 'none',
-  density: 'low'
-};
 CoachTools.GIFT_BACKDROPS = [
-  { id: 'bg_dark_green_subtle_triangles', name: 'Dark Green Subtle Triangles', base_color: '#1a3328', objects: [{ type: 'triangle', color: '#4a6b5a', opacity: 0.16, scale: 0.55, density: 'low' }] },
-  { id: 'bg_gold_subtle_horses', name: 'Gold Subtle Horses', base_color: '#c9a227', objects: [{ type: 'horse_silhouette', color: '#8a6f1f', opacity: 0.14, scale: 0.6, density: 'low' }] },
-  { id: 'bg_navy_subtle_stripes', name: 'Navy Subtle Stripes', base_color: '#0d1f4d', objects: [{ type: 'vertical_stripes', color: '#1a3a6e', opacity: 0.25, width: 'thin', density: 'medium' }] },
-  { id: 'bg_olive_subtle_crowns', name: 'Olive Subtle Crowns', base_color: '#2c3a28', objects: [{ type: 'crown', color: '#6b7a5a', opacity: 0.15, scale: 0.5, density: 'very_low' }] },
-  { id: 'bg_gold_subtle_m', name: 'Gold Subtle M', base_color: '#d4af37', objects: [{ type: 'stylized_m', color: '#a68b2a', opacity: 0.13, scale: 0.48, density: 'low' }] },
-  { id: 'bg_dark_green_subtle_balls', name: 'Dark Green Subtle Balls', base_color: '#1e3a2f', objects: [{ type: 'football', color: '#4a6b5a', opacity: 0.15, scale: 0.42, density: 'low' }] },
-  { id: 'bg_gold_boots', name: 'Gold Football Boots', base_color: '#c9a227', objects: [{ type: 'football_boot', color: '#8a6f1f', opacity: 0.14, scale: 0.52, density: 'low' }] },
-  { id: 'bg_navy_whistles', name: 'Navy Whistles', base_color: '#0d1f4d', objects: [{ type: 'whistle', color: '#3a5a8a', opacity: 0.15, scale: 0.5, density: 'low' }] },
-  { id: 'bg_dark_green_trophies', name: 'Dark Green Trophies', base_color: '#1a3328', objects: [{ type: 'trophy', color: '#4a6b5a', opacity: 0.13, scale: 0.48, density: 'very_low' }] },
-  { id: 'bg_gold_goals', name: 'Gold Goal Nets', base_color: '#d4af37', objects: [{ type: 'goal_net', color: '#a68b2a', opacity: 0.12, scale: 0.55, density: 'low' }] },
-  { id: 'bg_olive_captain_armbands', name: 'Olive Captain Armbands', base_color: '#2c3a28', objects: [{ type: 'captain_armband', color: '#6b7a5a', opacity: 0.15, scale: 0.5, density: 'low' }] },
-  { id: 'bg_navy_corner_flags', name: 'Navy Corner Flags', base_color: '#0d1f4d', objects: [{ type: 'corner_flag', color: '#3a5a8a', opacity: 0.14, scale: 0.48, density: 'low' }] },
-  { id: 'bg_dark_green_pitch_lines', name: 'Dark Green Pitch Lines', base_color: '#1e3a2f', objects: [{ type: 'pitch_line', color: '#4a6b5a', opacity: 0.18, scale: 1, density: 'medium', pattern: 'subtle_lines' }] },
-  { id: 'bg_gold_jerseys', name: 'Gold Jerseys', base_color: '#c9a227', objects: [{ type: 'jersey', color: '#8a6f1f', opacity: 0.13, scale: 0.5, density: 'low' }] },
-  { id: 'bg_navy_medals', name: 'Navy Medals', base_color: '#0d1f4d', objects: [{ type: 'medal', color: '#3a5a8a', opacity: 0.14, scale: 0.45, density: 'very_low' }] },
-  { id: 'bg_dark_green_gloves', name: 'Dark Green Goalkeeper Gloves', base_color: '#1a3328', objects: [{ type: 'goalkeeper_glove', color: '#4a6b5a', opacity: 0.15, scale: 0.52, density: 'low' }] },
-  { id: 'bg_gold_stars', name: 'Gold Stars', base_color: '#d4af37', objects: [{ type: 'star', color: '#a68b2a', opacity: 0.14, scale: 0.4, density: 'low' }] },
-  { id: 'bg_olive_shields', name: 'Olive Shields', base_color: '#2c3a28', objects: [{ type: 'shield', color: '#6b7a5a', opacity: 0.13, scale: 0.48, density: 'low' }] },
-  { id: 'bg_navy_numbers', name: 'Navy Numbers', base_color: '#0d1f4d', objects: [{ type: 'number', color: '#3a5a8a', opacity: 0.12, scale: 0.55, density: 'low' }] },
-  { id: 'bg_dark_green_whistles_mix', name: 'Dark Green Mixed Whistles', base_color: '#1e3a2f', objects: [{ type: 'whistle', color: '#4a6b5a', opacity: 0.15, scale: 0.48, density: 'low' }] },
-  { id: 'bg_gold_trophies_mix', name: 'Gold Mixed Trophies', base_color: '#c9a227', objects: [{ type: 'trophy', color: '#8a6f1f', opacity: 0.12, scale: 0.46, density: 'very_low' }] },
-  { id: 'bg_navy_balls_mix', name: 'Navy Mixed Balls', base_color: '#0d1f4d', objects: [{ type: 'football', color: '#3a5a8a', opacity: 0.14, scale: 0.44, density: 'low' }] },
-  { id: 'bg_olive_boots_mix', name: 'Olive Mixed Boots', base_color: '#2c3a28', objects: [{ type: 'football_boot', color: '#6b7a5a', opacity: 0.15, scale: 0.5, density: 'low' }] },
-  { id: 'bg_dark_green_stars_mix', name: 'Dark Green Mixed Stars', base_color: '#1a3328', objects: [{ type: 'star', color: '#4a6b5a', opacity: 0.13, scale: 0.42, density: 'low' }] },
-  { id: 'bg_gold_captain_mix', name: 'Gold Mixed Captain Armbands', base_color: '#d4af37', objects: [{ type: 'captain_armband', color: '#a68b2a', opacity: 0.14, scale: 0.48, density: 'low' }] },
-  { id: 'bg_navy_gloves_mix', name: 'Navy Mixed Gloves', base_color: '#0d1f4d', objects: [{ type: 'goalkeeper_glove', color: '#3a5a8a', opacity: 0.15, scale: 0.5, density: 'low' }] }
+  { id: 'night_pitch', name: 'Нічний газон', base_color: '#10241b', ink: 'light', hero: 'football', heroColor: '#e9fff4' },
+  { id: 'navy_kit', name: 'Темно-синя форма', base_color: '#071433', ink: 'light', hero: 'jersey', heroColor: '#f6e3a6' },
+  { id: 'gold_crest', name: 'Золотий герб', base_color: '#e6c56a', ink: 'dark', hero: 'shield', heroColor: '#14284f' },
+  { id: 'goal_night', name: 'Нічні ворота', base_color: '#0c1c16', ink: 'light', hero: 'goal_net', heroColor: '#e7fff3' },
+  { id: 'captain_band', name: 'Капітан', base_color: '#1c2a16', ink: 'light', hero: 'captain_armband', heroColor: '#f3d48a' },
+  { id: 'trophy_night', name: 'Нічний кубок', base_color: '#14261c', ink: 'light', hero: 'trophy', heroColor: '#f4d78c' },
+  { id: 'gold_boot', name: 'Золотий удар', base_color: '#e2b84a', ink: 'dark', hero: 'football_boot', heroColor: '#1a2744' },
+  { id: 'whistle_arc', name: 'Свисток', base_color: '#101a38', ink: 'light', hero: 'whistle', heroColor: '#dce8ff' },
+  { id: 'tactics_board', name: 'Тактична дошка', base_color: '#123026', ink: 'light', hero: 'corner_flag', heroColor: '#edfff6' },
+  { id: 'medal_night', name: 'Медаль', base_color: '#1a140c', ink: 'light', hero: 'medal', heroColor: '#f3d78a' },
+  { id: 'keeper_night', name: 'Воротар', base_color: '#10261f', ink: 'light', hero: 'goalkeeper_glove', heroColor: '#e5fff4' },
+  { id: 'star_gold', name: 'Золота зірка', base_color: '#f0d078', ink: 'dark', hero: 'star', heroColor: '#1a2744' }
 ];
 CoachTools._backdropGlyph = function (type, color, opacity) {
   const op = opacity == null ? CoachTools.BACKDROP_DEFAULTS.opacity : opacity;
@@ -743,45 +722,67 @@ CoachTools._backdropGlyph = function (type, color, opacity) {
   return CoachTools._footballSymbol('shield', color, op);
 };
 CoachTools._backdropSvg = function (def) {
-  const w = 180;
-  const h = 180;
-  const defaults = CoachTools.BACKDROP_DEFAULTS;
-  let body = '';
-  (def.objects || []).forEach(function (obj) {
-    const pattern = obj.pattern || defaults.pattern;
-    const opacity = obj.opacity == null ? defaults.opacity : obj.opacity;
-    const color = obj.color;
-    if (obj.type === 'vertical_stripes' || pattern === 'repeating_stripes') {
-      const stripe = obj.width === 'medium' ? 10 : 5;
-      const gap = (obj.density || defaults.density) === 'medium' ? 36 : 48;
-      for (let x = 10; x < w; x += gap) {
-        body += '<rect x="' + x + '" y="0" width="' + stripe + '" height="' + h + '" fill="' + color + '" opacity="' + opacity + '"/>';
-      }
-      return;
-    }
-    if (obj.type === 'pitch_line' || pattern === 'subtle_lines') {
-      body += '<g fill="none" stroke="' + color + '" stroke-width="1.5" opacity="' + opacity + '">' +
-        '<rect x="16" y="12" width="148" height="156" rx="2"/>' +
-        '<path d="M16 90 H164"/>' +
-        '<circle cx="90" cy="90" r="22"/>' +
-        '<rect x="50" y="12" width="80" height="30"/>' +
-        '<rect x="50" y="138" width="80" height="30"/>' +
-        '</g>';
-      return;
-    }
-    const density = obj.density || defaults.density;
-    const slots = density === 'very_low'
-      ? [[52, 58], [128, 126]]
-      : (density === 'medium'
-        ? [[42, 42], [132, 42], [42, 132], [132, 132]]
-        : [[46, 48], [128, 86], [78, 138]]);
-    const glyph = CoachTools._backdropGlyph(obj.type, color, opacity);
-    const scale = ((obj.scale == null ? defaults.scale : obj.scale) * 2.55).toFixed(2);
-    slots.forEach(function (pt) {
-      body += '<g transform="translate(' + pt[0] + ' ' + pt[1] + ') scale(' + scale + ')">' + glyph + '</g>';
-    });
-  });
-  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">' + body + '</svg>';
+  const key = String((def && def.id) || 'night_pitch');
+  const gid = 'ms' + key.replace(/[^a-z0-9]/gi, '');
+  const looks = {
+    night_pitch: ['#4e8a66', '#173628', '#08140f', 'pitch'],
+    navy_kit: ['#2a4f98', '#102454', '#070e22', 'kit'],
+    gold_crest: ['#fff3c9', '#e8c25a', '#b07d22', 'sheen'],
+    goal_night: ['#245c48', '#123228', '#07140f', 'goal'],
+    captain_band: ['#3d5a32', '#1d3118', '#0c160a', 'band'],
+    trophy_night: ['#3d6a52', '#163426', '#08140e', 'pitch'],
+    gold_boot: ['#fff0c0', '#e4b445', '#a8741c', 'sheen'],
+    whistle_arc: ['#2c4d96', '#142448', '#090f22', 'arcs'],
+    tactics_board: ['#2f6a50', '#143528', '#08140f', 'grid'],
+    medal_night: ['#6a5230', '#24180e', '#0c0906', 'sheen'],
+    keeper_night: ['#2f6e5c', '#12352c', '#071612', 'pitch'],
+    star_gold: ['#fff6d4', '#f0cc6a', '#c4922a', 'sheen']
+  };
+  const look = looks[key] || looks.night_pitch;
+  const hero = CoachTools._backdropGlyph(def.hero || 'football', def.heroColor || '#ffffff', 1);
+  let texture = '';
+  if (look[3] === 'pitch' || look[3] === 'goal') {
+    texture = '<g fill="none" stroke="' + (def.heroColor || '#fff') + '" stroke-opacity="0.34" stroke-width="2.4">' +
+      '<rect x="26" y="28" width="308" height="404" rx="10"/>' +
+      '<path d="M26 230 H334"/>' +
+      '<circle cx="180" cy="230" r="52"/>' +
+      '<rect x="104" y="28" width="152" height="70"/>' +
+      '<rect x="104" y="362" width="152" height="70"/>' +
+      '</g>';
+  } else if (look[3] === 'kit') {
+    texture = '<rect x="0" y="0" width="22" height="460" fill="#e8c547"/>' +
+      '<rect x="338" y="0" width="22" height="460" fill="#e8c547"/>' +
+      '<rect x="22" y="0" width="7" height="460" fill="#ffffff" opacity="0.28"/>' +
+      '<rect x="331" y="0" width="7" height="460" fill="#ffffff" opacity="0.28"/>';
+  } else if (look[3] === 'band') {
+    texture = '<rect x="0" y="118" width="360" height="34" fill="#f3d48a" opacity="0.9"/>' +
+      '<rect x="0" y="148" width="360" height="6" fill="#14284f" opacity="0.55"/>';
+  } else if (look[3] === 'arcs') {
+    texture = '<g fill="none" stroke="' + (def.heroColor || '#fff') + '" stroke-opacity="0.28" stroke-width="2">' +
+      '<circle cx="180" cy="168" r="46"/><circle cx="180" cy="168" r="78"/><circle cx="180" cy="168" r="112"/>' +
+      '</g>';
+  } else if (look[3] === 'grid') {
+    texture = '<g stroke="' + (def.heroColor || '#fff') + '" stroke-opacity="0.22" stroke-width="1.4">';
+    for (let x = 40; x < 340; x += 40) texture += '<path d="M' + x + ' 24 V436"/>';
+    for (let y = 40; y < 440; y += 40) texture += '<path d="M24 ' + y + ' H336"/>';
+    texture += '</g>';
+  } else {
+    texture = '<path d="M-40 80 L180 -20 L400 90 L400 150 L180 40 Z" fill="#ffffff" opacity="0.18"/>' +
+      '<path d="M-20 200 L220 40 L420 150 L420 190 L200 80 Z" fill="#ffffff" opacity="0.08"/>';
+  }
+  const heroMark = '<g transform="translate(180 168) scale(7.4)" opacity="0.42">' + hero + '</g>';
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="360" height="460" viewBox="0 0 360 460">' +
+    '<defs>' +
+    '<radialGradient id="' + gid + '" cx="50%" cy="16%" r="78%">' +
+    '<stop offset="0%" stop-color="' + look[0] + '"/>' +
+    '<stop offset="58%" stop-color="' + look[1] + '"/>' +
+    '<stop offset="100%" stop-color="' + look[2] + '"/>' +
+    '</radialGradient></defs>' +
+    '<rect width="360" height="460" fill="url(#' + gid + ')"/>' +
+    texture + heroMark +
+    '<rect width="360" height="150" fill="#ffffff" opacity="' + (def.ink === 'dark' ? '0.2' : '0.1') + '"/>' +
+    '<rect x="10" y="10" width="340" height="440" rx="22" fill="none" stroke="' + (def.ink === 'dark' ? '#14284f' : '#f4e2a4') + '" stroke-opacity="0.35" stroke-width="2"/>' +
+    '</svg>';
 };
 CoachTools.uniqueBackdropIndex = function (g) {
   const n = (CoachTools.GIFT_BACKDROPS || []).length || 1;

@@ -637,14 +637,15 @@ const StorageManager = {
     let profilePhoto = (typeof p.profilePhoto === 'string') ? p.profilePhoto : '';
     if (profilePhoto.length > 400000) profilePhoto = '';
     const srcProfile = (p.profile && typeof p.profile === 'object') ? p.profile : null;
-    const profile = srcProfile ? {
-      phone: srcProfile.phone || '',
+    const birth = p.birthDate || p.birthday || (srcProfile && srcProfile.birthDate) || '';
+    const profile = srcProfile ? Object.assign({}, srcProfile, {
+      phone: srcProfile.phone || p.phone || '',
       social: srcProfile.social || '',
       status: srcProfile.status || '',
-      bio: srcProfile.bio || '',
-      birthDate: srcProfile.birthDate || p.birthDate || p.birthday || ''
-    } : null;
-    return {
+      bio: srcProfile.bio || p.bio || '',
+      birthDate: birth
+    }) : (birth ? { birthDate: birth } : null);
+    return Object.assign({}, p, {
       id: p.id || uid(),
       firstName: p.firstName || '',
       lastName: p.lastName || '',
@@ -666,13 +667,13 @@ const StorageManager = {
       phone: p.phone || '',
       photoUrl: photoUrl || '',
       profilePhoto: profilePhoto || '',
-      birthDate: p.birthDate || p.birthday || '',
+      birthDate: birth,
       bio: p.bio || (profile && profile.bio) || '',
       statusText: p.statusText || (profile && profile.status) || '',
       profile: profile || undefined,
       isStarter: p.isStarter !== false && (p.group !== 'reserve'),
       squadRole: p.squadRole || (p.group === 'reserve' ? 'reserve' : 'starter')
-    };
+    });
   },
 
   normalizeBoardObj(o) {
@@ -721,11 +722,15 @@ const StorageManager = {
   buildExportPayload() {
     const s = Store.get();
     // Глибока копія players, щоб photoUrl точно потрапив у JSON
-    const players = (s.players || []).map(p => ({
-      ...p,
-      photoUrl: p.photoUrl || '',
-      birthDate: p.birthDate || ''
-    }));
+    const players = (s.players || []).map(p => {
+      const birth = p.birthDate || (p.profile && p.profile.birthDate) || p.birthday || '';
+      return {
+        ...p,
+        photoUrl: p.photoUrl || '',
+        birthDate: birth,
+        profile: Object.assign({}, p.profile || {}, birth ? { birthDate: birth } : {})
+      };
+    });
     return {
       schemaVersion: SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),

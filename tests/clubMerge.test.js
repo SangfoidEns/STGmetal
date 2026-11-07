@@ -147,4 +147,38 @@ describe('club snapshot merge', () => {
     assert.equal(merged.trainings[0].status, 'draft');
     assert.equal(merged.trainings[0].cancelledAt, undefined);
   });
+
+  it('keeps a birthday when the newer copy left the field blank', () => {
+    const phone = {
+      players: [{
+        id: 'p-test',
+        firstName: 'Тест',
+        birthDate: '',
+        phone: '',
+        profile: { birthDate: '', phone: '' },
+        updatedAt: '2026-11-07T03:00:00.000Z'
+      }]
+    };
+    const tablet = {
+      players: [{
+        id: 'p-test',
+        firstName: 'Тест',
+        birthDate: '2004-03-12',
+        phone: '+491700000',
+        profile: { birthDate: '2004-03-12', phone: '+491700000', bio: 'проба' },
+        updatedAt: '2026-11-06T12:00:00.000Z',
+        structure: []
+      }]
+    };
+    const merged = mergePayload(phone, tablet);
+    const player = merged.players[0];
+    assert.equal(player.birthDate, '2004-03-12');
+    assert.equal(player.profile.birthDate, '2004-03-12');
+    assert.equal(player.profile.phone, '+491700000');
+    assert.equal(player.profile.bio, 'проба');
+    const newerWins = mergePayload(tablet, {
+      players: [{ id: 'p-test', firstName: 'Тест', birthDate: '2011-01-02', updatedAt: '2026-11-07T04:00:00.000Z' }]
+    });
+    assert.equal(newerWins.players[0].birthDate, '2011-01-02');
+  });
 });

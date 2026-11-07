@@ -60,8 +60,63 @@
     }
     if (extraWins && extraItem && extraItem.coachPresent != null) merged.coachPresent = extraItem.coachPresent;
     else if (!extraWins && baseItem && baseItem.coachPresent != null) merged.coachPresent = baseItem.coachPresent;
+    keepFilled(merged, loser, winner);
     releaseWorkingSession(merged);
     return merged;
+  }
+
+  function filled(value) {
+    if (value == null) return false;
+    if (typeof value === 'string') return value.trim() !== '';
+    if (Array.isArray(value)) return value.length > 0;
+    return true;
+  }
+
+  function firstFilled() {
+    for (let i = 0; i < arguments.length; i++) {
+      if (filled(arguments[i])) return arguments[i];
+    }
+    return '';
+  }
+
+  /** Новіший знімок із порожнім полем не стирає день народження, фото, телефон і складену схему. */
+  function keepFilled(merged, loser, winner) {
+    if (!merged) return;
+    ['birthDate', 'birthday', 'photoUrl', 'photo', 'avatar', 'profilePhoto', 'phone', 'bio', 'statusText', 'telegramUsername', 'telegramId', 'firstName', 'lastName', 'notes', 'position'].forEach(function (key) {
+      if (!filled(winner && winner[key]) && filled(loser && loser[key])) merged[key] = loser[key];
+    });
+    if ((!winner || winner.number == null || winner.number === '' || winner.number === 0) && loser && loser.number) {
+      merged.number = loser.number;
+    }
+    ['structure', 'slides', 'objects', 'tags', 'secondaryPositions'].forEach(function (key) {
+      const older = loser && loser[key];
+      const newer = winner && winner[key];
+      if (Array.isArray(older) && older.length && (!Array.isArray(newer) || !newer.length)) merged[key] = older;
+    });
+    const olderBoard = loser && loser.board;
+    const newerBoard = winner && winner.board;
+    if (olderBoard && olderBoard.objects && olderBoard.objects.length && (!newerBoard || !newerBoard.objects || !newerBoard.objects.length)) {
+      merged.board = olderBoard;
+    }
+    const birth = firstFilled(
+      winner && winner.birthDate,
+      winner && winner.birthday,
+      winner && winner.profile && winner.profile.birthDate,
+      loser && loser.birthDate,
+      loser && loser.birthday,
+      loser && loser.profile && loser.profile.birthDate
+    );
+    const profile = Object.assign({}, (loser && loser.profile) || {}, (winner && winner.profile) || {});
+    ['phone', 'social', 'status', 'bio', 'birthDate'].forEach(function (key) {
+      if (!filled(winner && winner.profile && winner.profile[key]) && filled(loser && loser.profile && loser.profile[key])) {
+        profile[key] = loser.profile[key];
+      }
+    });
+    if (birth) {
+      merged.birthDate = String(birth).slice(0, 10);
+      profile.birthDate = merged.birthDate;
+    }
+    if (Object.keys(profile).length) merged.profile = profile;
   }
 
   /** Чернетка, план і проведене не стають скасованими через стару мітку cancelledAt. */
