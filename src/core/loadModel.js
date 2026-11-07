@@ -21,6 +21,7 @@ const LoadModel = {
   isCancelled(t) {
     if (!t) return false;
     const st = String(t.status || '').toLowerCase();
+    if (st === 'done' || st === 'completed' || st === 'проведено') return false;
     if (st === 'cancelled' || st === 'canceled' || st === 'скасовано') return true;
     if (t.cancelledAt) return true;
     return false;

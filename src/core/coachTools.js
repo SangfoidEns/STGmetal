@@ -1061,11 +1061,12 @@ const PlayerProgress = {
   /** Проведена сесія, або минула, де тренер уже поставив явку. Чернетка теж рахується. */
   sessionCounts(t) {
     if (!t) return false;
-    if (t.status === 'cancelled' || t.status === 'canceled' || t.cancelledAt) return false;
+    const st = String(t.status || '').toLowerCase();
+    if (st === 'done' || st === 'completed' || st === 'проведено') return true;
+    if (st === 'cancelled' || st === 'canceled' || st === 'скасовано' || t.cancelledAt) return false;
     try {
       if (typeof LoadModel !== 'undefined' && LoadModel.isCancelled && LoadModel.isCancelled(t)) return false;
     } catch (_) {}
-    if (t.status === 'done') return true;
     let todayStr = '';
     try {
       todayStr = (typeof LoadModel !== 'undefined' && LoadModel.todayStr) ? LoadModel.todayStr() : '';

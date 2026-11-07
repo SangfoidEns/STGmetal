@@ -630,7 +630,8 @@ const Actions = {
     t.name = document.getElementById('teName')?.value || t.name;
     t.date = document.getElementById('teDate')?.value || t.date;
     t.time = document.getElementById('teTime')?.value;
-    t.status = document.getElementById('teSt')?.value;
+    t.status = document.getElementById('teSt')?.value || t.status;
+    if (t.status !== 'cancelled' && t.status !== 'canceled') delete t.cancelledAt;
     t.intensity = +document.getElementById('teInt')?.value || t.intensity;
     t.mainGoal = document.getElementById('teGoal')?.value;
     t.comment = document.getElementById('teCom')?.value;
@@ -1120,7 +1121,10 @@ const Actions = {
       };
     });
     t.updatedAt = new Date().toISOString();
-    if (t.status !== 'cancelled' && t.status !== 'canceled') t.status = 'done';
+    if (t.status !== 'cancelled' && t.status !== 'canceled') {
+      t.status = 'done';
+      delete t.cancelledAt;
+    }
     try { LoadModel.recomputePlayerLoads(Store.get().players, Store.get().trainings); } catch (_) {}
     StorageManager.save();
     try { if (StorageManager.syncCloud) StorageManager.syncCloud(); } catch (_) {}

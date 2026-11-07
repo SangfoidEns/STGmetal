@@ -99,6 +99,30 @@ describe('z50 club rules', () => {
     assert.equal(streaked.xpStreak, 30);
   });
 
+  it('keeps a conducted session even when an old cancel stamp is still on it', () => {
+    const ctx = boot();
+    ctx.sanitize = (v) => String(v == null ? '' : v);
+    assert.equal(ctx.LoadModel.isCancelled({ status: 'done', cancelledAt: '2026-11-05T10:00:00.000Z' }), false);
+    assert.equal(ctx.LoadModel.isCancelled({ status: 'cancelled', cancelledAt: '2026-11-03T10:00:00.000Z' }), true);
+    ctx.__store.players[0].firstName = 'Сергій';
+    ctx.__store.players[0].lastName = 'Бобік';
+    ctx.__store.players[0].number = 7;
+    ctx.__store.players[0].position = 'DM';
+    ctx.__store.trainings.push({
+      id: 'held511', status: 'done', date: '2026-11-05', name: 'Тренування 5/11',
+      cancelledAt: '2026-11-05T09:00:00.000Z',
+      attendance: { p1: { present: true, rpe: 7 } }
+    });
+    const stats = ctx.PlayerProgress.compute('p1');
+    assert.ok(stats.history.some(h => h.name === 'Тренування 5/11' && h.kind === 'present'));
+    const card = ctx.Views._squadPlaque(ctx.__store.players[0], 72, 'Основа');
+    assert.equal(card.includes('#7 Сергій'), false);
+    assert.match(card, /Сергій Бобік/);
+    assert.match(card, /#7 · DM · Основа/);
+    assert.match(card, /Відвідуваність 72% · \d+ XP/);
+    assert.match(card, /pl-card-marks|pl-card-name-txt/);
+  });
+
   it('counts 5/11 when the coach was away and shows it ahead of gifts', () => {
     const ctx = boot();
     ctx.sanitize = (v) => String(v == null ? '' : v);

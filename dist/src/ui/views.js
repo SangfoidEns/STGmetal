@@ -1,7 +1,7 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z63',
-  APP_UPDATED: '06.11.2026',
+  APP_BUILD: 'z64',
+  APP_UPDATED: '07.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
   versionLetter(stamp) {
@@ -1649,14 +1649,25 @@ trainings() {
     const cloud = this._tgGiftCloud(orbit, 1, 'card');
     const badge = this._giftStatusBadge(mine);
     const bd = this._playerBackdrop(p);
-    return '<div class="pl-card glass pl-card-tint pl-acc ' + bd.className + '" data-player-id="' + p.id + '" data-action="open-player-card" role="button" tabindex="0" style="' + this._accAttr(p) + ';' + bd.style + '">' +
+    let xp = 0;
+    try { xp = (PlayerProgress.compute(p.id) || {}).xp || 0; } catch (_) {}
+    let mineId = '';
+    try {
+      const me = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer) ? AuthManager.getLinkedPlayer() : null;
+      mineId = me ? String(me.id) : '';
+    } catch (_) {}
+    const meCls = mineId && String(p.id) === mineId ? ' is-me' : '';
+    const num = (p.number != null && String(p.number) !== '') ? ('#' + p.number + ' · ') : '';
+    const marks = (this.appointmentHtml(p) || '') + (badge || '');
+    return '<div class="pl-card glass pl-card-tint pl-acc ' + bd.className + meCls + '" data-player-id="' + p.id + '" data-action="open-player-card" role="button" tabindex="0" style="' + this._accAttr(p) + ';' + bd.style + '">' +
       '<div class="pl-card-av-wrap">' + (photo
         ? ('<button type="button" class="pl-card-av" data-action="open-fifa-card" data-player-id="' + p.id + '">' + ph + '</button>')
         : ('<div class="pl-card-av">' + ph + '</div>')) +
       cloud + '</div>' +
-      '<div class="pl-card-body"><div class="pl-card-name"><span class="pl-card-name-txt">#' + (p.number || '—') + ' ' + sanitize(name) + '</span>' + this.appointmentHtml(p) + badge + '</div>' +
-      '<div class="pl-card-meta">' + sanitize(p.position || '') + (roleText ? (' · ' + roleText) : '') + '</div>' +
-      '<div class="pl-card-att">Відвідуваність ' + att + '%</div></div></div>';
+      '<div class="pl-card-body"><div class="pl-card-name"><span class="pl-card-name-txt">' + sanitize(name) + '</span></div>' +
+      (marks ? ('<div class="pl-card-marks">' + marks + '</div>') : '') +
+      '<div class="pl-card-meta">' + num + sanitize(p.position || '') + (roleText ? (' · ' + roleText) : '') + '</div>' +
+      '<div class="pl-card-att">Відвідуваність ' + att + '% · ' + xp + ' XP</div></div></div>';
   },
 
   _teamChat() {
@@ -1823,6 +1834,15 @@ trainings() {
       return this._playerSocialHub(mePlayer, list, attPct) + this._teamChat();
     }
     if (isPlayerRole) {
+      const meId = mePlayer ? String(mePlayer.id) : '';
+      list = list.slice().sort((a, b) => {
+        const aMe = meId && String(a.id) === meId ? 0 : 1;
+        const bMe = meId && String(b.id) === meId ? 0 : 1;
+        if (aMe !== bMe) return aMe - bMe;
+        const byAtt = attPct(b.id) - attPct(a.id);
+        if (byAtt) return byAtt;
+        return (a.number || 0) - (b.number || 0);
+      });
       const cards = list.map(p => this._squadPlaque(p, attPct(p.id), roleLabel(p))).join('');
       return '<div class="st">Команда</div><div class="pl-cards">' + (cards || '<div class="es">Немає гравців</div>') + '</div>' + this._teamChat();
     }

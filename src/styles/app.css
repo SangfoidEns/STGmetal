@@ -11779,16 +11779,26 @@ body.role-guest .team-chat { display: none !important; }
 }
 
 /* z42: worn gift sits by the name; the account opens the player card */
+.pl-cards .pl-card .pl-card-body { width: 100%; }
 .pl-cards .pl-card-name {
-  display: flex;
-  align-items: center;
-  flex-wrap: nowrap;
-  gap: 6px;
+  display: block;
+  width: 100%;
+  text-align: center;
 }
 .pl-cards .pl-card-name-txt {
   display: block;
-  flex: 1 1 auto;
-  min-width: 0;
+  width: 100%;
+  white-space: normal;
+  overflow-wrap: break-word;
+  line-height: 1.25;
+}
+.pl-cards .pl-card-marks {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  margin-top: 4px;
 }
 .pl-cards .pl-card-name .gift-status-badge,
 .pl-cards .pl-card-name .gift-status-badge .tg-gift-art,
