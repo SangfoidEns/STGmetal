@@ -673,6 +673,7 @@ const Actions = {
       c.name = base + ' (копія)';
       c.status = 'draft';
       c.attendance = {};
+      delete c.cancelledAt;
       if (c.structure) c.structure.forEach(b => b.id = uid());
       Store.get().trainings.push(c);
       StorageManager.save();

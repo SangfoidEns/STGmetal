@@ -43,7 +43,8 @@ describe('player collectible backgrounds', () => {
     assert.match(bg.style, /--pb-pat:/);
     const raw = decodeURIComponent(bg.style.split('data:image/svg+xml,')[1].replace(/'\)$/, '').replace(/;$/, ''));
     assert.equal(raw.includes('<text'), false);
-    assert.match(raw, new RegExp(club.base.replace('#', '#'), 'i'));
+    assert.equal(raw.includes('rotate('), false);
+    assert.match(bg.className, /gift-field/);
     const plain = ctx.CoachTools.playerBackdrop({ id: 'nobody' });
     const plainSvg = decodeURIComponent(plain.style.split('data:image/svg+xml,')[1].replace(/'\)$/, '').replace(/;$/, ''));
     assert.match(plainSvg, /rotate\(-7\)/);

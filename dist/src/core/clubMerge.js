@@ -60,7 +60,17 @@
     }
     if (extraWins && extraItem && extraItem.coachPresent != null) merged.coachPresent = extraItem.coachPresent;
     else if (!extraWins && baseItem && baseItem.coachPresent != null) merged.coachPresent = baseItem.coachPresent;
+    releaseWorkingSession(merged);
     return merged;
+  }
+
+  /** Чернетка, план і проведене не стають скасованими через стару мітку cancelledAt. */
+  function releaseWorkingSession(item) {
+    if (!item || !item.cancelledAt) return;
+    const st = String(item.status || '').toLowerCase();
+    if (st === 'draft' || st === 'planned' || st === 'pinned' || st === 'done' || st === 'completed' || st === 'проведено') {
+      delete item.cancelledAt;
+    }
   }
 
   function mergeList(baseList, extraList) {
@@ -160,6 +170,7 @@
     const kept = [];
     groups.forEach(function (items) {
       if (items.length === 1) {
+        releaseWorkingSession(items[0]);
         kept.push(items[0]);
         return;
       }
@@ -169,6 +180,7 @@
         if (loser && loser.id) idMap[loser.id] = winner.id;
         winner.attendance = mergeAttendance(winner.attendance, loser && loser.attendance);
       });
+      releaseWorkingSession(winner);
       kept.push(winner);
     });
     payload.trainings = kept;

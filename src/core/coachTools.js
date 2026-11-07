@@ -581,14 +581,14 @@ CoachTools.playerBackdrop = function (player) {
       const club = CoachTools.GIFT_BACKDROPS[idx];
       const svg = CoachTools._backdropSvg(club);
       const pat = 'url(\'data:image/svg+xml,' + encodeURIComponent(svg) + '\')';
-      const inkDark = club.base_color === '#d4af37' || club.base_color === '#e8b923';
+      const inkDark = club.base_color === '#d4af37' || club.base_color === '#c9a227' || club.base_color === '#e8b923';
       const ring = inkDark ? '#0d1f4d' : '#e8c547';
       return {
         id: club.id,
         name: club.name,
         tone: inkDark ? 'light' : 'dark',
         hue: CoachTools.giftHue ? CoachTools.giftHue(gift) : 42,
-        className: 'player-collectible' + (inkDark ? ' tone-ink-dark' : ''),
+        className: 'player-collectible gift-field' + (inkDark ? ' tone-ink-dark' : ''),
         style: '--acc-ring:' + ring + ';--acc-bg:' + club.base_color + ';--pb-pat:' + pat + ';'
       };
     }
@@ -678,64 +678,110 @@ CoachTools.coachProgress = function () {
     attSeries: attSeries.slice(-8)
   };
 };
+CoachTools.BACKDROP_DEFAULTS = {
+  pattern: 'repeating_scattered',
+  opacity: 0.16,
+  scale: 0.58,
+  rotation: 'none',
+  density: 'low'
+};
 CoachTools.GIFT_BACKDROPS = [
-  { id: 'bg_hourglass_dark_green', name: 'Hourglass Dark Green', base_color: '#1e3a2f', objects: [{ type: 'hourglass', pattern: 'repeating_scattered', opacity: 0.25, color: '#a8c4a0', scale: 0.8, rotation: 'random' }] },
-  { id: 'bg_turtle_tactical_pine', name: 'Turtle Tactical Pine', base_color: '#2c4a42', objects: [{ type: 'turtle', pattern: 'repeating_scattered', opacity: 0.3, color: '#8fb8a8', scale: 0.7, rotation: 'random' }] },
-  { id: 'bg_crown_dark_green', name: 'Crown Dark Green', base_color: '#1a3328', objects: [{ type: 'crown', pattern: 'repeating_scattered', opacity: 0.22, color: '#c4b88a', scale: 0.75, rotation: 'random' }] },
-  { id: 'bg_gold_horse_ball', name: 'Gold Horse + Ball', base_color: '#d4af37', objects: [{ type: 'horse_silhouette', pattern: 'repeating_scattered', opacity: 0.25, color: '#0d1f4d', scale: 0.7 }, { type: 'football', pattern: 'repeating_scattered', opacity: 0.2, color: '#0d1f4d', scale: 0.45 }] },
-  { id: 'bg_navy_gold_stripes', name: 'Navy Gold Stripes', base_color: '#0d1f4d', objects: [{ type: 'vertical_stripes', pattern: 'repeating_stripes', opacity: 1, color: '#c9a227' }] },
-  { id: 'bg_crown_burgundy', name: 'Crown Gold on Burgundy', base_color: '#4a1c1c', objects: [{ type: 'crown', pattern: 'repeating_grid', opacity: 0.35, color: '#d4af37', scale: 0.85 }] },
-  { id: 'bg_mixed_metalist_gold', name: 'Mixed Metalist', base_color: '#e8b923', objects: [{ type: 'horse_silhouette', pattern: 'repeating_scattered', opacity: 0.22, color: '#0d1f4d', scale: 0.65 }, { type: 'stylized_m', pattern: 'repeating_scattered', opacity: 0.18, color: '#0d1f4d', scale: 0.5 }, { type: 'football', pattern: 'repeating_scattered', opacity: 0.16, color: '#0d1f4d', scale: 0.4 }] }
+  { id: 'bg_dark_green_subtle_triangles', name: 'Dark Green Subtle Triangles', base_color: '#1a3328', objects: [{ type: 'triangle', color: '#4a6b5a', opacity: 0.16, scale: 0.55, density: 'low' }] },
+  { id: 'bg_gold_subtle_horses', name: 'Gold Subtle Horses', base_color: '#c9a227', objects: [{ type: 'horse_silhouette', color: '#8a6f1f', opacity: 0.14, scale: 0.6, density: 'low' }] },
+  { id: 'bg_navy_subtle_stripes', name: 'Navy Subtle Stripes', base_color: '#0d1f4d', objects: [{ type: 'vertical_stripes', color: '#1a3a6e', opacity: 0.25, width: 'thin', density: 'medium' }] },
+  { id: 'bg_olive_subtle_crowns', name: 'Olive Subtle Crowns', base_color: '#2c3a28', objects: [{ type: 'crown', color: '#6b7a5a', opacity: 0.15, scale: 0.5, density: 'very_low' }] },
+  { id: 'bg_gold_subtle_m', name: 'Gold Subtle M', base_color: '#d4af37', objects: [{ type: 'stylized_m', color: '#a68b2a', opacity: 0.13, scale: 0.48, density: 'low' }] },
+  { id: 'bg_dark_green_subtle_balls', name: 'Dark Green Subtle Balls', base_color: '#1e3a2f', objects: [{ type: 'football', color: '#4a6b5a', opacity: 0.15, scale: 0.42, density: 'low' }] },
+  { id: 'bg_gold_boots', name: 'Gold Football Boots', base_color: '#c9a227', objects: [{ type: 'football_boot', color: '#8a6f1f', opacity: 0.14, scale: 0.52, density: 'low' }] },
+  { id: 'bg_navy_whistles', name: 'Navy Whistles', base_color: '#0d1f4d', objects: [{ type: 'whistle', color: '#3a5a8a', opacity: 0.15, scale: 0.5, density: 'low' }] },
+  { id: 'bg_dark_green_trophies', name: 'Dark Green Trophies', base_color: '#1a3328', objects: [{ type: 'trophy', color: '#4a6b5a', opacity: 0.13, scale: 0.48, density: 'very_low' }] },
+  { id: 'bg_gold_goals', name: 'Gold Goal Nets', base_color: '#d4af37', objects: [{ type: 'goal_net', color: '#a68b2a', opacity: 0.12, scale: 0.55, density: 'low' }] },
+  { id: 'bg_olive_captain_armbands', name: 'Olive Captain Armbands', base_color: '#2c3a28', objects: [{ type: 'captain_armband', color: '#6b7a5a', opacity: 0.15, scale: 0.5, density: 'low' }] },
+  { id: 'bg_navy_corner_flags', name: 'Navy Corner Flags', base_color: '#0d1f4d', objects: [{ type: 'corner_flag', color: '#3a5a8a', opacity: 0.14, scale: 0.48, density: 'low' }] },
+  { id: 'bg_dark_green_pitch_lines', name: 'Dark Green Pitch Lines', base_color: '#1e3a2f', objects: [{ type: 'pitch_line', color: '#4a6b5a', opacity: 0.18, scale: 1, density: 'medium', pattern: 'subtle_lines' }] },
+  { id: 'bg_gold_jerseys', name: 'Gold Jerseys', base_color: '#c9a227', objects: [{ type: 'jersey', color: '#8a6f1f', opacity: 0.13, scale: 0.5, density: 'low' }] },
+  { id: 'bg_navy_medals', name: 'Navy Medals', base_color: '#0d1f4d', objects: [{ type: 'medal', color: '#3a5a8a', opacity: 0.14, scale: 0.45, density: 'very_low' }] },
+  { id: 'bg_dark_green_gloves', name: 'Dark Green Goalkeeper Gloves', base_color: '#1a3328', objects: [{ type: 'goalkeeper_glove', color: '#4a6b5a', opacity: 0.15, scale: 0.52, density: 'low' }] },
+  { id: 'bg_gold_stars', name: 'Gold Stars', base_color: '#d4af37', objects: [{ type: 'star', color: '#a68b2a', opacity: 0.14, scale: 0.4, density: 'low' }] },
+  { id: 'bg_olive_shields', name: 'Olive Shields', base_color: '#2c3a28', objects: [{ type: 'shield', color: '#6b7a5a', opacity: 0.13, scale: 0.48, density: 'low' }] },
+  { id: 'bg_navy_numbers', name: 'Navy Numbers', base_color: '#0d1f4d', objects: [{ type: 'number', color: '#3a5a8a', opacity: 0.12, scale: 0.55, density: 'low' }] },
+  { id: 'bg_dark_green_whistles_mix', name: 'Dark Green Mixed Whistles', base_color: '#1e3a2f', objects: [{ type: 'whistle', color: '#4a6b5a', opacity: 0.15, scale: 0.48, density: 'low' }] },
+  { id: 'bg_gold_trophies_mix', name: 'Gold Mixed Trophies', base_color: '#c9a227', objects: [{ type: 'trophy', color: '#8a6f1f', opacity: 0.12, scale: 0.46, density: 'very_low' }] },
+  { id: 'bg_navy_balls_mix', name: 'Navy Mixed Balls', base_color: '#0d1f4d', objects: [{ type: 'football', color: '#3a5a8a', opacity: 0.14, scale: 0.44, density: 'low' }] },
+  { id: 'bg_olive_boots_mix', name: 'Olive Mixed Boots', base_color: '#2c3a28', objects: [{ type: 'football_boot', color: '#6b7a5a', opacity: 0.15, scale: 0.5, density: 'low' }] },
+  { id: 'bg_dark_green_stars_mix', name: 'Dark Green Mixed Stars', base_color: '#1a3328', objects: [{ type: 'star', color: '#4a6b5a', opacity: 0.13, scale: 0.42, density: 'low' }] },
+  { id: 'bg_gold_captain_mix', name: 'Gold Mixed Captain Armbands', base_color: '#d4af37', objects: [{ type: 'captain_armband', color: '#a68b2a', opacity: 0.14, scale: 0.48, density: 'low' }] },
+  { id: 'bg_navy_gloves_mix', name: 'Navy Mixed Gloves', base_color: '#0d1f4d', objects: [{ type: 'goalkeeper_glove', color: '#3a5a8a', opacity: 0.15, scale: 0.5, density: 'low' }] }
 ];
 CoachTools._backdropGlyph = function (type, color, opacity) {
-  const op = opacity == null ? 0.25 : opacity;
-  if (type === 'football') return CoachTools._footballSymbol('ball', color, op);
-  if (type === 'horse_silhouette') return CoachTools._footballSymbol('horse', color, op);
+  const op = opacity == null ? CoachTools.BACKDROP_DEFAULTS.opacity : opacity;
+  const known = {
+    horse_silhouette: 'horse',
+    football: 'ball',
+    football_boot: 'boot',
+    whistle: 'whistle',
+    trophy: 'cup',
+    captain_armband: 'captain',
+    corner_flag: 'flag',
+    jersey: 'jersey',
+    medal: 'medal',
+    goalkeeper_glove: 'glove',
+    shield: 'shield'
+  };
+  if (known[type]) return CoachTools._footballSymbol(known[type], color, op);
   const g = '<g fill="' + color + '" opacity="' + op + '">';
   const z = '</g>';
-  if (type === 'hourglass') {
-    return g + '<path d="M-5,-6 H5 L0.7,-0.35 H-0.7 Z"/><path d="M-5,6 H5 L0.7,0.35 H-0.7 Z"/><rect x="-5.2" y="-6.6" width="10.4" height="1.15" rx="0.3"/><rect x="-5.2" y="5.45" width="10.4" height="1.15" rx="0.3"/>' + z;
+  if (type === 'triangle') return g + '<path d="M0,-7.2 L6.4,5.4 H-6.4 Z"/>' + z;
+  if (type === 'crown') return g + '<path d="M-6.4,3.4 L-6.4,-0.4 L-3.2,-4.8 L0,0 L3.2,-4.8 L6.4,-0.4 L6.4,3.4 Z"/>' + z;
+  if (type === 'stylized_m') return g + '<path d="M-6,5 L-6,-4.6 L-4.1,-4.6 L0,1.4 L4.1,-4.6 L6,-4.6 L6,5 L4.1,5 L4.1,-1.2 L1,3.2 H-1 L-4.1,-1.2 L-4.1,5 Z"/>' + z;
+  if (type === 'star') return g + '<path d="M0,-7.4 L1.8,-2.4 L7,-2.2 L2.9,1.1 L4.4,6.6 L0,3.6 L-4.4,6.6 L-2.9,1.1 L-7,-2.2 L-1.8,-2.4 Z"/>' + z;
+  if (type === 'goal_net') {
+    return '<g fill="none" stroke="' + color + '" stroke-width="1.15" opacity="' + op + '">' +
+      '<path d="M-6.2,-5.4 H6.2 V6.2 H-6.2 Z M-6.2,-1.6 H6.2 M-6.2,2.2 H6.2 M-2.1,-5.4 V6.2 M2.1,-5.4 V6.2"/>' + z;
   }
-  if (type === 'turtle') {
-    return g + '<ellipse cx="0" cy="0.6" rx="4.4" ry="3.1"/><circle cx="0" cy="-3.3" r="1.45"/><ellipse cx="-3.3" cy="-1.5" rx="1.55" ry="0.85"/><ellipse cx="3.3" cy="-1.5" rx="1.55" ry="0.85"/><ellipse cx="-3.5" cy="2.3" rx="1.55" ry="0.85"/><ellipse cx="3.5" cy="2.3" rx="1.55" ry="0.85"/>' + z;
-  }
-  if (type === 'crown') {
-    return g + '<path d="M-6.2,3.2 L-6.2,-0.6 L-3.1,-4.4 L0,-0.2 L3.1,-4.4 L6.2,-0.6 L6.2,3.2 Z"/><circle cx="-3.1" cy="-4.1" r="0.7"/><circle cx="3.1" cy="-4.1" r="0.7"/><circle cx="0" cy="-0.15" r="0.55"/>' + z;
-  }
-  if (type === 'stylized_m') {
-    return g + '<path d="M-5.6,4.6 L-5.6,-4.2 L-3.9,-4.2 L0,1.2 L3.9,-4.2 L5.6,-4.2 L5.6,4.6 L3.8,4.6 L3.8,-1.1 L0.9,3.1 H-0.9 L-3.8,-1.1 L-3.8,4.6 Z"/>' + z;
-  }
+  if (type === 'number') return g + '<path d="M-3.4,-6.4 H4.4 V-4.3 L0.4,6.4 H-2.2 L1.4,-4.3 H-3.4 Z"/>' + z;
   return CoachTools._footballSymbol('shield', color, op);
 };
 CoachTools._backdropSvg = function (def) {
-  const w = 168;
-  const h = 168;
-  let body = '<rect width="' + w + '" height="' + h + '" fill="' + def.base_color + '"/>';
-  (def.objects || []).forEach(function (obj, oi) {
-    if (obj.type === 'vertical_stripes' || obj.pattern === 'repeating_stripes') {
-      const stripe = 12;
-      const gap = 24;
-      for (let x = 0; x < w; x += gap) {
-        body += '<rect x="' + x + '" y="0" width="' + stripe + '" height="' + h + '" fill="' + obj.color + '" opacity="' + (obj.opacity == null ? 1 : obj.opacity) + '"/>';
+  const w = 180;
+  const h = 180;
+  const defaults = CoachTools.BACKDROP_DEFAULTS;
+  let body = '';
+  (def.objects || []).forEach(function (obj) {
+    const pattern = obj.pattern || defaults.pattern;
+    const opacity = obj.opacity == null ? defaults.opacity : obj.opacity;
+    const color = obj.color;
+    if (obj.type === 'vertical_stripes' || pattern === 'repeating_stripes') {
+      const stripe = obj.width === 'medium' ? 10 : 5;
+      const gap = (obj.density || defaults.density) === 'medium' ? 36 : 48;
+      for (let x = 10; x < w; x += gap) {
+        body += '<rect x="' + x + '" y="0" width="' + stripe + '" height="' + h + '" fill="' + color + '" opacity="' + opacity + '"/>';
       }
       return;
     }
-    const glyph = CoachTools._backdropGlyph(obj.type, obj.color, obj.opacity);
-    const scale = ((obj.scale == null ? 0.7 : obj.scale) * 1.45).toFixed(2);
-    const gap = obj.pattern === 'repeating_grid' ? 40 : 48;
-    const cols = 4;
-    const rows = 4;
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const jitter = obj.pattern === 'repeating_scattered' ? (((r * 3 + c * 5 + oi * 7) % 9) - 4) : 0;
-        const rot = obj.rotation === 'random' ? (((r * 17 + c * 11 + oi * 13) % 46) - 23) : 0;
-        const x = 18 + c * gap + jitter;
-        const y = 20 + r * gap + (obj.pattern === 'repeating_scattered' && c % 2 ? 8 : 0);
-        body += '<g transform="translate(' + x + ' ' + y + ') rotate(' + rot + ') scale(' + scale + ')">' + glyph + '</g>';
-      }
+    if (obj.type === 'pitch_line' || pattern === 'subtle_lines') {
+      body += '<g fill="none" stroke="' + color + '" stroke-width="1.5" opacity="' + opacity + '">' +
+        '<rect x="16" y="12" width="148" height="156" rx="2"/>' +
+        '<path d="M16 90 H164"/>' +
+        '<circle cx="90" cy="90" r="22"/>' +
+        '<rect x="50" y="12" width="80" height="30"/>' +
+        '<rect x="50" y="138" width="80" height="30"/>' +
+        '</g>';
+      return;
     }
+    const density = obj.density || defaults.density;
+    const slots = density === 'very_low'
+      ? [[52, 58], [128, 126]]
+      : (density === 'medium'
+        ? [[42, 42], [132, 42], [42, 132], [132, 132]]
+        : [[46, 48], [128, 86], [78, 138]]);
+    const glyph = CoachTools._backdropGlyph(obj.type, color, opacity);
+    const scale = ((obj.scale == null ? defaults.scale : obj.scale) * 2.55).toFixed(2);
+    slots.forEach(function (pt) {
+      body += '<g transform="translate(' + pt[0] + ' ' + pt[1] + ') scale(' + scale + ')">' + glyph + '</g>';
+    });
   });
-  return '<svg xmlns="http://www.w3.org/2000/svg" width="168" height="168" viewBox="0 0 168 168">' + body + '</svg>';
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">' + body + '</svg>';
 };
 CoachTools.uniqueBackdropIndex = function (g) {
   const n = (CoachTools.GIFT_BACKDROPS || []).length || 1;
@@ -1201,7 +1247,7 @@ const PlayerProgress = {
     if (!t) return false;
     const st = String(t.status || '').toLowerCase();
     if (st === 'done' || st === 'completed' || st === 'проведено') return true;
-    if (st === 'cancelled' || st === 'canceled' || st === 'скасовано' || t.cancelledAt) return false;
+    if (st === 'cancelled' || st === 'canceled' || st === 'скасовано') return false;
     try {
       if (typeof LoadModel !== 'undefined' && LoadModel.isCancelled && LoadModel.isCancelled(t)) return false;
     } catch (_) {}

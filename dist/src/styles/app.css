@@ -12182,6 +12182,13 @@ body.mode-board-focus #boardToolbarTop.btb-top {
   pointer-events: auto !important;
   cursor: pointer !important;
 }
+.player-collectible.gift-field::before {
+  background-size: 180px 180px;
+  opacity: 1;
+}
+.player-collectible.gift-field::after {
+  background: radial-gradient(ellipse 140% 120% at 50% 40%, transparent 72%, rgba(0, 0, 0, 0.14) 100%);
+}
 .player-collectible.tone-ink-dark,
 .player-collectible.tone-ink-dark .pl-card-name,
 .player-collectible.tone-ink-dark .pl-card-name-txt,

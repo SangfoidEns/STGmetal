@@ -120,4 +120,31 @@ describe('club snapshot merge', () => {
     assert.equal(merged.gifts.length, 0);
     assert.ok(merged.settings.removedGiftIds.indexOf('g_old') >= 0);
   });
+
+  it('keeps a draft a draft when the phone still has an old cancel stamp', () => {
+    const phone = {
+      trainings: [{
+        id: 't10',
+        name: 'Тренування 10/11',
+        date: '2026-11-10',
+        status: 'cancelled',
+        cancelledAt: '2026-10-29T14:06:47.413Z',
+        updatedAt: '2026-10-29T14:06:47.413Z'
+      }]
+    };
+    const tablet = {
+      trainings: [{
+        id: 't10',
+        name: 'Тренування 10/11',
+        date: '2026-11-10',
+        status: 'draft',
+        cancelledAt: '2026-10-29T14:06:47.413Z',
+        updatedAt: '2026-11-07T01:20:00.000Z'
+      }]
+    };
+    const merged = mergePayload(phone, tablet);
+    assert.equal(merged.trainings.length, 1);
+    assert.equal(merged.trainings[0].status, 'draft');
+    assert.equal(merged.trainings[0].cancelledAt, undefined);
+  });
 });

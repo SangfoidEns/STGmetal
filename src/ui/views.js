@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z68',
+  APP_BUILD: 'z69',
   APP_UPDATED: '07.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -1946,6 +1946,7 @@ trainings() {
     if (typeof LoadModel !== 'undefined' && LoadModel.isCancelled) return !!LoadModel.isCancelled(tr);
     const st = String(tr.status || '').toLowerCase();
     if (st === 'done' || st === 'completed' || st === 'проведено') return false;
+    if (st === 'draft' || st === 'planned' || st === 'pinned') return false;
     if (st === 'cancelled' || st === 'canceled' || st === 'скасовано') return true;
     return !!tr.cancelledAt;
   },

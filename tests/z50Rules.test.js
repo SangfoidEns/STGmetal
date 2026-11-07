@@ -103,6 +103,7 @@ describe('z50 club rules', () => {
     const ctx = boot();
     ctx.sanitize = (v) => String(v == null ? '' : v);
     assert.equal(ctx.LoadModel.isCancelled({ status: 'done', cancelledAt: '2026-11-05T10:00:00.000Z' }), false);
+    assert.equal(ctx.LoadModel.isCancelled({ status: 'draft', cancelledAt: '2026-10-29T14:06:47.413Z' }), false);
     assert.equal(ctx.LoadModel.isCancelled({ status: 'cancelled', cancelledAt: '2026-11-03T10:00:00.000Z' }), true);
     ctx.__store.players[0].firstName = 'Сергій';
     ctx.__store.players[0].lastName = 'Бобік';

@@ -29,7 +29,7 @@ describe('calendar weekday letters', () => {
     assert.match(html, /title="Субота">Сб</);
     assert.match(html, /title="Неділя">Нд</);
     assert.equal(html.includes('>А<'), false);
-    assert.equal(context.Views.APP_BUILD, 'z68');
+    assert.equal(context.Views.APP_BUILD, 'z69');
     assert.equal(context.Views.versionLetter('07.11.2026'), 'Д');
     assert.equal(context.Views.versionLetter('06.11.2026'), 'Ґ');
     assert.equal(context.Views.versionLetter('02.11.2026'), 'А');
@@ -41,7 +41,8 @@ describe('calendar weekday letters', () => {
       settings: {},
       players: [{ id: 'p1', firstName: 'Artem', lastName: 'Serdiuk', birthDate: '1989-07-25', number: 25 }],
       trainings: [
-        { id: 'c3', name: 'Тренування 03/11', date: '2026-11-03', status: 'draft', cancelledAt: '2026-11-06T22:43:32.162Z' },
+        { id: 'c3', name: 'Тренування 03/11', date: '2026-11-03', status: 'cancelled', cancelledAt: '2026-11-06T22:43:32.162Z' },
+        { id: 'd10', name: 'Тренування 10/11', date: '2026-11-10', status: 'draft', cancelledAt: '2026-10-29T14:06:47.413Z' },
         { id: 'held', name: 'Тренування 5/11', date: '2026-11-05', status: 'done', cancelledAt: '2026-10-22T14:02:28.376Z' }
       ],
       gifts: [], boards: [], calendar: [], matches: [], chat: []
@@ -78,6 +79,8 @@ describe('calendar weekday letters', () => {
     const list = context.Views.trainings();
     assert.match(list, /Тренування 03\/11/);
     assert.match(list, /Скасовано · не пропуск/);
+    assert.equal(list.includes('Тренування 10/11'), false);
+    assert.equal(context.Views._trainingCancelled(store.trainings[1]), false);
     const heldAt = list.indexOf('Тренування 5/11');
     const heldBadge = list.slice(heldAt, heldAt + 180);
     assert.match(heldBadge, /Проведено/);
