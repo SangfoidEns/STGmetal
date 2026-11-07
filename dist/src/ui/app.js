@@ -833,7 +833,7 @@ const App = {
     if (build) {
       const letter = (typeof Views !== 'undefined' && Views.versionLetter) ? Views.versionLetter() : 'А';
       const when = (typeof Views !== 'undefined' && Views.APP_UPDATED) || '07.11.2026';
-      build.textContent = letter + ' • ' + when;
+      build.textContent = letter + ' › ' + when;
     }
     const parts = (s.clubName || 'МЕТАЛІСТ ШТУТТГАРТ').split(' ');
     const cn = document.getElementById('clubName');
@@ -1597,7 +1597,7 @@ const App = {
       if (view === 'players') {
         const log = document.getElementById('teamChatLog');
         const inp = document.getElementById('teamChatInput');
-        if (log) log.scrollTop = (chatKeep && !chatKeep.atEnd) ? chatKeep.scroll : log.scrollHeight;
+        if (log) log.scrollTop = 0;
         if (inp && chatKeep && chatKeep.value) inp.value = chatKeep.value;
         if (inp && chatKeep && chatKeep.focused) {
           try { inp.focus({ preventScroll: true }); } catch (_) { try { inp.focus(); } catch (__) {} }
@@ -2256,6 +2256,7 @@ const App = {
       document.addEventListener('click', (ev) => {
         const node = ev.target;
         if (!node || !node.closest) return;
+        if (node.closest('.tg-gift-item, [data-action="inspect-artifact"], [data-action="delete-gift"], .club-feed-row')) return;
         const fifa = node.closest('[data-action="open-fifa-card"], .pps-account, button.pps-avatar, button.pl-card-av[data-action="open-fifa-card"]');
         if (fifa) {
           const host = fifa.getAttribute('data-player-id') ? fifa : fifa.closest('[data-player-id]');
@@ -2301,6 +2302,7 @@ const App = {
         if (closestOk) {
           const own = t.closest('button, a, [data-action]');
           if (own && !own.closest('[data-action="team-chat-send"]') && own.id !== 'teamChatInput') return;
+          if (t.closest('.club-feed, #teamChat') && !t.closest('[data-action="team-chat-send"], #teamChatInput')) return;
         }
         if (!closestOk && !inBox) {
           if ((App._chatPointerDown || (App._chatBlocksTraining && App._chatBlocksTraining())) && App._chatHitOpensTraining && App._chatHitOpensTraining(t)) {
@@ -2363,8 +2365,9 @@ const App = {
           e.preventDefault();
           e.stopPropagation();
           try { App.sendTeamChat(); } catch (err) { console.error('[team-chat]', err); }
+          return;
         }
-        return;
+        if (!e.target.closest('[data-action]')) return;
       }
       const coachHit = typeof ClickGuard !== 'undefined' && ClickGuard.coachCardClick(e.target);
       if (coachHit && !e.target.closest('a[href], [data-action="open-photo"]')) {
@@ -3329,7 +3332,7 @@ const App = {
       if (action === 'edit-gift-note') {
         e.preventDefault(); e.stopPropagation();
         const uid = t.dataset.giftUid;
-        const g = (Store.get().gifts || []).find(x => x.id === uid);
+        const g = (Store.get().gifts || []).find(x => x && (String(x.id || '') === String(uid) || String(x.uid || '') === String(uid)));
         if (!g) return;
         const cur = g.note || '';
         if (typeof Modal !== 'undefined' && Modal.prompt) {

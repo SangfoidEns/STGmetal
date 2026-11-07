@@ -106,4 +106,18 @@ describe('club snapshot merge', () => {
     assert.equal(nov.attendance.p1.present, true);
     assert.equal(merged.calendar[0].trainingId, 'real22');
   });
+
+  it('does not restore a gift the coach already deleted', () => {
+    const file = {
+      settings: { coachStats: { updatedAt: '2026-11-01T00:00:00.000Z' } },
+      gifts: [{ id: 'g_old', uid: 'g_old', playerId: 'p1', label: 'Кубок' }]
+    };
+    const local = {
+      settings: { removedGiftIds: ['g_old'], coachStats: { updatedAt: '2026-11-07T00:00:00.000Z' } },
+      gifts: []
+    };
+    const merged = mergePayload(local, file);
+    assert.equal(merged.gifts.length, 0);
+    assert.ok(merged.settings.removedGiftIds.indexOf('g_old') >= 0);
+  });
 });

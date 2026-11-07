@@ -4,7 +4,7 @@
  * Відвідуваність зливається по гравцю. Час тренера береться більший.
  */
 (function (root) {
-  const LISTS = ['players', 'trainings', 'exercises', 'boards', 'calendar', 'matches', 'diary', 'myExercises', 'animations', 'gifts', 'moments', 'chat'];
+  const LISTS = ['players', 'trainings', 'exercises', 'boards', 'calendar', 'matches', 'diary', 'myExercises', 'animations', 'gifts', 'moments', 'chat', 'feed'];
 
   function stamp(value) {
     const n = Date.parse(value || '');
@@ -101,6 +101,30 @@
     out.coachStats = mergeCoachStats(base.coachStats, extra.coachStats);
     if (!out.coachPhoto) out.coachPhoto = (loser.coachPhoto || winner.coachPhoto || '');
     if (!out.coachName) out.coachName = (loser.coachName || winner.coachName || '');
+    const gone = [];
+    [base.removedGiftIds, extra.removedGiftIds].forEach(function (list) {
+      (Array.isArray(list) ? list : []).forEach(function (id) {
+        const key = String(id || '');
+        if (key && gone.indexOf(key) < 0) gone.push(key);
+      });
+    });
+    if (gone.length) out.removedGiftIds = gone.slice(-800);
+    return out;
+  }
+
+  function mergeFeedMeta(base, extra) {
+    const out = {};
+    ['status', 'photo', 'level', 'streak'].forEach(function (key) {
+      const a = (base && base[key]) || {};
+      const b = (extra && extra[key]) || {};
+      const merged = Object.assign({}, a, b);
+      if (key === 'level' || key === 'streak') {
+        Object.keys(merged).forEach(function (id) {
+          merged[id] = Math.max(Number(a[id]) || 0, Number(b[id]) || 0);
+        });
+      }
+      out[key] = merged;
+    });
     return out;
   }
 
@@ -168,6 +192,15 @@
       out[key] = mergeList(base && base[key], extra && extra[key]);
     });
     out.settings = mergeSettings(base && base.settings, extra && extra.settings);
+    out.feedMeta = mergeFeedMeta(base && base.feedMeta, extra && extra.feedMeta);
+    const gone = new Set((out.settings && out.settings.removedGiftIds) || []);
+    if (gone.size && Array.isArray(out.gifts)) {
+      out.gifts = out.gifts.filter(function (item) {
+        if (!item) return false;
+        const keys = [item.uid, item.id].map(function (k) { return String(k || ''); }).filter(Boolean);
+        return !keys.some(function (k) { return gone.has(k); });
+      });
+    }
     collapseTrainings(out);
     return out;
   }

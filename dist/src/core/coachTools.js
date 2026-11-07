@@ -766,33 +766,57 @@ CoachTools.awardGift = function (playerId, giftId, momentText) {
 CoachTools.deleteGift = function (uid) {
   const s = Store.get();
   const key = String(uid || '');
-  if (!key) return false;
+  if (!key || !s) return false;
+  if (!s.settings) s.settings = {};
+  if (!Array.isArray(s.settings.removedGiftIds)) s.settings.removedGiftIds = [];
+  const remember = function (id) {
+    const k = String(id || '');
+    if (!k || s.settings.removedGiftIds.indexOf(k) >= 0) return;
+    s.settings.removedGiftIds.push(k);
+  };
+  const doomed = (s.gifts || []).filter(g => g && (String(g.uid || '') === key || String(g.id || '') === key));
+  doomed.forEach(g => { remember(g.uid); remember(g.id); });
+  remember(key);
+  if (s.settings.removedGiftIds.length > 800) s.settings.removedGiftIds = s.settings.removedGiftIds.slice(-800);
   const before = (s.gifts || []).length;
   s.gifts = (s.gifts || []).filter(g => {
     if (!g) return false;
     return String(g.uid || '') !== key && String(g.id || '') !== key;
   });
-  if ((s.gifts || []).length === before) return false;
   (s.players || []).forEach(p => {
     if (!p || !p.profile) return;
     if (String(p.profile.featuredGiftId || '') !== key) return;
-    const next = (s.gifts || []).find(g => g && String(g.playerId) === String(p.id) && g.featured)
-      || (s.gifts || []).find(g => g && String(g.playerId) === String(p.id));
+    const next = (s.gifts || []).find(g => g && String(g.playerId) === String(p.id) && g.attached !== false && g.featured)
+      || (s.gifts || []).find(g => g && String(g.playerId) === String(p.id) && g.attached !== false);
     p.profile.featuredGiftId = next ? (next.uid || next.id || '') : '';
     if (next && next.hue != null) p.profile.themeHue = next.hue;
   });
   try { StorageManager.save(); } catch (_) {}
-  try { if (typeof Toast !== 'undefined') Toast.show('Подарунок видалено', 'ok'); } catch (_) {}
+  try {
+    if (typeof Toast !== 'undefined') Toast.show((s.gifts || []).length !== before ? 'Подарунок видалено' : 'Подарунок уже прибрано', 'ok');
+  } catch (_) {}
   return true;
 };
 
 CoachTools.attachGift = function (uid) {
-  // mark gift as pinned/status for player profile
   const s = Store.get();
-  const g = (s.gifts || []).find(x => x.uid === uid);
+  const g = (s.gifts || []).find(x => x && (String(x.uid || '') === String(uid) || String(x.id || '') === String(uid)));
   if (!g) return false;
   g.pinned = true;
+  g.attached = true;
   try { StorageManager.save(); } catch (_) {}
+  return true;
+};
+
+CoachTools.toggleAttachGift = function (uid) {
+  const s = Store.get();
+  const key = String(uid || '');
+  const g = (s.gifts || []).find(x => x && (String(x.uid || '') === key || String(x.id || '') === key));
+  if (!g) return false;
+  g.attached = g.attached === false;
+  if (g.attached === false && g.featured) g.featured = false;
+  try { StorageManager.save(); } catch (_) {}
+  try { if (typeof Toast !== 'undefined') Toast.show(g.attached === false ? 'Знято з профілю' : 'Знову на профілі', 'ok'); } catch (_) {}
   return true;
 };
 
@@ -1178,30 +1202,23 @@ CoachTools.playerGiftsSorted = function (playerId) {
     return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
   });
 };
-/** Ensure at least one gift attached; prefer featured, else rarest */
+/** Подарунок біля імені. Знятий з профілю не повертаємо самі. */
 CoachTools.ensureWornGift = function (playerId) {
   try {
     const s = Store.get();
     if (!s.gifts) return null;
-    const mine = s.gifts.filter(g => g.playerId === playerId);
+    const mine = s.gifts.filter(g => g && String(g.playerId) === String(playerId) && g.attached !== false);
     if (!mine.length) return null;
     let featured = mine.find(g => g.featured);
-    let worn = mine.filter(g => g.attached !== false);
-    if (!worn.length) {
-      const best = mine.slice().sort((a, b) => CoachTools.rarityRank(b.rarity) - CoachTools.rarityRank(a.rarity))[0];
-      if (best) {
-        best.attached = true;
-        if (!featured) { mine.forEach(x => { x.featured = false; }); best.featured = true; featured = best; }
+    if (!featured) {
+      featured = mine.slice().sort((a, b) => CoachTools.rarityRank(b.rarity) - CoachTools.rarityRank(a.rarity))[0];
+      if (featured) {
+        mine.forEach(x => { x.featured = false; });
+        featured.featured = true;
         try { StorageManager.save(); } catch (_) {}
-        worn = [best];
       }
     }
-    if (!featured && worn.length) {
-      const best = worn.slice().sort((a, b) => CoachTools.rarityRank(b.rarity) - CoachTools.rarityRank(a.rarity))[0];
-      mine.forEach(x => { x.featured = false; });
-      if (best) { best.featured = true; featured = best; try { StorageManager.save(); } catch (_) {} }
-    }
-    return featured || worn[0] || null;
+    return featured || mine[0] || null;
   } catch (_) { return null; }
 };
 CoachTools.giftAccent = function (g) {
@@ -1233,3 +1250,174 @@ CoachTools.playerXpTotal = function (playerId) {
     return Math.max(0, xp);
   } catch (_) { return 0; }
 };
+
+/** Стрічка клубу: подарунки, серії, дні народження, статус, фото, рейтинг. */
+const ClubFeed = {
+  MILESTONES: [3, 5, 8, 12, 16, 20, 24, 30],
+  _busy: false,
+  _name(p) {
+    return [p && p.firstName, p && p.lastName].filter(Boolean).join(' ').trim() || (p && p.name) || 'Гравець';
+  },
+  _meta(s) {
+    if (!s.feedMeta || typeof s.feedMeta !== 'object') s.feedMeta = {};
+    ['status', 'photo', 'level', 'streak'].forEach(function (key) {
+      if (!s.feedMeta[key] || typeof s.feedMeta[key] !== 'object') s.feedMeta[key] = {};
+    });
+    return s.feedMeta;
+  },
+  _push(s, entry) {
+    if (!Array.isArray(s.feed)) s.feed = [];
+    if (s.feed.some(function (x) { return x && x.id === entry.id; })) return false;
+    s.feed.push({
+      id: entry.id,
+      kind: entry.kind,
+      playerId: entry.playerId || null,
+      title: String(entry.title || '').slice(0, 80),
+      text: String(entry.text || '').slice(0, 200),
+      createdAt: entry.createdAt || new Date().toISOString()
+    });
+    if (s.feed.length > 240) s.feed = s.feed.slice(-240);
+    return true;
+  },
+  _berlin(now) {
+    try {
+      const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' });
+      const parts = fmt.formatToParts(now || new Date());
+      const pick = function (type) { return (parts.find(function (p) { return p.type === type; }) || {}).value; };
+      return { y: Number(pick('year')), m: Number(pick('month')), d: Number(pick('day')) };
+    } catch (_) {
+      const n = now || new Date();
+      return { y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate() };
+    }
+  },
+  _daysUntil(iso, today) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+    if (!m) return null;
+    const month = Number(m[2]);
+    const day = Number(m[3]);
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+    const t0 = Date.UTC(today.y, today.m - 1, today.d);
+    let next = Date.UTC(today.y, month - 1, day);
+    if (next < t0) next = Date.UTC(today.y + 1, month - 1, day);
+    const year = new Date(next).getUTCFullYear();
+    return { days: Math.round((next - t0) / 86400000), year: year, age: year - Number(m[1]) };
+  },
+  sync() {
+    if (this._busy) return;
+    this._busy = true;
+    try {
+      const s = Store.get();
+      if (!s) return;
+      const meta = this._meta(s);
+      let dirty = false;
+      const today = this._berlin(new Date());
+      (s.gifts || []).forEach(function (g) {
+        if (!g) return;
+        const id = String(g.uid || g.id || '');
+        if (!id) return;
+        const player = (s.players || []).find(function (p) { return p && String(p.id) === String(g.playerId); });
+        const who = player ? ClubFeed._name(player) : 'Гравець';
+        const label = (CoachTools.giftLabel && CoachTools.giftLabel(g)) || g.label || 'подарунок';
+        if (ClubFeed._push(s, {
+          id: 'gift:' + id,
+          kind: 'gift',
+          playerId: g.playerId || null,
+          title: 'Подарунок',
+          text: who + ' отримав «' + label + '»',
+          createdAt: g.createdAt || new Date().toISOString()
+        })) dirty = true;
+      });
+      (s.players || []).forEach(function (p) {
+        if (!p || p.id == null) return;
+        const pid = String(p.id);
+        const who = ClubFeed._name(p);
+        const status = String((p.profile && p.profile.status) || p.statusText || '').trim();
+        if (status) {
+          if (meta.status[pid] == null) {
+            meta.status[pid] = status;
+            dirty = true;
+          } else if (meta.status[pid] !== status) {
+            if (ClubFeed._push(s, {
+              id: 'status:' + pid + ':' + status,
+              kind: 'status',
+              playerId: p.id,
+              title: 'Статус біля імені',
+              text: who + ' змінив статус на «' + status + '»'
+            })) dirty = true;
+            meta.status[pid] = status;
+          }
+        }
+        const photo = String(p.photoUrl || p.profilePhoto || (p.profile && p.profile.photo) || '');
+        const sig = photo ? (String(photo.length) + ':' + photo.slice(-24)) : '';
+        if (sig) {
+          if (meta.photo[pid] == null) {
+            meta.photo[pid] = sig;
+            dirty = true;
+          } else if (meta.photo[pid] !== sig) {
+            if (ClubFeed._push(s, {
+              id: 'photo:' + pid + ':' + sig.slice(0, 48),
+              kind: 'photo',
+              playerId: p.id,
+              title: 'Нове фото',
+              text: who + ' додав нове фото'
+            })) dirty = true;
+            meta.photo[pid] = sig;
+          }
+        }
+        let level = 1;
+        let streak = 0;
+        try {
+          const prog = (typeof PlayerProgress !== 'undefined' && PlayerProgress.compute) ? (PlayerProgress.compute(p.id) || {}) : {};
+          level = Number(prog.level) || 1;
+          streak = Number(prog.streak) || 0;
+        } catch (_) {}
+        if (meta.level[pid] == null) {
+          meta.level[pid] = level;
+          dirty = true;
+        } else if (level > Number(meta.level[pid] || 0)) {
+          if (ClubFeed._push(s, {
+            id: 'level:' + pid + ':' + level,
+            kind: 'rating',
+            playerId: p.id,
+            title: 'Рейтинг',
+            text: who + ' підняв рейтинг до рівня ' + level
+          })) dirty = true;
+          meta.level[pid] = level;
+        }
+        let hit = 0;
+        ClubFeed.MILESTONES.forEach(function (n) { if (streak >= n) hit = n; });
+        if (hit && Number(meta.streak[pid] || 0) < hit) {
+          if (ClubFeed._push(s, {
+            id: 'streak:' + pid + ':' + hit,
+            kind: 'streak',
+            playerId: p.id,
+            title: 'Серія відвідувань',
+            text: who + ' тримає серію ' + hit + ' тренувань поспіль'
+          })) dirty = true;
+          meta.streak[pid] = hit;
+        }
+        const birth = p.birthDate || (p.profile && p.profile.birthDate) || p.birthday || '';
+        const when = ClubFeed._daysUntil(birth, today);
+        if (when && when.days <= 14) {
+          const ageBit = (when.age >= 1 && when.age <= 99) ? (' · ' + when.age + ' р.') : '';
+          const text = when.days === 0
+            ? (who + ' сьогодні святкує день народження' + ageBit)
+            : (who + ' · день народження через ' + when.days + ' дн.' + ageBit);
+          if (ClubFeed._push(s, {
+            id: 'bday:' + pid + ':' + when.year,
+            kind: 'birthday',
+            playerId: p.id,
+            title: 'День народження',
+            text: text
+          })) dirty = true;
+        }
+      });
+      if (dirty) {
+        try { if (typeof StorageManager !== 'undefined' && StorageManager.save) StorageManager.save(); } catch (_) {}
+      }
+    } finally {
+      this._busy = false;
+    }
+  }
+};
+if (typeof window !== 'undefined') window.ClubFeed = ClubFeed;

@@ -12139,3 +12139,133 @@ body.mode-board-focus #boardToolbarTop.btb-top {
 .role-president { background: #8b3a4a; color: #f4efe2; }
 #playersLayer .pt .pt-assist { background: #3d7ea6 !important; color: #f4efe2 !important; }
 #playersLayer .pt .pt-pres { background: #8b3a4a !important; color: #f4efe2 !important; }
+
+/* z66 — подарунки розгортаються навколо фото і ловлять натискання */
+.pl-cards .pl-card {
+  overflow: visible !important;
+}
+.pl-cards .pl-card .pl-card-av-wrap,
+.player-profile-hero .cp-avatar-wrap,
+.cp-hero .cp-avatar-wrap {
+  overflow: visible !important;
+  z-index: 8 !important;
+}
+.pl-cards .pl-card .tg-gift-cloud,
+.player-profile-hero .tg-gift-cloud,
+.cp-hero .tg-gift-cloud {
+  z-index: 12 !important;
+  overflow: visible !important;
+}
+.pl-card-av-wrap .tg-gift-counter { --fan: -56px; }
+.player-profile-hero .tg-gift-counter { --fan: -84px; }
+.pl-card-av-wrap .tg-gift-counter,
+.player-profile-hero .tg-gift-counter {
+  animation: giftOrbitUpright 22s linear infinite, giftFanOut 0.9s cubic-bezier(.16, 1.15, .3, 1) both !important;
+}
+@keyframes giftFanOut {
+  0% { top: 0; }
+  100% { top: var(--fan, -56px); }
+}
+@keyframes giftItemIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.pl-card-av-wrap .tg-gift-spin .tg-gift-item,
+.pl-card-av-wrap .tg-gift-spin .tg-gift-item.nft-art,
+.pl-card-av-wrap .tg-gift-cloud .tg-gift-item.nft-art,
+.pl-card-av-wrap .tg-gift-spin .tg-gift-item.rarity-legendary,
+.player-profile-hero .tg-gift-spin .tg-gift-item,
+.player-profile-hero .tg-gift-spin .tg-gift-item.nft-art,
+.player-profile-hero .tg-gift-spin .tg-gift-item.rarity-legendary,
+.cp-hero .tg-gift-item[data-action="inspect-artifact"] {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  z-index: 14 !important;
+  animation: giftItemIn 0.7s ease both !important;
+  animation-delay: calc(var(--gi, 0) * 0.08s) !important;
+  transform: none !important;
+}
+.pl-card-av-wrap .tg-gift-spin .tg-gift-item,
+.pl-card-av-wrap .tg-gift-spin .tg-gift-item.nft-art {
+  width: 34px !important;
+  height: 34px !important;
+  margin: -17px 0 0 -17px !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pl-card-av-wrap .tg-gift-counter,
+  .player-profile-hero .tg-gift-counter {
+    animation: none !important;
+    top: var(--fan, -56px) !important;
+  }
+  .pl-card-av-wrap .tg-gift-spin .tg-gift-item,
+  .player-profile-hero .tg-gift-spin .tg-gift-item {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+}
+.coach-gift-chip {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 4px;
+}
+.coach-gift-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  min-height: 36px;
+}
+.coach-gift-del {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 120, 120, 0.45);
+  background: rgba(80, 20, 24, 0.55);
+  color: #ffb4b4;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.club-feed .team-chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.club-feed-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(240, 193, 75, 0.22);
+  background: linear-gradient(165deg, rgba(42, 36, 18, 0.92), rgba(16, 18, 24, 0.96));
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.club-feed-ico {
+  width: 28px;
+  flex: 0 0 28px;
+  font-size: 18px;
+  line-height: 1.4;
+}
+.club-feed-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.club-feed-body b { font-size: 12px; color: #f0c14b; }
+.club-feed-body span { font-size: 14px; line-height: 1.35; }
+.club-feed-time {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--muted, #9aa4b2);
+}

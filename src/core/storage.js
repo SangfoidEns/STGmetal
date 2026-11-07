@@ -360,6 +360,8 @@ const StorageManager = {
       gifts: s.gifts || [],
       moments: s.moments || [],
       chat: s.chat || [],
+      feed: s.feed || [],
+      feedMeta: s.feedMeta || {},
       activeBoard: {
         objects: (s.activeBoard && s.activeBoard.objects) || [],
         fieldView: (s.activeBoard && s.activeBoard.fieldView) || 'full'
@@ -612,6 +614,10 @@ const StorageManager = {
     else base.moments = base.moments || [];
     if (Array.isArray(data.chat)) base.chat = data.chat;
     else if (!Array.isArray(base.chat)) base.chat = [];
+    if (Array.isArray(data.feed)) base.feed = data.feed;
+    else if (!Array.isArray(base.feed)) base.feed = [];
+    if (data.feedMeta && typeof data.feedMeta === 'object') base.feedMeta = data.feedMeta;
+    else if (!base.feedMeta || typeof base.feedMeta !== 'object') base.feedMeta = {};
     base.schemaVersion = SCHEMA_VERSION;
     if (data.updatedAt) base.updatedAt = data.updatedAt;
     else if (data.exportedAt) base.updatedAt = data.exportedAt;
@@ -740,6 +746,8 @@ const StorageManager = {
       gifts: s.gifts || [],
       moments: s.moments || [],
       chat: s.chat || [],
+      feed: s.feed || [],
+      feedMeta: s.feedMeta || {},
       activeBoard: {
         objects: (s.activeBoard && s.activeBoard.objects) || [],
         fieldView: (s.activeBoard && s.activeBoard.fieldView) || 'full'
@@ -789,6 +797,8 @@ const StorageManager = {
       diary: JSON.parse(JSON.stringify(s.diary || [])),
       gifts: JSON.parse(JSON.stringify(s.gifts || [])),
       chat: JSON.parse(JSON.stringify(s.chat || [])),
+      feed: JSON.parse(JSON.stringify(s.feed || [])),
+      feedMeta: JSON.parse(JSON.stringify(s.feedMeta || {})),
       exercises: JSON.parse(JSON.stringify(s.exercises || [])),
       myExercises: JSON.parse(JSON.stringify(s.myExercises || [])),
       animations: JSON.parse(JSON.stringify(s.animations || [])),

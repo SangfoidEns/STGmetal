@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z65',
+  APP_BUILD: 'z66',
   APP_UPDATED: '07.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -219,7 +219,7 @@ const Views = {
         ';--art-hue:' + hue + ';--art-pattern:' + (g.pattern || 1) +
         ';transform:translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) scale(1);opacity:1;visibility:visible"' +
         ' title="' + title +
-        '" data-gift-id="' + (g.giftId || '') + '" data-action="inspect-artifact" data-gift-uid="' + (g.uid || g.id || '') + '">' +
+        '" data-gift-id="' + (g.giftId || '') + '" data-action="inspect-artifact" data-gift-uid="' + (g.uid || g.id || '') + '" role="button" tabindex="0">' +
         art + '</span>';
       if ((mode || 'full') === 'full' || mode === 'card') {
         return '<span class="tg-gift-spin" style="--i:' + i + ';--n:' + take.length + '"><span class="tg-gift-counter">' + item + '</span></span>';
@@ -468,7 +468,7 @@ const Views = {
               style="border-color:var(--pos-ring);background:var(--pos-bg)">
               ${ph}
             </button>
-            ${this._tgGiftCloud((pc.gifts || []).filter(g => g && !g.featured), 1.15, 'full')}
+            ${this._tgGiftCloud(pc.gifts || [], 1.15, 'full')}
           </div>
           ${this._giftStrip(pc.gifts)}
           <div class="cp-role-line"><span class="cp-role-kind">${pc.kind === 'coach' ? 'Тренер' : 'Гравець'}</span></div>
@@ -1146,7 +1146,7 @@ const Views = {
               title="${photo ? 'Фото на весь екран' : 'FIFA-картка'}" style="border-color:var(--pos-ring);background:var(--pos-bg)">
               ${photoHtml}
             </button>
-            ${this._tgGiftCloud(worn.filter(g => g && !g.featured), 1.2, 'full')}
+            ${this._tgGiftCloud(worn, 1.2, 'full')}
           </div>
           <div class="cp-role-line"><span class="cp-role-kind">Гравець</span></div>
           <h1 class="cp-title cp-title-name">${sanitize(fullName)} ${featBadge}</h1>
@@ -1649,9 +1649,7 @@ trainings() {
     try {
       mine = (Store.get().gifts || []).filter(g => g && p && String(g.playerId) === String(p.id));
     } catch (_) {}
-    const featured = mine.find(g => g && g.featured) || null;
-    const orbit = featured ? mine.filter(g => g !== featured) : mine;
-    const cloud = this._tgGiftCloud(orbit, 1, 'card');
+    const cloud = this._tgGiftCloud(mine, 1, 'card');
     const badge = this._giftStatusBadge(mine);
     const bd = this._playerBackdrop(p);
     let xp = 0;
@@ -1676,76 +1674,36 @@ trainings() {
   },
 
   _teamChat() {
+    try { if (typeof ClubFeed !== 'undefined' && ClubFeed.sync) ClubFeed.sync(); } catch (_) {}
     const s = Store.get();
-    const list = (s.chat || []).slice().sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || ''))).slice(-80);
-    let meKey = 'guest';
-    try {
-      if (typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach()) meKey = 'coach';
-      else {
-        const me = AuthManager.getLinkedPlayer && AuthManager.getLinkedPlayer();
-        meKey = me ? ('p:' + me.id) : ('g:' + ((AuthManager.displayName && AuthManager.displayName()) || ''));
-      }
-    } catch (_) {}
-    const chatHue = (key) => {
-      const slots = [205, 152, 18, 278, 332, 118, 8, 235, 88, 312];
-      let h = 2166136261;
-      const str = String(key || 'x');
-      for (let i = 0; i < str.length; i++) {
-        h ^= str.charCodeAt(i);
-        h = Math.imul(h, 16777619);
-      }
-      return slots[(h >>> 0) % slots.length];
-    };
-    const rows = list.map(m => {
-      const key = m.authorRole === 'coach' ? 'coach' : (m.playerId ? ('p:' + m.playerId) : ('g:' + (m.authorName || '')));
-      const mine = key === meKey;
-      let accent = { ring: '#9aa4b2', bg: 'rgba(255,255,255,0.06)' };
-      if (m.authorRole === 'coach') accent = { ring: '#e8c547', bg: 'linear-gradient(165deg,#3a3010,#161208)' };
-      else if (m.playerId) {
-        const person = (s.players || []).find(p => p && String(p.id) === String(m.playerId));
-        if (person) accent = this._accountAccent(person);
-        else {
-          const hue = chatHue(m.playerId || key);
-          accent = {
-            ring: 'hsl(' + hue + ' 78% 64%)',
-            bg: 'linear-gradient(165deg, hsl(' + hue + ' 46% 28%) 0%, hsl(' + hue + ' 40% 12%) 100%)'
-          };
-        }
-      } else {
-        const hue = chatHue(m.authorName || key);
-        accent = {
-          ring: 'hsl(' + hue + ' 78% 64%)',
-          bg: 'linear-gradient(165deg, hsl(' + hue + ' 46% 28%) 0%, hsl(' + hue + ' 40% 12%) 100%)'
-        };
-      }
+    const list = (s.feed || []).slice().sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))).slice(0, 40);
+    const icons = { gift: '🎁', streak: '🔥', birthday: '🎂', status: '✨', photo: '📷', rating: '⭐' };
+    const kinds = ['gift', 'streak', 'birthday', 'status', 'photo', 'rating'];
+    const rows = list.map(item => {
+      if (!item) return '';
       let time = '';
       try {
-        const d = new Date(m.createdAt);
-        if (!isNaN(d.getTime())) time = d.toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-      } catch (_) {}
-      const role = m.authorRole === 'coach' ? 'Тренер' : (m.authorRole === 'player' ? 'Гравець' : 'Гість');
-      let badge = '';
-      if (m.playerId) {
-        const owned = (s.gifts || []).filter(g => g && String(g.playerId) === String(m.playerId));
-        const featured = owned.find(g => g.featured) || null;
-        if (featured) {
-          const art = (typeof CoachTools !== 'undefined' && CoachTools.giftBackdropHtml)
-            ? CoachTools.giftBackdropHtml(featured, 'sm')
-            : (featured.ico || '');
-          badge = '<span class="gift-status-badge rarity-' + (featured.rarity || 'common') + '" title="' + sanitize(this._gl(featured) || '') + '">' + art + '</span>';
+        const d = new Date(item.createdAt);
+        if (!isNaN(d.getTime())) {
+          time = new Intl.DateTimeFormat('uk-UA', {
+            timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+          }).format(d);
         }
-      }
-      return '<div class="team-chat-msg' + (mine ? ' mine' : '') + '" style="--acc-ring:' + accent.ring + ';--acc-bg:' + accent.bg + '">' +
-        '<div class="team-chat-meta"><b>' + sanitize(m.authorName || role) + '</b>' + badge + ' <span>' + sanitize(role) + (time ? (' · ' + time) : '') + '</span></div>' +
-        '<div class="team-chat-text">' + sanitize(m.text || '') + '</div></div>';
+      } catch (_) {}
+      const kind = kinds.indexOf(item.kind) >= 0 ? item.kind : 'news';
+      const pid = item.playerId != null && item.playerId !== '' ? String(item.playerId) : '';
+      const open = pid ? (' data-action="open-player-card" data-player-id="' + pid + '"') : '';
+      return '<button type="button" class="club-feed-row kind-' + kind + '"' + open + '>' +
+        '<span class="club-feed-ico" aria-hidden="true">' + (icons[kind] || '•') + '</span>' +
+        '<span class="club-feed-body"><b>' + sanitize(item.title || 'Новина') + '</b><span>' + sanitize(item.text || '') + '</span></span>' +
+        (time ? ('<span class="club-feed-time">' + sanitize(time) + '</span>') : '') +
+        '</button>';
     }).join('');
-    return '<section class="team-chat" id="teamChat">' +
-      '<div class="ct">Чат команди</div>' +
-      '<p class="note-sm">Пишуть тренер і гравці. Повідомлення з’являються в усіх, хто відкрив додаток.</p>' +
-      '<div class="team-chat-log" id="teamChatLog">' + (rows || '<div class="team-chat-empty">Напишіть перше повідомлення команді.</div>') + '</div>' +
-      '<div class="team-chat-form" id="teamChatForm">' +
-        '<input id="teamChatInput" type="text" maxlength="500" placeholder="Повідомлення команді…" autocomplete="off" enterkeyhint="send">' +
-        '<button type="button" class="btn btn-p" data-action="team-chat-send">Надіслати</button>' +
+    return '<section class="team-chat club-feed" id="teamChat">' +
+      '<div class="ct">Стрічка клубу</div>' +
+      '<p class="note-sm">Подарунки, серії 3 · 5 · 8 · 12, дні народження, статус біля імені, нове фото і рейтинг.</p>' +
+      '<div class="team-chat-log" id="teamChatLog">' +
+      (rows || '<div class="team-chat-empty">Поки тихо. Щойно хтось отримає подарунок, змінить статус чи збереже серію — це з’явиться тут.</div>') +
       '</div></section>';
   },
 
@@ -1762,7 +1720,12 @@ trainings() {
           const art = (typeof CoachTools !== 'undefined' && CoachTools.giftBackdropHtml)
             ? CoachTools.giftBackdropHtml(g, 'sm')
             : (g.ico || '★');
-          return '<span class="coach-gift-chip" title="' + sanitize(this._gl(g) || '') + '">' + art + '<span>' + sanitize(this._gl(g) || '') + '</span></span>';
+          const uid = g.uid || g.id || '';
+          return '<span class="coach-gift-chip">' +
+            '<button type="button" class="coach-gift-open" data-action="inspect-artifact" data-gift-uid="' + uid + '" title="' + sanitize(this._gl(g) || '') + '">' +
+            art + '<span>' + sanitize(this._gl(g) || '') + '</span></button>' +
+            '<button type="button" class="coach-gift-del" data-action="delete-gift" data-gift-uid="' + uid + '" aria-label="Видалити подарунок">×</button>' +
+            '</span>';
         }).join('') + '</div>')
       : '<p class="note-sm">Ще немає подарунків.</p>';
     const catalog = (typeof CoachTools !== 'undefined' && CoachTools.GIFT_CATALOG ? CoachTools.GIFT_CATALOG : []).map(g => {
