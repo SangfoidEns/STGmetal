@@ -29,7 +29,7 @@ describe('calendar weekday letters', () => {
     assert.match(html, /title="Субота">Сб</);
     assert.match(html, /title="Неділя">Нд</);
     assert.equal(html.includes('>А<'), false);
-    assert.equal(context.Views.APP_BUILD, 'z70');
+    assert.equal(context.Views.APP_BUILD, 'z71');
     assert.equal(context.Views.versionLetter('07.11.2026'), 'Д');
     assert.equal(context.Views.versionLetter('06.11.2026'), 'Ґ');
     assert.equal(context.Views.versionLetter('02.11.2026'), 'А');

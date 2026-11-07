@@ -679,21 +679,21 @@ CoachTools.coachProgress = function () {
   };
 };
 CoachTools.GIFT_BACKDROPS = [
-  { id: 'night_pitch', name: 'Нічний газон', base_color: '#10241b', ink: 'light', hero: 'football', heroColor: '#e9fff4' },
-  { id: 'navy_kit', name: 'Темно-синя форма', base_color: '#071433', ink: 'light', hero: 'jersey', heroColor: '#f6e3a6' },
-  { id: 'gold_crest', name: 'Золотий герб', base_color: '#e6c56a', ink: 'dark', hero: 'shield', heroColor: '#14284f' },
-  { id: 'goal_night', name: 'Нічні ворота', base_color: '#0c1c16', ink: 'light', hero: 'goal_net', heroColor: '#e7fff3' },
-  { id: 'captain_band', name: 'Капітан', base_color: '#1c2a16', ink: 'light', hero: 'captain_armband', heroColor: '#f3d48a' },
-  { id: 'trophy_night', name: 'Нічний кубок', base_color: '#14261c', ink: 'light', hero: 'trophy', heroColor: '#f4d78c' },
-  { id: 'gold_boot', name: 'Золотий удар', base_color: '#e2b84a', ink: 'dark', hero: 'football_boot', heroColor: '#1a2744' },
-  { id: 'whistle_arc', name: 'Свисток', base_color: '#101a38', ink: 'light', hero: 'whistle', heroColor: '#dce8ff' },
-  { id: 'tactics_board', name: 'Тактична дошка', base_color: '#123026', ink: 'light', hero: 'corner_flag', heroColor: '#edfff6' },
-  { id: 'medal_night', name: 'Медаль', base_color: '#1a140c', ink: 'light', hero: 'medal', heroColor: '#f3d78a' },
-  { id: 'keeper_night', name: 'Воротар', base_color: '#10261f', ink: 'light', hero: 'goalkeeper_glove', heroColor: '#e5fff4' },
-  { id: 'star_gold', name: 'Золота зірка', base_color: '#f0d078', ink: 'dark', hero: 'star', heroColor: '#1a2744' }
+  { id: 'night_pitch', name: 'Нічний газон', base_color: '#07140f', ink: 'light', glow: '#3dcca0', hero: 'football', heroColor: '#e7fff4' },
+  { id: 'navy_kit', name: 'Темно-синя форма', base_color: '#070e22', ink: 'light', glow: '#4c7dff', hero: 'jersey', heroColor: '#f6e3a6' },
+  { id: 'gold_crest', name: 'Золотий герб', base_color: '#120e08', ink: 'light', glow: '#e8c547', hero: 'shield', heroColor: '#f6e3a6' },
+  { id: 'goal_night', name: 'Нічні ворота', base_color: '#07140f', ink: 'light', glow: '#7dffc3', hero: 'goal_net', heroColor: '#e7fff4' },
+  { id: 'captain_band', name: 'Капітан', base_color: '#10160c', ink: 'light', glow: '#c6e27a', hero: 'captain_armband', heroColor: '#f6e3a6' },
+  { id: 'trophy_night', name: 'Нічний кубок', base_color: '#100e0a', ink: 'light', glow: '#e0b15a', hero: 'trophy', heroColor: '#f8e7b8' },
+  { id: 'gold_boot', name: 'Золотий удар', base_color: '#120e08', ink: 'light', glow: '#ffb703', hero: 'football_boot', heroColor: '#ffe7a8' },
+  { id: 'whistle_arc', name: 'Свисток', base_color: '#090f22', ink: 'light', glow: '#8eb4ff', hero: 'whistle', heroColor: '#e4edff' },
+  { id: 'tactics_board', name: 'Тактична дошка', base_color: '#07140f', ink: 'light', glow: '#5ee0a0', hero: 'corner_flag', heroColor: '#e7fff4' },
+  { id: 'medal_night', name: 'Медаль', base_color: '#100c08', ink: 'light', glow: '#d4a574', hero: 'medal', heroColor: '#f8e7c8' },
+  { id: 'keeper_night', name: 'Воротар', base_color: '#071412', ink: 'light', glow: '#3ddec8', hero: 'goalkeeper_glove', heroColor: '#e5fff8' },
+  { id: 'star_gold', name: 'Золота зірка', base_color: '#120e08', ink: 'light', glow: '#f0d078', hero: 'star', heroColor: '#fff1c4' }
 ];
 CoachTools._backdropGlyph = function (type, color, opacity) {
-  const op = opacity == null ? CoachTools.BACKDROP_DEFAULTS.opacity : opacity;
+  const op = opacity == null ? 0.7 : opacity;
   const known = {
     horse_silhouette: 'horse',
     football: 'ball',
@@ -724,64 +724,32 @@ CoachTools._backdropGlyph = function (type, color, opacity) {
 CoachTools._backdropSvg = function (def) {
   const key = String((def && def.id) || 'night_pitch');
   const gid = 'ms' + key.replace(/[^a-z0-9]/gi, '');
-  const looks = {
-    night_pitch: ['#4e8a66', '#173628', '#08140f', 'pitch'],
-    navy_kit: ['#2a4f98', '#102454', '#070e22', 'kit'],
-    gold_crest: ['#fff3c9', '#e8c25a', '#b07d22', 'sheen'],
-    goal_night: ['#245c48', '#123228', '#07140f', 'goal'],
-    captain_band: ['#3d5a32', '#1d3118', '#0c160a', 'band'],
-    trophy_night: ['#3d6a52', '#163426', '#08140e', 'pitch'],
-    gold_boot: ['#fff0c0', '#e4b445', '#a8741c', 'sheen'],
-    whistle_arc: ['#2c4d96', '#142448', '#090f22', 'arcs'],
-    tactics_board: ['#2f6a50', '#143528', '#08140f', 'grid'],
-    medal_night: ['#6a5230', '#24180e', '#0c0906', 'sheen'],
-    keeper_night: ['#2f6e5c', '#12352c', '#071612', 'pitch'],
-    star_gold: ['#fff6d4', '#f0cc6a', '#c4922a', 'sheen']
-  };
-  const look = looks[key] || looks.night_pitch;
-  const hero = CoachTools._backdropGlyph(def.hero || 'football', def.heroColor || '#ffffff', 1);
-  let texture = '';
-  if (look[3] === 'pitch' || look[3] === 'goal') {
-    texture = '<g fill="none" stroke="' + (def.heroColor || '#fff') + '" stroke-opacity="0.34" stroke-width="2.4">' +
-      '<rect x="26" y="28" width="308" height="404" rx="10"/>' +
-      '<path d="M26 230 H334"/>' +
-      '<circle cx="180" cy="230" r="52"/>' +
-      '<rect x="104" y="28" width="152" height="70"/>' +
-      '<rect x="104" y="362" width="152" height="70"/>' +
-      '</g>';
-  } else if (look[3] === 'kit') {
-    texture = '<rect x="0" y="0" width="22" height="460" fill="#e8c547"/>' +
-      '<rect x="338" y="0" width="22" height="460" fill="#e8c547"/>' +
-      '<rect x="22" y="0" width="7" height="460" fill="#ffffff" opacity="0.28"/>' +
-      '<rect x="331" y="0" width="7" height="460" fill="#ffffff" opacity="0.28"/>';
-  } else if (look[3] === 'band') {
-    texture = '<rect x="0" y="118" width="360" height="34" fill="#f3d48a" opacity="0.9"/>' +
-      '<rect x="0" y="148" width="360" height="6" fill="#14284f" opacity="0.55"/>';
-  } else if (look[3] === 'arcs') {
-    texture = '<g fill="none" stroke="' + (def.heroColor || '#fff') + '" stroke-opacity="0.28" stroke-width="2">' +
-      '<circle cx="180" cy="168" r="46"/><circle cx="180" cy="168" r="78"/><circle cx="180" cy="168" r="112"/>' +
-      '</g>';
-  } else if (look[3] === 'grid') {
-    texture = '<g stroke="' + (def.heroColor || '#fff') + '" stroke-opacity="0.22" stroke-width="1.4">';
-    for (let x = 40; x < 340; x += 40) texture += '<path d="M' + x + ' 24 V436"/>';
-    for (let y = 40; y < 440; y += 40) texture += '<path d="M24 ' + y + ' H336"/>';
-    texture += '</g>';
-  } else {
-    texture = '<path d="M-40 80 L180 -20 L400 90 L400 150 L180 40 Z" fill="#ffffff" opacity="0.18"/>' +
-      '<path d="M-20 200 L220 40 L420 150 L420 190 L200 80 Z" fill="#ffffff" opacity="0.08"/>';
-  }
-  const heroMark = '<g transform="translate(180 168) scale(7.4)" opacity="0.42">' + hero + '</g>';
+  const glow = (def && def.glow) || '#3dcca0';
+  const base = (def && def.base_color) || '#07140f';
+  const hero = CoachTools._backdropGlyph(def.hero || 'football', def.heroColor || '#f6e3a6', 1);
+  const kit = key === 'navy_kit'
+    ? '<rect x="348" y="0" width="12" height="460" fill="#e8c547"/>'
+    : '';
   return '<svg xmlns="http://www.w3.org/2000/svg" width="360" height="460" viewBox="0 0 360 460">' +
     '<defs>' +
-    '<radialGradient id="' + gid + '" cx="50%" cy="16%" r="78%">' +
-    '<stop offset="0%" stop-color="' + look[0] + '"/>' +
-    '<stop offset="58%" stop-color="' + look[1] + '"/>' +
-    '<stop offset="100%" stop-color="' + look[2] + '"/>' +
-    '</radialGradient></defs>' +
+    '<radialGradient id="' + gid + '" cx="50%" cy="0%" r="62%">' +
+    '<stop offset="0%" stop-color="' + glow + '" stop-opacity="0.9"/>' +
+    '<stop offset="42%" stop-color="' + glow + '" stop-opacity="0.22"/>' +
+    '<stop offset="100%" stop-color="' + base + '" stop-opacity="0"/>' +
+    '</radialGradient>' +
+    '<linearGradient id="' + gid + 'b" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0%" stop-color="' + base + '" stop-opacity="0"/>' +
+    '<stop offset="55%" stop-color="' + base + '" stop-opacity="0.2"/>' +
+    '<stop offset="100%" stop-color="#050605"/>' +
+    '</linearGradient></defs>' +
+    '<rect width="360" height="460" fill="' + base + '"/>' +
+    '<circle cx="48" cy="36" r="110" fill="' + glow + '" opacity="0.16"/>' +
     '<rect width="360" height="460" fill="url(#' + gid + ')"/>' +
-    texture + heroMark +
-    '<rect width="360" height="150" fill="#ffffff" opacity="' + (def.ink === 'dark' ? '0.2' : '0.1') + '"/>' +
-    '<rect x="10" y="10" width="340" height="440" rx="22" fill="none" stroke="' + (def.ink === 'dark' ? '#14284f' : '#f4e2a4') + '" stroke-opacity="0.35" stroke-width="2"/>' +
+    '<ellipse cx="180" cy="-36" rx="260" ry="132" fill="none" stroke="#e8c547" stroke-opacity="0.7" stroke-width="1.6"/>' +
+    kit +
+    '<g transform="translate(308 46) scale(1.55)" opacity="0.72">' + hero + '</g>' +
+    '<rect width="360" height="460" fill="url(#' + gid + 'b)"/>' +
+    '<rect x="8" y="8" width="344" height="444" rx="26" fill="none" stroke="#e8c547" stroke-opacity="0.28" stroke-width="1.2"/>' +
     '</svg>';
 };
 CoachTools.uniqueBackdropIndex = function (g) {

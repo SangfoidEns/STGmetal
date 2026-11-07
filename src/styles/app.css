@@ -12189,7 +12189,7 @@ body.mode-board-focus #boardToolbarTop.btb-top {
   opacity: 1;
 }
 .player-collectible.gift-field::after {
-  background: linear-gradient(180deg, transparent 0%, transparent 62%, rgba(0, 0, 0, 0.18) 100%);
+  background: linear-gradient(180deg, transparent 0%, transparent 46%, rgba(0, 0, 0, 0.42) 100%);
 }
 .player-collectible.tone-ink-dark,
 .player-collectible.tone-ink-dark .pl-card-name,

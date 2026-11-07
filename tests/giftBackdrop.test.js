@@ -21,10 +21,11 @@ describe('telegram gift backdrops', () => {
     const pitch = context.CoachTools._backdropSvg(context.CoachTools.GIFT_BACKDROPS[0]);
     assert.match(pitch, /viewBox="0 0 360 460"/);
     assert.match(pitch, /radialGradient/);
-    assert.match(pitch, /<circle /);
+    assert.match(pitch, /<ellipse /);
+    assert.equal(pitch.includes('scale(7'), false);
     const kit = context.CoachTools._backdropSvg(context.CoachTools.GIFT_BACKDROPS[1]);
     assert.match(kit, /#e8c547/);
     const gold = context.CoachTools.GIFT_BACKDROPS.find(d => d.id === 'gold_crest');
-    assert.equal(gold.ink, 'dark');
+    assert.equal(gold.ink, 'light');
   });
 });
