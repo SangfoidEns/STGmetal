@@ -262,7 +262,7 @@ const AuthManager = {
       'view-matches': true,
       'view-players': true,
       'view-trainings': false,
-      'view-analytics': false,
+      'view-analytics': true,
       'view-board': false,
       'view-diary': false,
       'view-settings': true,

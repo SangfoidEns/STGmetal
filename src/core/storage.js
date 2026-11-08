@@ -925,10 +925,9 @@ const StorageManager = {
       const day = typeof today === 'function' ? today() : new Date().toISOString().slice(0, 10);
       const who = String(me.lastName || me.firstName || 'гравець').replace(/[^\w\u0400-\u04FF-]+/g, '_');
       const filename = 'metalist_anketa_' + who + '_' + day + '.json';
-      const n = (packet.stamps || []).length;
       this._openExportChooser(text, filename, {
         title: 'Експорт для тренера',
-        lead: 'Анкета і печатки «Я тут» · <strong>' + n + '</strong>. Надішліть файл тренеру: він відкриє його через Імпорт JSON.'
+        lead: 'Анкета гравця. Явку відмічає тренер. Надішліть файл: тренер відкриє його через Імпорт JSON.'
       });
     } catch (e) {
       try { ErrorManager.log('export-player', e); } catch (_) {}
@@ -1236,8 +1235,7 @@ const StorageManager = {
           try { App.renderCurrent(); } catch (_) {}
           try { App.updateHeader && App.updateHeader(); } catch (_) {}
           publishImport();
-          const missed = res.missed ? (' · без тренування ' + res.missed) : '';
-          Toast.show('Анкета ' + res.name + ' · печаток «Я тут»: ' + res.stamps + missed, 'ok');
+          Toast.show('Анкета ' + res.name + ' оновлена', 'ok');
           return true;
         }
 

@@ -833,7 +833,7 @@ const App = {
     if (build) {
       const letter = (typeof Views !== 'undefined' && Views.versionLetter) ? Views.versionLetter() : 'А';
       const when = (typeof Views !== 'undefined' && Views.APP_UPDATED) || '07.11.2026';
-      build.textContent = letter + ' + ' + when;
+      build.textContent = letter + ' • ' + when;
     }
     const parts = (s.clubName || 'МЕТАЛІСТ ШТУТТГАРТ').split(' ');
     const cn = document.getElementById('clubName');
@@ -1369,7 +1369,7 @@ const App = {
       const el = document.getElementById('nextTr');
       const sub = document.getElementById('nextTrCountdown');
       const s = Store.get();
-      const next = (s.trainings || []).filter(x => x.status === 'planned' && x.date >= (typeof today === 'function' ? today() : '')).sort((a, b) => (a.date || '').localeCompare(b.date || '') || String(a.time||'').localeCompare(String(b.time||'')))[0];
+      const next = (typeof Views !== 'undefined' && Views._nextPlanned) ? Views._nextPlanned(s.trainings) : null;
       if (!next) {
         if (el) el.textContent = '—';
         if (sub) sub.textContent = '';
@@ -1399,7 +1399,7 @@ const App = {
       const el = document.getElementById('nextTr');
       if (!el) return;
       const s = Store.get();
-      const next = (s.trainings || []).filter(x => x.status === 'planned' && x.date >= (typeof today === 'function' ? today() : '')).sort((a, b) => (a.date || '').localeCompare(b.date || ''))[0];
+      const next = (typeof Views !== 'undefined' && Views._nextPlanned) ? Views._nextPlanned(s.trainings) : null;
       el.textContent = next ? this.formatNextTr(next) : '—';
       el.title = next ? ((next.name || '') + ' · ' + (next.date || '')) : '';
     } catch (_) {}
@@ -1429,6 +1429,7 @@ const App = {
     if (this._usageTimer) return;
     const tick = () => {
       try {
+        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
         const s = Store.get();
         if (!s) return;
         s.settings = s.settings || {};
@@ -1715,7 +1716,7 @@ const App = {
       el.innerHTML = '<strong>' + d + '</strong> · ' + t;
     }
     const s = Store.get();
-    const next = (s.trainings || []).filter(t => t.status === 'planned' && t.date >= today()).sort((a, b) => a.date.localeCompare(b.date))[0];
+    const next = (typeof Views !== 'undefined' && Views._nextPlanned) ? Views._nextPlanned(s.trainings) : null;
     const nt = document.getElementById('nextTr');
     const cdEl = document.getElementById('nextTrCountdown');
     if (next) {
@@ -2629,18 +2630,7 @@ const App = {
       }
       if (action === 'claim-session') {
         e.preventDefault(); e.stopPropagation();
-        const me = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer) ? AuthManager.getLinkedPlayer() : null;
-        const tr = (Store.get().trainings || []).find(x => String(x.id) === String(t.dataset.trainingId));
-        if (!me || !tr || typeof SessionPlay === 'undefined') { Toast.show('Печатку ставить гравець зі своєї картки', 'warn'); return; }
-        const res = SessionPlay.claim(tr, me.id);
-        if (res.ok && res.state === 'claimed') {
-          try { StorageManager.save({ localOnly: !(AuthManager._canWriteClub && AuthManager._canWriteClub()) }); } catch (_) { try { StorageManager.save(); } catch (e2) {} }
-          try { TelegramManager.haptic && TelegramManager.haptic('medium'); } catch (_) {}
-          Toast.show('Печатка стоїть. Залік після підтвердження тренера', 'ok');
-          App.renderCurrent();
-        } else if (res.state === 'confirmed') {
-          Toast.show('Тренер уже підтвердив явку', 'ok');
-        }
+        Toast.show('Присутніх відмічає лише тренер', 'warn');
         return;
       }
       if (action === 'session-beat-next') {
@@ -2911,9 +2901,6 @@ const App = {
             }).join('')
             : '<p class="note-sm">Поки немає подарунків, які можна поставити біля імені.</p>';
           const currentPhoto = me.profilePhoto || me.photoUrl || '';
-          const stampCount = ((Store.get().trainings) || []).filter(function (tr) {
-            return tr && tr.attendance && tr.attendance[me.id] && tr.attendance[me.id].claimed;
-          }).length;
           const body = '<div class="soc-edit-form player-profile-form">' +
             '<p class="note-sm">Профіль клубу. Позицію, номер і склад змінює лише тренер.</p>' +
             '<label class="fld"><span>Ім\'я</span><input id="ppFirst" class="inp" value="' + sanitize(me.firstName || '') + '"/></label>' +
@@ -2928,7 +2915,7 @@ const App = {
             '</label>' +
             '<div class="fld"><span>Подарунок біля імені</span><div class="pp-gift-picks">' + giftPicks + '</div></div>' +
             '<div class="fld pp-export"><span>Передача тренеру</span>' +
-            '<p class="note-sm">У файлі буде ця анкета і печатки «Я тут»: ' + stampCount + '. Тренер відкриває його через Імпорт JSON.</p>' +
+            '<p class="note-sm">У файлі буде ця анкета. Явку відмічає тренер. Він відкриває файл через Імпорт JSON.</p>' +
             '<button type="button" class="btn btn-p" data-action="export-for-coach">Експорт для тренера</button></div>' +
             '</div>';
           Modal.open('Мій профіль', body, [
@@ -2951,27 +2938,17 @@ const App = {
             file.addEventListener('change', function () {
               const chosen = file.files && file.files[0];
               if (!chosen) return;
-              const reader = new FileReader();
-              reader.onload = function () {
-                const img = new Image();
-                img.onload = function () {
-                  const max = 256;
-                  const scale = Math.min(1, max / Math.max(img.width || 1, img.height || 1));
-                  const canvas = document.createElement('canvas');
-                  canvas.width = Math.max(1, Math.round(img.width * scale));
-                  canvas.height = Math.max(1, Math.round(img.height * scale));
-                  const ctx = canvas.getContext('2d');
-                  if (!ctx) return;
-                  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                  const url = canvas.toDataURL('image/jpeg', 0.72);
-                  const hidden = document.getElementById('ppPhotoPicked');
-                  const preview = document.querySelector('#modalBody .pp-photo-preview');
-                  if (hidden) hidden.value = url;
-                  if (preview) { preview.src = url; preview.hidden = false; }
-                };
-                img.src = reader.result;
+              const done = (url) => {
+                const hidden = document.getElementById('ppPhotoPicked');
+                const preview = document.querySelector('#modalBody .pp-photo-preview');
+                if (hidden) hidden.value = url || '';
+                if (preview && url) { preview.src = url; preview.hidden = false; }
               };
-              reader.readAsDataURL(chosen);
+              if (typeof Actions !== 'undefined' && Actions._compressImageFile) {
+                Actions._compressImageFile(chosen, 512, 0.72).then(done);
+                return;
+              }
+              done('');
             });
           }, 40);
         } catch (err) { console.warn(err); }

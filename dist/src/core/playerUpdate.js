@@ -1,18 +1,9 @@
-/** Анкета гравця для тренера: лише його поля і печатки «Я тут», без present. */
+/** Анкета гравця для тренера: профіль і подарунок біля імені. Явку ставить лише тренер. */
 const PlayerUpdate = {
   TYPE: 'metalist_player_update',
 
   _norm(value) {
     return String(value || '').trim().replace(/^@/, '').toLowerCase();
-  },
-
-  _nameKey(name) {
-    return String(name || '')
-      .replace(/\s*\(копія\)/gi, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .toLowerCase()
-      .replace(/\d+/g, function (n) { return String(parseInt(n, 10)); });
   },
 
   _findPlayer(state, packet) {
@@ -28,34 +19,9 @@ const PlayerUpdate = {
     return players.find(p => p && this._norm(p.telegramUsername) === nick) || null;
   },
 
-  _findTraining(state, stamp) {
-    const list = (state && state.trainings) || [];
-    const id = stamp && stamp.trainingId;
-    if (id) {
-      const byId = list.find(t => t && String(t.id) === String(id));
-      if (byId) return byId;
-    }
-    const date = stamp && stamp.date;
-    const key = this._nameKey(stamp && stamp.name);
-    if (!date || !key) return null;
-    return list.find(t => t && t.date === date && this._nameKey(t.name) === key) || null;
-  },
-
   build(state, player) {
     if (!player || player.id == null) return null;
     const profile = player.profile || {};
-    const stamps = [];
-    ((state && state.trainings) || []).forEach(tr => {
-      if (!tr || !tr.attendance) return;
-      const cell = tr.attendance[player.id];
-      if (!cell || !cell.claimed) return;
-      stamps.push({
-        trainingId: tr.id || '',
-        name: tr.name || '',
-        date: tr.date || '',
-        claimedAt: cell.claimedAt || ''
-      });
-    });
     let featuredGiftKey = '';
     ((state && state.gifts) || []).forEach(g => {
       if (!g || String(g.playerId) !== String(player.id) || !g.featured) return;
@@ -87,7 +53,7 @@ const PlayerUpdate = {
         }
       },
       featuredGiftKey: featuredGiftKey,
-      stamps: stamps
+      stamps: []
     };
   },
 
@@ -126,25 +92,11 @@ const PlayerUpdate = {
         if (hit) player.featuredGiftId = g.giftId || player.featuredGiftId || '';
       });
     }
-    let stamps = 0;
-    let missed = 0;
-    (packet.stamps || []).forEach(stamp => {
-      const training = this._findTraining(state, stamp);
-      if (!training) { missed++; return; }
-      if (!training.attendance) training.attendance = {};
-      const cell = Object.assign({}, training.attendance[player.id] || {});
-      cell.claimed = true;
-      if (stamp.claimedAt) cell.claimedAt = stamp.claimedAt;
-      else if (!cell.claimedAt) cell.claimedAt = new Date().toISOString();
-      cell.updatedAt = cell.claimedAt;
-      training.attendance[player.id] = cell;
-      stamps++;
-    });
     return {
       ok: true,
       name: [player.firstName, player.lastName].filter(Boolean).join(' ') || 'Гравець',
-      stamps: stamps,
-      missed: missed,
+      stamps: 0,
+      missed: 0,
       sameSquad: playersCount(state) === before
     };
   }

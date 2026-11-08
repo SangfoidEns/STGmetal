@@ -1,4 +1,4 @@
-/** Печатка явки, серія, смуга складу і кадри пояснення. Печатка сама не ставить present. */
+/** Серія, смуга складу і кадри пояснення. Явку ставить лише тренер. */
 const SessionPlay = {
   SEALS: [3, 5, 8],
 
@@ -30,17 +30,8 @@ const SessionPlay = {
     return null;
   },
 
-  claim(training, playerId) {
-    if (!training || !playerId || this.cancelled(training)) return { ok: false, reason: 'closed' };
-    if (!training.attendance) training.attendance = {};
-    const prev = training.attendance[playerId] || {};
-    if (prev.present === true) return { ok: true, state: 'confirmed', cell: prev };
-    training.attendance[playerId] = Object.assign({}, prev, {
-      claimed: true,
-      claimedAt: new Date().toISOString()
-    });
-    if (prev.present == null) delete training.attendance[playerId].present;
-    return { ok: true, state: 'claimed', cell: training.attendance[playerId] };
+  claim() {
+    return { ok: false, reason: 'coach' };
   },
 
   meter(training, players) {
@@ -101,16 +92,8 @@ const SessionPlay = {
       controls + '</div>';
   },
 
-  claimHtml(tr) {
-    const me = this.me();
-    if (!me || !tr || !tr.id || this.cancelled(tr)) return '';
-    if (tr.status === 'done' && !(tr.attendance && tr.attendance[me.id] && tr.attendance[me.id].claimed)) return '';
-    const cell = (tr.attendance && tr.attendance[me.id]) || {};
-    let label = 'Я тут';
-    let cls = 'claim-open';
-    if (cell.present === true) { label = 'Тренер підтвердив'; cls = 'claim-in'; }
-    else if (cell.claimed) { label = 'Печатка стоїть · чекає тренера'; cls = 'claim-wait'; }
-    return '<button type="button" class="claim-btn ' + cls + '" data-action="claim-session" data-training-id="' + tr.id + '">' + label + '</button>';
+  claimHtml() {
+    return '';
   },
 
   meterHtml(state) {
@@ -120,8 +103,7 @@ const SessionPlay = {
     const m = this.meter(tr, s.players || []);
     const full = m.full ? ' is-full' : '';
     return '<div class="pitch-meter' + full + '" data-training-id="' + tr.id + '">' +
-      '<div class="pitch-meter-label">На полі ' + m.here + ' з ' + m.total +
-      (m.stamps ? (' · печаток ' + m.stamps) : '') + '</div>' +
+      '<div class="pitch-meter-label">На полі ' + m.here + ' з ' + m.total + '</div>' +
       '<div class="pitch-meter-track"><i style="width:' + (m.total ? Math.round(m.here / m.total * 100) : 0) + '%"></i></div></div>';
   },
 

@@ -500,7 +500,8 @@ const Actions = {
       mainGoal: document.getElementById('tGoal')?.value, physGoal: document.getElementById('tPhys')?.value,
       tactGoal: document.getElementById('tTact')?.value, techGoal: document.getElementById('tTech')?.value,
       psychGoal: document.getElementById('tPsych')?.value, comment: document.getElementById('tCom')?.value,
-      status: document.getElementById('tSt')?.value || 'draft', structure, createdAt: new Date().toISOString()
+      status: document.getElementById('tSt')?.value || 'draft', structure,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
     };
     Store.get().trainings.push(t);
     Store.get().calendar.push({ id: uid(), type: 'TRAINING', title: t.name, date: t.date, time: t.time, trainingId: t.id });
@@ -636,6 +637,7 @@ const Actions = {
     t.mainGoal = document.getElementById('teGoal')?.value;
     t.comment = document.getElementById('teCom')?.value;
     t.duration = (t.structure || []).reduce((a, b) => a + (b.duration || 0), 0);
+    t.updatedAt = new Date().toISOString();
     if (document.getElementById('teAttachBoard')?.checked) {
       if (typeof BoardLink !== 'undefined') BoardLink.attachTo(t);
       else t.board = { objects: JSON.parse(JSON.stringify((Store.get().activeBoard || {}).objects || [])) };
@@ -866,36 +868,44 @@ const Actions = {
   _compressImageFile(file, maxSide, quality) {
     maxSide = maxSide || 512;
     quality = quality == null ? 0.72 : quality;
+    const paint = (source, w0, h0) => {
+      let w = w0;
+      let h = h0;
+      if (!w || !h) return '';
+      const scale = Math.min(1, maxSide / Math.max(w, h));
+      w = Math.max(1, Math.round(w * scale));
+      h = Math.max(1, Math.round(h * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(source, 0, 0, w, h);
+      if (source.close) { try { source.close(); } catch (_) {} }
+      let out = canvas.toDataURL('image/jpeg', quality);
+      if (out.length > 280000) out = canvas.toDataURL('image/jpeg', 0.55);
+      if (out.length > 280000) out = canvas.toDataURL('image/jpeg', 0.4);
+      return out;
+    };
     return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onerror = () => resolve('');
-      reader.onload = () => {
-        const img = new Image();
-        img.onload = () => {
-          try {
-            let w = img.naturalWidth || img.width;
-            let h = img.naturalHeight || img.height;
-            if (!w || !h) return resolve(String(reader.result || ''));
-            const scale = Math.min(1, maxSide / Math.max(w, h));
-            w = Math.max(1, Math.round(w * scale));
-            h = Math.max(1, Math.round(h * scale));
-            const canvas = document.createElement('canvas');
-            canvas.width = w; canvas.height = h;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, w, h);
-            let out = canvas.toDataURL('image/jpeg', quality);
-            // якщо все ще велике — сильніше стискаємо
-            if (out.length > 280000) out = canvas.toDataURL('image/jpeg', 0.55);
-            if (out.length > 280000) out = canvas.toDataURL('image/jpeg', 0.4);
-            resolve(out);
-          } catch (e) {
-            resolve(String(reader.result || ''));
-          }
+      const fallback = () => {
+        const reader = new FileReader();
+        reader.onerror = () => resolve('');
+        reader.onload = () => {
+          const img = new Image();
+          img.onload = () => {
+            try { resolve(paint(img, img.naturalWidth || img.width, img.naturalHeight || img.height) || String(reader.result || '')); }
+            catch (e) { resolve(String(reader.result || '')); }
+          };
+          img.onerror = () => resolve(String(reader.result || ''));
+          img.src = String(reader.result || '');
         };
-        img.onerror = () => resolve(String(reader.result || ''));
-        img.src = String(reader.result || '');
+        reader.readAsDataURL(file);
       };
-      reader.readAsDataURL(file);
+      if (typeof createImageBitmap !== 'function') { fallback(); return; }
+      createImageBitmap(file, { imageOrientation: 'from-image' }).then(bmp => {
+        try { resolve(paint(bmp, bmp.width, bmp.height) || ''); }
+        catch (e) { fallback(); }
+      }).catch(() => fallback());
     });
   },
 
@@ -911,10 +921,9 @@ const Actions = {
         ? PlayerProgress.attendanceMark(hasRecord ? a : null)
         : (a.present === false || a.present === 0 ? false : (a.present === true ? true : null));
       const checked = hasRecord ? mark === true : true;
-      const stamp = a.claimed && a.present !== true ? ' · печатка' : '';
       const intv = a.intensity != null ? a.intensity : (t.intensity || 6);
       return `<div class="att-row" data-pid="${p.id}">
-        <label class="att-check"><input type="checkbox" class="att-present" ${checked ? 'checked' : ''}> <span>${p.number}. ${sanitize(p.lastName || p.firstName || '')}${stamp}</span></label>
+        <label class="att-check"><input type="checkbox" class="att-present" ${checked ? 'checked' : ''}> <span>${p.number}. ${sanitize(p.lastName || p.firstName || '')}</span></label>
         <span class="att-pos">${sanitize(p.position || '')}</span>
         <input type="number" class="att-rpe" min="1" max="10" value="${intv}" title="Індивідуальний RPE" ${checked ? '' : 'disabled'}>
       </div>`;

@@ -181,4 +181,48 @@ describe('club snapshot merge', () => {
     });
     assert.equal(newerWins.players[0].birthDate, '2011-01-02');
   });
+
+  it('keeps a rescheduled 10/11 when the phone only updated attendance', () => {
+    const phone = {
+      trainings: [{
+        id: 't10',
+        name: 'Тренування 12',
+        date: '2026-11-08',
+        status: 'planned',
+        createdAt: '2026-11-01T10:00:00.000Z',
+        attendance: { p1: { present: true, updatedAt: '2026-11-08T18:00:00.000Z' } }
+      }]
+    };
+    const tablet = {
+      trainings: [{
+        id: 't10',
+        name: 'Тренування 10/11',
+        date: '2026-11-10',
+        time: '18:00',
+        status: 'planned',
+        createdAt: '2026-11-01T10:00:00.000Z',
+        updatedAt: '2026-11-08T12:00:00.000Z',
+        attendance: { p1: { present: false, updatedAt: '2026-11-01T10:00:00.000Z' } }
+      }]
+    };
+    const merged = mergePayload(phone, tablet);
+    assert.equal(merged.trainings.length, 1);
+    assert.equal(merged.trainings[0].name, 'Тренування 10/11');
+    assert.equal(merged.trainings[0].date, '2026-11-10');
+    assert.equal(merged.trainings[0].status, 'planned');
+    assert.equal(merged.trainings[0].attendance.p1.present, true);
+  });
+
+  it('does not fold a future 10/11 into an older session with the same name', () => {
+    const merged = mergePayload({
+      trainings: [
+        { id: 'old', name: 'Тренування 10/11', date: '2025-11-10', status: 'done' },
+        { id: 'next', name: 'Тренування 10/11', date: '10.11.2026', status: 'planned', time: '18:00' }
+      ]
+    }, { trainings: [] });
+    assert.equal(merged.trainings.length, 2);
+    const next = merged.trainings.find(t => t.id === 'next');
+    assert.equal(next.date, '2026-11-10');
+    assert.equal(next.status, 'planned');
+  });
 });

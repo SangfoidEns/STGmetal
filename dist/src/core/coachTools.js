@@ -677,6 +677,111 @@ CoachTools.coachProgress = function () {
     attSeries: attSeries.slice(-8)
   };
 };
+/** Прокачка самого Металіста: явка, серії, навантаження, додаток, дошка, тренер і подарунки. */
+CoachTools.clubProgress = function () {
+  const s = Store.get() || {};
+  const players = (s.players || []).filter(function (p) { return p && p.id; });
+  let attend = 0, intensity = 0, giftsXp = 0, streaks = 0;
+  let present = 0, absent = 0, bestStreak = 0;
+  players.forEach(function (p) {
+    let pr = null;
+    try { pr = PlayerProgress.compute(p.id); } catch (_) {}
+    if (!pr) return;
+    attend += pr.xpAttend || 0;
+    attend += (pr.absent || 0) * ((PlayerProgress.RULES && PlayerProgress.RULES.absent) || 0);
+    intensity += pr.xpIntensity || 0;
+    giftsXp += pr.xpGifts || 0;
+    streaks += pr.xpStreak || 0;
+    present += pr.present || 0;
+    absent += pr.absent || 0;
+    if ((pr.streak || 0) > bestStreak) bestStreak = pr.streak || 0;
+  });
+  const done = (s.trainings || []).filter(function (t) {
+    if (!t) return false;
+    const st = String(t.status || '').toLowerCase();
+    if (st !== 'done' && st !== 'completed' && st !== 'проведено') return false;
+    try {
+      if (typeof LoadModel !== 'undefined' && LoadModel.isCancelled && LoadModel.isCancelled(t)) return false;
+    } catch (_) {}
+    return true;
+  }).slice().sort(function (a, b) { return String(a.date || '').localeCompare(String(b.date || '')); });
+  let totalLoad = 0;
+  let coachHere = 0;
+  const rates = [];
+  done.forEach(function (t) {
+    totalLoad += (Number(t.duration) || 0) * (Number(t.intensity) || 0);
+    if (t.coachPresent !== false) coachHere++;
+    const att = t.attendance || {};
+    const ids = Object.keys(att);
+    if (!ids.length) { rates.push(0); return; }
+    let here = 0;
+    ids.forEach(function (id) {
+      try {
+        if (PlayerProgress.attendanceMark(att[id]) === true) here++;
+      } catch (_) {}
+    });
+    rates.push(here / ids.length);
+  });
+  let teamStreak = 0;
+  for (let i = rates.length - 1; i >= 0; i--) {
+    if (rates[i] >= 0.6) teamStreak++;
+    else break;
+  }
+  const teamTable = { 3: 60, 5: 120, 8: 200, 12: 320 };
+  let teamBonus = 0;
+  Object.keys(teamTable).forEach(function (step) {
+    if (teamStreak >= Number(step)) teamBonus = Math.max(teamBonus, teamTable[step]);
+  });
+  streaks += teamBonus;
+  const cs = (s.settings && s.settings.coachStats) || s.coachStats || {};
+  const appMs = Number(cs.appMs) || 0;
+  const boardMs = Number(cs.boardMs) || 0;
+  const boards = (s.boards || []).length;
+  const parts = {
+    attend: Math.max(0, attend),
+    streaks: streaks,
+    load: Math.round(totalLoad / 10),
+    intensity: intensity,
+    app: Math.round(appMs / 60000 * 0.4),
+    board: Math.round(boardMs / 60000),
+    coach: coachHere * 20 + boards * 8,
+    gifts: giftsXp
+  };
+  let xp = 0;
+  Object.keys(parts).forEach(function (key) { xp += Math.max(0, parts[key] || 0); });
+  const base = 480;
+  const growth = 1.22;
+  let level = 1;
+  let need = base;
+  let remain = xp;
+  while (remain >= need && level < 99) {
+    remain -= need;
+    level++;
+    need = Math.round(base * Math.pow(growth, level - 1));
+  }
+  const avgAtt = rates.length ? Math.round(rates.reduce(function (a, v) { return a + v; }, 0) / rates.length * 100) : 0;
+  return {
+    xp: xp,
+    level: level,
+    levelProgress: need ? Math.min(100, Math.round(remain / need * 100)) : 0,
+    xpToNext: Math.max(0, need - remain),
+    parts: parts,
+    present: present,
+    absent: absent,
+    bestStreak: bestStreak,
+    teamStreak: teamStreak,
+    teamBonus: teamBonus,
+    totalLoad: totalLoad,
+    sessions: done.length,
+    coachHere: coachHere,
+    avgAtt: avgAtt,
+    appMs: appMs,
+    boardMs: boardMs,
+    boards: boards,
+    gifts: (s.gifts || []).length,
+    players: players.length
+  };
+};
 CoachTools.GIFT_BACKDROPS = [
   { id: 'night_pitch', name: 'Нічний газон', base_color: '#07140f', ink: 'light', glow: '#3dcca0', hero: 'football', heroColor: '#e7fff4' },
   { id: 'navy_kit', name: 'Темно-синя форма', base_color: '#070e22', ink: 'light', glow: '#4c7dff', hero: 'jersey', heroColor: '#f6e3a6' },

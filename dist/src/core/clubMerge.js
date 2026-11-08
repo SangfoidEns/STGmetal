@@ -11,18 +11,69 @@
     return Number.isFinite(n) ? n : 0;
   }
 
-  function recordStamp(obj) {
-    if (!obj || typeof obj !== 'object') return 0;
-    let best = stamp(obj.updatedAt || obj.createdAt || obj.exportedAt);
-    const att = obj.attendance;
-    if (att && typeof att === 'object') {
-      Object.keys(att).forEach(function (key) {
-        const cell = att[key];
-        if (cell && typeof cell === 'object') best = Math.max(best, stamp(cell.updatedAt));
-      });
-    }
-    return best;
+function recordStamp(obj) {
+  if (!obj || typeof obj !== 'object') return 0;
+  let best = stamp(obj.updatedAt || obj.createdAt || obj.exportedAt);
+  const att = obj.attendance;
+  if (att && typeof att === 'object') {
+    Object.keys(att).forEach(function (key) {
+      const cell = att[key];
+      if (cell && typeof cell === 'object') best = Math.max(best, stamp(cell.updatedAt));
+    });
   }
+  return best;
+}
+
+/** Дата і статус тренування не залежать від печатки відвідування. */
+function scheduleStamp(obj) {
+  if (!obj || typeof obj !== 'object') return 0;
+  return stamp(obj.updatedAt || obj.createdAt || obj.exportedAt);
+}
+
+function isoDay(value) {
+  const s = String(value || '').trim();
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return iso[1] + '-' + iso[2] + '-' + iso[3];
+  const euro = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})/);
+  if (euro) return euro[3] + '-' + euro[2].padStart(2, '0') + '-' + euro[1].padStart(2, '0');
+  return '';
+}
+
+function isTraining(item) {
+  if (!item || typeof item !== 'object') return false;
+  return !!(item.attendance || item.structure || (item.date && (item.status || item.name)));
+}
+
+function planRank(item) {
+  const st = String((item && item.status) || '').toLowerCase();
+  if (st === 'planned' || st === 'pinned') return 4;
+  if (st === 'done' || st === 'completed' || st === 'проведено') return 3;
+  if (st === 'draft') return 2;
+  if (st === 'cancelled' || st === 'canceled') return 0;
+  return 1;
+}
+
+/** Розклад береться з новішого запису тренування. Печатка «Я тут» не відкочує дату. */
+function applyTrainingSchedule(merged, winner, loser) {
+  if (!merged) return;
+  const wAt = scheduleStamp(winner);
+  const lAt = scheduleStamp(loser);
+  let from = winner;
+  if (lAt > wAt) from = loser;
+  else if (lAt === wAt && loser) {
+    const lRank = planRank(loser);
+    const wRank = planRank(winner);
+    const lDate = isoDay(loser.date);
+    const wDate = isoDay(winner && winner.date);
+    if (lRank > wRank) from = loser;
+    else if (lRank === wRank && lDate && wDate && lDate > wDate) from = loser;
+  }
+  ['name', 'date', 'time', 'status', 'duration', 'place', 'surface', 'intensity', 'mainGoal', 'comment', 'structure', 'playersCount', 'physGoal', 'tactGoal', 'techGoal', 'psychGoal'].forEach(function (key) {
+    if (from && filled(from[key])) merged[key] = from[key];
+  });
+  const day = isoDay(merged.date);
+  if (day) merged.date = day;
+}
 
   function keyOf(item) {
     if (!item || typeof item !== 'object') return '';
@@ -48,22 +99,24 @@
     return out;
   }
 
-  function mergeRecord(baseItem, extraItem) {
-    const baseAt = recordStamp(baseItem);
-    const extraAt = recordStamp(extraItem);
-    const extraWins = extraAt > baseAt;
-    const winner = extraWins ? extraItem : baseItem;
-    const loser = extraWins ? baseItem : extraItem;
-    const merged = Object.assign({}, loser, winner);
-    if ((baseItem && baseItem.attendance) || (extraItem && extraItem.attendance)) {
-      merged.attendance = mergeAttendance(baseItem && baseItem.attendance, extraItem && extraItem.attendance);
-    }
-    if (extraWins && extraItem && extraItem.coachPresent != null) merged.coachPresent = extraItem.coachPresent;
-    else if (!extraWins && baseItem && baseItem.coachPresent != null) merged.coachPresent = baseItem.coachPresent;
-    keepFilled(merged, loser, winner);
-    releaseWorkingSession(merged);
-    return merged;
+function mergeRecord(baseItem, extraItem) {
+  const training = isTraining(baseItem) || isTraining(extraItem);
+  const baseAt = training ? scheduleStamp(baseItem) : recordStamp(baseItem);
+  const extraAt = training ? scheduleStamp(extraItem) : recordStamp(extraItem);
+  const extraWins = extraAt > baseAt;
+  const winner = extraWins ? extraItem : baseItem;
+  const loser = extraWins ? baseItem : extraItem;
+  const merged = Object.assign({}, loser, winner);
+  if ((baseItem && baseItem.attendance) || (extraItem && extraItem.attendance)) {
+    merged.attendance = mergeAttendance(baseItem && baseItem.attendance, extraItem && extraItem.attendance);
   }
+  if (extraWins && extraItem && extraItem.coachPresent != null) merged.coachPresent = extraItem.coachPresent;
+  else if (!extraWins && baseItem && baseItem.coachPresent != null) merged.coachPresent = baseItem.coachPresent;
+  if (training) applyTrainingSchedule(merged, winner, loser);
+  keepFilled(merged, loser, winner);
+  releaseWorkingSession(merged);
+  return merged;
+}
 
   function filled(value) {
     if (value == null) return false;
@@ -211,33 +264,57 @@
     return copy + statusScore + att * 4;
   }
 
-  /** Одна назва — одне тренування. «(копія)» і «05/11» поруч із «5/11» зливаються в оригінал. */
-  function collapseTrainings(payload) {
-    if (!payload || !Array.isArray(payload.trainings)) return { removed: 0, idMap: {} };
-    const groups = new Map();
-    payload.trainings.forEach(function (item) {
-      if (!item) return;
-      const key = trainingNameKey(item.name) || ('id:' + (item.id || ''));
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(item);
+/** Копія і «05/11» поруч із «5/11» того ж дня зливаються. Інша дата з тією ж назвою лишається окремим тренуванням. */
+function collapseTrainings(payload) {
+  if (!payload || !Array.isArray(payload.trainings)) return { removed: 0, idMap: {} };
+  const groups = new Map();
+  const originals = [];
+  payload.trainings.forEach(function (item) {
+    if (!item) return;
+    const nameKey = trainingNameKey(item.name) || ('id:' + (item.id || ''));
+    const copy = /\(копія\)/i.test(String(item.name || ''));
+    if (copy) {
+      if (!groups.has(nameKey)) groups.set(nameKey, []);
+      groups.get(nameKey).push(item);
+      return;
+    }
+    const key = nameKey + '|' + (isoDay(item.date) || String(item.date || ''));
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+    originals.push({ nameKey: nameKey, key: key, item: item });
+  });
+  groups.forEach(function (items, key) {
+    if (key.indexOf('|') >= 0) return;
+    const mates = originals.filter(function (row) { return row.nameKey === key; });
+    if (!mates.length) return;
+    const host = mates.slice().sort(function (a, b) { return trainingRank(b.item) - trainingRank(a.item); })[0];
+    items.splice(0, items.length).forEach(function (copy) {
+      groups.get(host.key).push(copy);
     });
-    const idMap = {};
-    const kept = [];
-    groups.forEach(function (items) {
-      if (items.length === 1) {
-        releaseWorkingSession(items[0]);
-        kept.push(items[0]);
-        return;
-      }
-      const ranked = items.slice().sort(function (a, b) { return trainingRank(b) - trainingRank(a); });
-      const winner = Object.assign({}, ranked[0]);
-      ranked.slice(1).forEach(function (loser) {
-        if (loser && loser.id) idMap[loser.id] = winner.id;
-        winner.attendance = mergeAttendance(winner.attendance, loser && loser.attendance);
-      });
-      releaseWorkingSession(winner);
-      kept.push(winner);
+    groups.delete(key);
+  });
+  const idMap = {};
+  const kept = [];
+  groups.forEach(function (items) {
+    if (!items.length) return;
+    if (items.length === 1) {
+      const day = isoDay(items[0].date);
+      if (day) items[0].date = day;
+      releaseWorkingSession(items[0]);
+      kept.push(items[0]);
+      return;
+    }
+    const ranked = items.slice().sort(function (a, b) { return trainingRank(b) - trainingRank(a); });
+    const winner = Object.assign({}, ranked[0]);
+    const day = isoDay(winner.date);
+    if (day) winner.date = day;
+    ranked.slice(1).forEach(function (loser) {
+      if (loser && loser.id) idMap[loser.id] = winner.id;
+      winner.attendance = mergeAttendance(winner.attendance, loser && loser.attendance);
     });
+    releaseWorkingSession(winner);
+    kept.push(winner);
+  });
     payload.trainings = kept;
     if (Array.isArray(payload.calendar)) {
       payload.calendar = payload.calendar.map(function (ev) {

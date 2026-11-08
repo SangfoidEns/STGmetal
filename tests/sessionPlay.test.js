@@ -76,16 +76,14 @@ describe('click targets stay on the control that was pressed', () => {
 });
 
 describe('session play', () => {
-  it('lets a player stamp attendance without counting it yet', () => {
+  it('does not let a player stamp attendance', () => {
     const { SessionPlay } = boot();
     const training = { id: 't1', status: 'planned', attendance: {} };
     const res = SessionPlay.claim(training, 'p1');
-    assert.equal(res.state, 'claimed');
-    assert.equal(training.attendance.p1.claimed, true);
-    assert.equal(training.attendance.p1.present, undefined);
-    training.attendance.p1.present = true;
-    const again = SessionPlay.claim(training, 'p1');
-    assert.equal(again.state, 'confirmed');
+    assert.equal(res.ok, false);
+    assert.equal(res.reason, 'coach');
+    assert.equal(training.attendance.p1, undefined);
+    assert.equal(SessionPlay.claimHtml(training), '');
   });
 
   it('counts confirmed players and keeps stamps separate', () => {

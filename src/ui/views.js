@@ -1,7 +1,7 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z72',
-  APP_UPDATED: '07.11.2026',
+  APP_BUILD: 'z74',
+  APP_UPDATED: '08.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
   versionLetter(stamp) {
@@ -379,7 +379,7 @@ const Views = {
     const s = Store.get();
     const avail = s.players.filter(p => p.status === 'available' || p.status === 'healthy' || !p.status).length;
     const injured = s.players.filter(p => p.status === 'injured' || p.status === 'recovery' || p.status === 'rehab').length;
-    const next = s.trainings.filter(t => t.status === 'planned' && t.date >= today()).sort((a, b) => a.date.localeCompare(b.date))[0];
+    const next = this._nextPlanned(s.trainings);
     const weekLoad = LoadModel.weeklyLoad(s.trainings);
     const pastForStats = (typeof LoadModel !== 'undefined' && LoadModel.pastTrainings)
       ? LoadModel.pastTrainings(s.trainings) : s.trainings.filter(t => t.date && t.date <= today() && t.status !== 'cancelled');
@@ -468,9 +468,7 @@ const Views = {
               style="border-color:var(--pos-ring);background:var(--pos-bg)">
               ${ph}
             </button>
-            ${this._tgGiftCloud(pc.gifts || [], 1.15, 'full')}
           </div>
-          ${this._giftStrip(pc.gifts)}
           <div class="cp-role-line"><span class="cp-role-kind">${pc.kind === 'coach' ? 'Тренер' : 'Гравець'}</span></div>
           <h1 class="cp-title cp-title-name">${sanitize(pc.name)}${this._giftStatusBadge(pc.gifts)}</h1>
           <div class="cp-role-badge" ${pc.kind === 'coach' ? 'data-action="coach-easter" role="button" title="Утримуйте 1с · картка тренера"' : ''} style="border-color:var(--pos-ring);color:var(--pos-ring);cursor:${pc.kind === 'coach' ? 'pointer' : 'default'}">${sanitize(pc.pos)}</div>
@@ -494,6 +492,7 @@ const Views = {
           <div class="coach-grow-sub">${coachXp.sessions} сесій · середня явка ${coachXp.avgAtt}% · XP гравців ${coachXp.teamXp}</div>
           <div class="cp-stat-spark">${this._sparkline(coachXp.attSeries, { color: '#e8c547', fill: 'rgba(232,197,71,.16)' })}</div>
         </section>` : ''}
+        ${this._clubForgeHtml()}
 
         <!-- Quick pills -->
         <div class="cp-pills">
@@ -744,7 +743,6 @@ const Views = {
     const ph = photo
       ? '<img src="' + sanitize(photo) + '" alt="" referrerpolicy="no-referrer"/>'
       : '<span>' + sanitize(initials.toUpperCase()) + '</span>';
-    const stories = (typeof this._playerStoriesStrip === 'function') ? this._playerStoriesStrip(p.id) : '';
     const pat = this._playerPatternStyle ? this._playerPatternStyle(p) : '';
     const bd = this._playerBackdrop ? this._playerBackdrop(p) : { className: '', style: pat };
     return '<div class="player-profile-sheet profile-tinted ' + (bd.className || '') + '" style="' + (bd.style || pat) + 'border-color:' + (gs.ring || acc.ring) + '">' +
@@ -760,8 +758,6 @@ const Views = {
       '<div class="pps-actions">' +
         '<button type="button" class="btn btn-s btn-sm" data-action="open-player-gifts" data-player-id="' + p.id + '">🎁 Подарунки</button>' +
       '</div>' +
-      '<div class="pps-stories-title">Сторіз футболіста</div>' +
-      stories +
       '</div>';
   },
   _fifaCard(p, stats) {
@@ -860,11 +856,6 @@ const Views = {
               '<div class="note-sm">LVL ' + (pr.level||1) + ' · ' + (pr.xp||0) + ' XP</div></div>';
           } catch(_) { return ''; }
         })()}
-        <div class="fifa-gifts-block">
-          <div class="fifa-gifts-title">Подарунки</div>
-          ${giftRow}
-          
-        </div>
         ${compareHtml}
       </div>`;
   },
@@ -1096,7 +1087,7 @@ const Views = {
       try { AuthManager._resolveRole(); me = AuthManager.getLinkedPlayer(); } catch (_) {}
     }
     const stats = me ? this._playerStats(me.id) : { attPct: 0, avgRpe: 0, load28: 0, cancelled: 0 };
-    const next = s.trainings.filter(t => t.status === 'planned' && t.date >= today()).sort((a, b) => a.date.localeCompare(b.date))[0];
+    const next = this._nextPlanned(s.trainings);
     const todayStr = today();
     const monthPrefix = todayStr.slice(0, 7);
     const nextMatch = s.matches.filter(m => m.date >= todayStr && String(m.date).slice(0, 7) === monthPrefix)
@@ -1146,11 +1137,9 @@ const Views = {
               title="${photo ? 'Фото на весь екран' : 'FIFA-картка'}" style="border-color:var(--pos-ring);background:var(--pos-bg)">
               ${photoHtml}
             </button>
-            ${this._tgGiftCloud(worn, 1.2, 'full')}
           </div>
           <div class="cp-role-line"><span class="cp-role-kind">Гравець</span></div>
           <h1 class="cp-title cp-title-name">${sanitize(fullName)} ${featBadge}</h1>
-          ${this._giftStrip(worn)}
           ${statusText ? '<div class="player-status-line">' + sanitize(statusText) + '</div>' : ''}
           <div class="cp-role-badge" style="border-color:var(--pos-ring);color:var(--pos-ring)">${sanitize(me.position || '—')}</div>
           <div class="soc-xp-block player-home-xp">
@@ -1163,6 +1152,8 @@ const Views = {
           ${bio ? '<p class="player-bio-home">' + sanitize(bio) + '</p>' : ''}
           <div class="cp-status"><span class="cp-dot"></span>${(typeof I18n!=='undefined'?I18n.t('attendance','Відвідуваність'):'Відвідуваність')} ${Math.round(stats.attPct || 0)}% · тап по фото — на весь екран</div>
         </div>` : this._noPlayerLink()}
+
+      ${this._clubForgeHtml()}
 
       <div class="cp-pills player-quick">
         <button type="button" class="cp-pill" data-view="trainings">📅 ${t('nav_trainings')}</button>
@@ -1284,6 +1275,35 @@ const Views = {
     return 'Старт';
   },
 
+  _clubForgeHtml() {
+    let c = null;
+    try { c = (typeof CoachTools !== 'undefined' && CoachTools.clubProgress) ? CoachTools.clubProgress() : null; } catch (_) { c = null; }
+    if (!c || !c.parts) return '';
+    const clock = (ms) => {
+      const min = Math.round((Number(ms) || 0) / 60000);
+      if (min < 60) return min + ' хв';
+      return Math.floor(min / 60) + ' год ' + (min % 60) + ' хв';
+    };
+    const row = (label, xp, hint) =>
+      '<div class="forge-row"><span>' + label + '</span><b>' + xp + ' XP</b><small>' + hint + '</small></div>';
+    const p = c.parts;
+    return '<section class="club-forge glass">' +
+      '<div class="club-forge-head"><span>Прокачка Металіста</span><b>LVL ' + c.level + '</b></div>' +
+      '<div class="soc-xp-bar" aria-hidden="true"><div class="soc-xp-fill" style="width:' + c.levelProgress + '%"></div></div>' +
+      '<div class="soc-xp-sub">' + c.xp + ' XP · до LVL ' + (c.level + 1) + ': ' + c.xpToNext +
+      ' · явка команди ' + c.avgAtt + '% · сесій ' + c.sessions + '</div>' +
+      '<div class="forge-grid">' +
+        row('Явка', p.attend, c.present + ' був · ' + c.absent + ' пропуск') +
+        row('Серії', p.streaks, 'гравець ' + c.bestStreak + ' · команда ' + c.teamStreak) +
+        row('Навантаження', p.load, 'сума ' + c.totalLoad) +
+        row('Інтенсивність', p.intensity, 'RPE на явці') +
+        row('Додаток', p.app, clock(c.appMs)) +
+        row('Дошка', p.board, clock(c.boardMs) + ' · схем ' + c.boards) +
+        row('Тренер', p.coach, 'був на ' + c.coachHere + ' з ' + c.sessions) +
+        row('Подарунки', p.gifts, c.gifts + ' артефактів') +
+      '</div></section>';
+  },
+
   _accountProgress(playerId) {
     let pr = null;
     try { pr = (typeof PlayerProgress !== 'undefined') ? PlayerProgress.compute(playerId) : null; } catch (_) { pr = null; }
@@ -1375,7 +1395,7 @@ const Views = {
       if (!url) return '';
       return '<a class="club-media-link" href="' + sanitize(url) + '" target="_blank" rel="noopener">' + sanitize(title) + '</a>';
     }).join('') + links.map(url => '<a class="club-media-link" href="' + sanitize(url) + '" target="_blank" rel="noopener">' + sanitize(url) + '</a>').join('');
-    const next = (s.trainings || []).filter(t => t.status === 'planned' && t.date >= today()).sort((a, b) => a.date.localeCompare(b.date))[0];
+    const next = this._nextPlanned(s.trainings);
 
     return '<div class="club-public">' +
       this._buildLine() +
@@ -1391,6 +1411,7 @@ const Views = {
         '<div><b>' + avg + '%</b><span>явка</span></div>' +
         '<div><b>' + (next ? sanitize(next.date || '') : '—') + '</b><span>наступне</span></div>' +
       '</div>' +
+      this._clubForgeHtml() +
       '<section class="club-block"><h2>Активність</h2><ul class="club-feed">' +
         (activity.join('') || '<li class="club-act"><span>Поки немає відмічених сесій.</span></li>') +
       '</ul></section>' +
@@ -1627,6 +1648,28 @@ trainings() {
     return '--acc-ring:' + a.ring + ';--acc-bg:' + a.bg;
   },
 
+  _isoDay(value) {
+    const s = String(value || '').trim();
+    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return iso[1] + '-' + iso[2] + '-' + iso[3];
+    const euro = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})/);
+    if (euro) return euro[3] + '-' + euro[2].padStart(2, '0') + '-' + euro[1].padStart(2, '0');
+    return '';
+  },
+
+  /** Найближче заплановане тренування. Чернетка лишається лише в тренера. */
+  _nextPlanned(list) {
+    const todayStr = (typeof today === 'function') ? today() : '';
+    return (list || []).filter(t => {
+      if (!t) return false;
+      const date = this._isoDay(t.date);
+      if (!date || (todayStr && date < todayStr)) return false;
+      if (this._trainingCancelled && this._trainingCancelled(t)) return false;
+      const st = String(t.status || '').toLowerCase();
+      return st === 'planned' || st === 'pinned';
+    }).sort((a, b) => this._isoDay(a.date).localeCompare(this._isoDay(b.date)) || String(a.time || '').localeCompare(String(b.time || '')))[0] || null;
+  },
+
   _playerBackdrop(p) {
     try {
       if (typeof CoachTools !== 'undefined' && CoachTools.playerBackdrop) return CoachTools.playerBackdrop(p || {});
@@ -1649,8 +1692,7 @@ trainings() {
     try {
       mine = (Store.get().gifts || []).filter(g => g && p && String(g.playerId) === String(p.id));
     } catch (_) {}
-    const cloud = this._tgGiftCloud(mine, 1, 'card');
-    const badge = this._giftStatusBadge(mine);
+    const badge = this._giftStatusBadge(mine, p.id);
     const bd = this._playerBackdrop(p);
     let xp = 0;
     try { xp = (PlayerProgress.compute(p.id) || {}).xp || 0; } catch (_) {}
@@ -1661,14 +1703,13 @@ trainings() {
     } catch (_) {}
     const meCls = mineId && String(p.id) === mineId ? ' is-me' : '';
     const num = (p.number != null && String(p.number) !== '') ? ('#' + p.number + ' · ') : '';
-    const marks = (this.appointmentHtml(p) || '') + (badge || '');
     return '<div class="pl-card glass pl-card-tint pl-acc ' + bd.className + meCls + '" data-player-id="' + p.id + '" data-action="open-player-card" role="button" tabindex="0" style="' + this._accAttr(p) + ';' + bd.style + '">' +
       '<div class="pl-card-av-wrap">' + (photo
         ? ('<button type="button" class="pl-card-av" data-action="open-fifa-card" data-player-id="' + p.id + '">' + ph + '</button>')
         : ('<div class="pl-card-av">' + ph + '</div>')) +
-      cloud + '</div>' +
-      '<div class="pl-card-body"><div class="pl-card-name"><span class="pl-card-name-txt">' + sanitize(name) + '</span></div>' +
-      (marks ? ('<div class="pl-card-marks">' + marks + '</div>') : '') +
+      '</div>' +
+      '<div class="pl-card-body"><div class="pl-card-name"><span class="pl-card-name-txt">' + sanitize(name) + '</span>' + (badge || '') + '</div>' +
+      (this.appointmentHtml(p) ? ('<div class="pl-card-marks">' + this.appointmentHtml(p) + '</div>') : '') +
       '<div class="pl-card-meta">' + num + sanitize(p.position || '') + (roleText ? (' · ' + roleText) : '') + '</div>' +
       '<div class="pl-card-att">Відвідуваність ' + att + '% · ' + xp + ' XP</div></div></div>';
   },
@@ -1857,7 +1898,7 @@ trainings() {
         const att = attPct(p.id);
         return '<div class="pl-row tg-row ' + cls + '" data-player-id="' + p.id + '" data-action="open-player-card" role="button">' +
           '<span class="pl-num">#' + (p.number || '—') + '</span>' +
-          '<span class="pl-name">' + sanitize(p.lastName || '') + ' ' + sanitize((p.firstName || '')[0] || '') + '.' + this.appointmentHtml(p) + '</span>' +
+          '<span class="pl-name">' + sanitize(p.lastName || '') + ' ' + sanitize((p.firstName || '')[0] || '') + '.' + this.appointmentHtml(p) + this._giftStatusBadge((s.gifts || []).filter(g => g && String(g.playerId) === String(p.id)), p.id) + '</span>' +
           '<span class="pl-pos">' + sanitize(p.position || '') + '</span>' +
           '<span class="pl-att">' + att + '%</span></div>';
       }).join('');
@@ -2346,6 +2387,7 @@ trainings() {
     }).join('');
     const guest = typeof AuthManager !== 'undefined' && AuthManager.isGuest && AuthManager.isGuest();
     return '<div class="st">' + (guest ? 'Статистика' : 'Аналітика') + '</div>' +
+      this._clubForgeHtml() +
       '<div class="card glass an-summary"><div class="ct">Проведені тренування: <b>' + trainings.length + '</b></div>' +
       '<div class="an-summary-line">Середня відвідуваність <b>' + avgAtt + '%</b> · візити <b>' + presentSum + '</b></div></div>' +
       this._analyticsCharts(players, getSt) +
@@ -2504,7 +2546,7 @@ trainings() {
       <div class="card glass settings-card">
         <div class="ct">Дані клубу</div>
         <p class="note-sm">Спільні дані — файл club.json. Експортуйте JSON, замініть ним club.json у репозиторії й запуште. Усі в Telegram отримають цей файл.</p>
-        <p class="note-sm">Імпорт також приймає файл з анкети гравця: його поля і печатки «Я тут».</p>
+        <p class="note-sm">Імпорт також приймає анкету гравця. Присутність у ній не змінюється: її ставить тренер.</p>
         <p class="note-sm" id="clubSyncLine">${sanitize((typeof StorageManager !== 'undefined' && StorageManager._clubSyncText) || 'Клубний обмін: підключення…')}</p>
         <div class="settings-actions">
           <button type="button" class="btn btn-s" data-action="export-json">Експорт JSON</button>

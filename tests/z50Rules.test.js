@@ -99,6 +99,41 @@ describe('z50 club rules', () => {
     assert.equal(streaked.xpStreak, 30);
   });
 
+  it('grows the club from attendance, streaks, load and app time', () => {
+    const ctx = boot();
+    ctx.sanitize = (v) => String(v == null ? '' : v);
+    const before = ctx.CoachTools.clubProgress();
+    ctx.__store.trainings.push({
+      id: 'load', status: 'done', date: '2026-11-06', duration: 90, intensity: 8,
+      coachPresent: true,
+      attendance: { p1: { present: true, rpe: 8 }, p2: { present: true, rpe: 7 } }
+    });
+    ctx.__store.settings.coachStats = { appMs: 60 * 60000, boardMs: 30 * 60000 };
+    ctx.__store.boards = [{ id: 'b1' }];
+    const after = ctx.CoachTools.clubProgress();
+    assert.ok(after.xp > before.xp);
+    assert.ok(after.parts.attend > before.parts.attend);
+    assert.ok(after.parts.load > before.parts.load);
+    assert.ok(after.parts.app > 0);
+    assert.ok(after.parts.board > 0);
+    assert.ok(after.parts.coach > before.parts.coach);
+    const marked = ctx.CoachTools.clubProgress();
+    ctx.__store.trainings.push({
+      id: 'miss', status: 'done', date: '2026-11-07', duration: 0, intensity: 0,
+      attendance: { p1: { present: false } }
+    });
+    const missed = ctx.CoachTools.clubProgress();
+    assert.ok(missed.parts.attend < marked.parts.attend);
+    const html = ctx.Views.analytics();
+    assert.match(html, /Прокачка Металіста/);
+    assert.match(html, /Явка/);
+    assert.match(html, /Серії/);
+    assert.match(html, /Навантаження/);
+    assert.match(html, /Додаток/);
+    assert.match(html, /Тренер/);
+    assert.match(html, /Подарунки/);
+  });
+
   it('keeps a conducted session even when an old cancel stamp is still on it', () => {
     const ctx = boot();
     ctx.sanitize = (v) => String(v == null ? '' : v);

@@ -558,6 +558,8 @@ const BoardEngine = {
           x: world.x - obj.x,
           y: world.y - obj.y
         };
+        this._dragOrigin = { x: e.clientX, y: e.clientY };
+        this._dragMovedPx = 0;
         try { target.setPointerCapture(e.pointerId); } catch (_) {}
         try { TelegramManager.haptic('medium'); } catch (_) {}
         target.classList.add('dragging');
@@ -774,6 +776,9 @@ const BoardEngine = {
       const pos = this.clampWorld(world.x - this.dragOffset.x, world.y - this.dragOffset.y);
       this.dragObj.x = pos.x;
       this.dragObj.y = pos.y;
+      if (this._dragOrigin) {
+        this._dragMovedPx = Math.max(this._dragMovedPx || 0, Math.hypot(e.clientX - this._dragOrigin.x, e.clientY - this._dragOrigin.y));
+      }
       this._updateTokenDOM(this.dragObj);
       return;
     }
@@ -833,15 +838,18 @@ const BoardEngine = {
         el.classList.remove('dragging');
         try { if (e && e.pointerId != null) el.releasePointerCapture(e.pointerId); } catch (_) {}
       }
-      // Якщо відпустили над панеллю ЗАПАС → на лавку (вільний перенос)
+      // На лавку лише якщо фішку справді перетягли на панель. Довгий тап лишає гравця на полі.
       let demoted = false;
       try {
+        const moved = (this._dragMovedPx || 0) > 36;
         const panel = document.getElementById('benchPanel');
-        const under = (e && e.clientX != null) ? document.elementFromPoint(e.clientX, e.clientY) : null;
+        const under = (moved && e && e.clientX > 2 && e.clientY > 2) ? document.elementFromPoint(e.clientX, e.clientY) : null;
         if (panel && under && (panel === under || panel.contains(under))) {
           demoted = true;
         }
       } catch (_) {}
+      this._dragOrigin = null;
+      this._dragMovedPx = 0;
       this.dragObj = null;
       this.activePointerId = null;
       if (demoted) {

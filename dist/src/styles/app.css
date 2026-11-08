@@ -5433,7 +5433,7 @@ body.board-active .main {
   -webkit-tap-highlight-color: transparent;
 }
 .cp-avatar img {
-  width: 100%; height: 100%; object-fit: cover;
+  width: 100%; height: 100%; object-fit: cover; object-position: center center;
 }
 .cp-avatar-ph {
   display: flex; align-items: center; justify-content: center;
@@ -11103,6 +11103,31 @@ body.mode-board-focus .team-chat-form { display: none !important; }
 }
 .coach-xp-head b, .coach-grow-title { color: #e8c547; }
 .coach-xp-meta, .coach-grow-sub { font-size: 12px; color: #9aa4b2; margin: 6px 0; }
+.club-forge {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(232,197,71,.28);
+  background: rgba(12,16,24,.72);
+}
+.club-forge-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+  font-weight: 700;
+}
+.club-forge-head b { color: #e8c547; }
+.forge-grid { display: grid; gap: 6px; margin-top: 10px; }
+.forge-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 10px;
+  align-items: baseline;
+  font-size: 12px;
+}
+.forge-row b { color: #e8c547; font-variant-numeric: tabular-nums; }
+.forge-row small { grid-column: 1 / -1; color: #9aa4b2; }
 .coach-grow-title { margin-top: 10px; }
 .pl-card-av { padding: 0; border: 0; background: transparent; color: inherit; }
 .photo-lightbox {
@@ -11546,8 +11571,9 @@ body.role-guest .team-chat { display: none !important; }
   flex: 1 1 auto;
 }
 .cpc-photo {
-  width: 92px;
-  height: 92px;
+  width: 132px;
+  height: 132px;
+  aspect-ratio: 1 / 1;
   border-radius: 50%;
   border: 3px solid var(--gift-ring, #e8c547);
   padding: 0;
@@ -11559,14 +11585,18 @@ body.role-guest .team-chat { display: none !important; }
   font-size: 28px;
   font-weight: 800;
   position: relative;
-  flex: 0 0 auto;
+  flex: 0 0 132px;
+  box-sizing: border-box;
   cursor: pointer;
 }
 .cpc-photo img,
 .cpc-photo .fifa-avatar-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+  border-radius: 0 !important;
   display: block;
 }
 .cpc-id { min-width: 0; }
@@ -12268,4 +12298,54 @@ body.mode-board-focus #boardToolbarTop.btb-top {
   flex: 0 0 auto;
   font-size: 11px;
   color: var(--muted, #9aa4b2);
+}
+.cp-avatar-wrap > .tg-gift-cloud,
+.pl-card-av-wrap > .tg-gift-cloud,
+.cp-hero > .tg-gift-strip,
+.player-profile-hero > .tg-gift-strip,
+.fifa-gifts-block {
+  display: none !important;
+}
+.pl-cards .pl-card-name,
+.cp-title-name,
+.cpc-name,
+.pl-name,
+.pps-name {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+  min-width: 0;
+}
+.pl-cards .pl-card-name-txt {
+  display: block;
+  width: auto;
+  max-width: calc(100% - 30px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pl-card-name .gift-status-badge,
+.cp-title-name .gift-status-badge,
+.cpc-name .gift-status-badge,
+.pl-name .gift-status-badge,
+.pps-name .gift-status-badge {
+  margin-left: 0 !important;
+  flex: 0 0 auto;
+}
+.cp-avatar,
+.pl-card-av,
+.pps-avatar {
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: 50%;
+}
+.cp-avatar img,
+.pl-card-av img,
+.pps-avatar img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  object-position: center center !important;
 }
