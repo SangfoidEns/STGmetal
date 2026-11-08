@@ -85,4 +85,28 @@ describe('club feed and gift delete', () => {
     assert.equal(context.CoachTools.ensureWornGift('p1'), null);
     assert.equal(context.Store.state.gifts[0].attached, false);
   });
+
+  it('drops a deleted gift from the feed and keeps one photo a day', () => {
+    context.Store.state = {
+      players: [{ id: 'p1', firstName: 'Михайло', lastName: 'Копич', profilePhoto: 'a'.repeat(40) }],
+      gifts: [{ uid: 'g9', id: 'g9', playerId: 'p1', label: 'Хет-трик', createdAt: '2026-11-08T17:00:00.000Z' }],
+      trainings: [],
+      settings: {},
+      feed: [
+        { id: 'gift:g9', kind: 'gift', playerId: 'p1', title: 'Подарунок', text: 'отримав', createdAt: '2026-11-08T17:00:00.000Z' },
+        { id: 'photo:p1:old-a', kind: 'photo', playerId: 'p1', title: 'Нове фото', text: 'додав', createdAt: '2026-11-08T18:47:00.000Z' },
+        { id: 'photo:p1:old-b', kind: 'photo', playerId: 'p1', title: 'Нове фото', text: 'додав', createdAt: '2026-11-08T19:42:00.000Z' }
+      ]
+    };
+    context.ClubFeed.sync();
+    assert.equal(context.Store.state.feed.filter(x => x.kind === 'photo').length, 1);
+    assert.equal(context.Store.state.feed.find(x => x.kind === 'photo').id, 'photo:p1:old-b');
+    assert.equal(context.CoachTools.deleteGift('g9'), true);
+    assert.equal(context.Store.state.feed.some(x => x.kind === 'gift'), false);
+    context.Store.state.players[0].profilePhoto = 'b'.repeat(40);
+    context.ClubFeed.sync();
+    const today = context.ClubFeed._day(new Date().toISOString());
+    const photos = context.Store.state.feed.filter(x => x.kind === 'photo' && context.ClubFeed._day(x.createdAt) === today);
+    assert.equal(photos.length, 1);
+  });
 });

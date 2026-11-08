@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z74',
+  APP_BUILD: 'z75',
   APP_UPDATED: '08.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -242,12 +242,9 @@ const Views = {
       featured = gifts.find(g => g.featured) || null;
     }
     if (!featured) return '';
-    const art = (typeof CoachTools !== 'undefined' && CoachTools.giftBackdropHtml)
-      ? CoachTools.giftBackdropHtml(featured, 'sm')
-      : ('<span class="gsb-ico">' + (featured.ico || '★') + '</span>');
-    return '<span class="gift-status-badge rarity-' + (featured.rarity || 'common') +
-      '" style="--art-hue:' + this._gh(featured) + '" title="' +
-      sanitize(this._gl(featured) || '') + '">' + art + '</span>';
+    const hue = this._gh(featured);
+    return '<span class="gift-status-badge" style="--art-hue:' + hue + '" title="' +
+      sanitize(this._gl(featured) || '') + '"><span class="gsb-ico">' + (featured.ico || '★') + '</span></span>';
   },
 
 
@@ -835,7 +832,7 @@ const Views = {
           </div>
           ${logoTag}
         </div>
-        <div class="cpc-name">${sanitize(p.firstName || '')} <strong>${sanitize(p.lastName || '')}</strong> ${this.appointmentHtml(p)} ${this._giftStatusBadge(gifts, p.id)}</div>
+        <div class="cpc-name"><span class="cpc-name-txt">${sanitize(p.firstName || '')} <strong>${sanitize(p.lastName || '')}</strong></span>${this.appointmentHtml(p)}${this._giftStatusBadge(gifts, p.id)}</div>
         <div class="cpc-meta">${sanitize(stLabel)}${tg ? ' · ' + tg : ''}</div>
         ${(typeof SessionPlay !== 'undefined') ? SessionPlay.sealHtml(p.id) : ''}
         <div class="fifa-stats">
@@ -1619,6 +1616,19 @@ trainings() {
     `;
   },
 
+  _feedHue(p) {
+    if (!p) return 42;
+    const profile = p.profile || {};
+    const stored = profile.themeHue != null ? profile.themeHue : p.themeHue;
+    if (stored != null && stored !== '' && isFinite(Number(stored))) return Number(stored);
+    const pos = String(p.position || '').toUpperCase();
+    if (pos.indexOf('GK') >= 0) return 48;
+    if (/CB|LB|RB|WB|DEF/.test(pos)) return 210;
+    if (/CM|DM|AM|LM|RM|MID/.test(pos)) return 140;
+    if (/ST|CF|LW|RW|ATT/.test(pos)) return 4;
+    return 42;
+  },
+
   _accountAccent(p) {
     const fallback = { ring: '#c8a84b', bg: 'linear-gradient(160deg,#2a2410,#12100a)' };
     if (!p) return fallback;
@@ -1720,6 +1730,8 @@ trainings() {
     const list = (s.feed || []).slice().sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))).slice(0, 40);
     const icons = { gift: '🎁', streak: '🔥', birthday: '🎂', status: '✨', photo: '📷', rating: '⭐' };
     const kinds = ['gift', 'streak', 'birthday', 'status', 'photo', 'rating'];
+    const players = s.players || [];
+    const frames = { gift: '#e8c547', photo: '#60a5fa', rating: '#f5c542', streak: '#fb923c', birthday: '#f472b6', status: '#c084fc' };
     const rows = list.map(item => {
       if (!item) return '';
       let time = '';
@@ -1733,8 +1745,11 @@ trainings() {
       } catch (_) {}
       const kind = kinds.indexOf(item.kind) >= 0 ? item.kind : 'news';
       const pid = item.playerId != null && item.playerId !== '' ? String(item.playerId) : '';
+      const player = pid ? players.find(p => p && String(p.id) === pid) : null;
+      const hue = player ? this._feedHue(player) : 42;
+      const frame = frames[kind] || '#9aa4b2';
       const open = pid ? (' data-action="open-player-card" data-player-id="' + pid + '"') : '';
-      return '<button type="button" class="club-feed-row kind-' + kind + '"' + open + '>' +
+      return '<button type="button" class="club-feed-row kind-' + kind + '" style="--feed-hue:' + hue + ';--feed-frame:' + frame + '"' + open + '>' +
         '<span class="club-feed-ico" aria-hidden="true">' + (icons[kind] || '•') + '</span>' +
         '<span class="club-feed-body"><b>' + sanitize(item.title || 'Новина') + '</b><span>' + sanitize(item.text || '') + '</span></span>' +
         (time ? ('<span class="club-feed-time">' + sanitize(time) + '</span>') : '') +
@@ -1898,7 +1913,7 @@ trainings() {
         const att = attPct(p.id);
         return '<div class="pl-row tg-row ' + cls + '" data-player-id="' + p.id + '" data-action="open-player-card" role="button">' +
           '<span class="pl-num">#' + (p.number || '—') + '</span>' +
-          '<span class="pl-name">' + sanitize(p.lastName || '') + ' ' + sanitize((p.firstName || '')[0] || '') + '.' + this.appointmentHtml(p) + this._giftStatusBadge((s.gifts || []).filter(g => g && String(g.playerId) === String(p.id)), p.id) + '</span>' +
+          '<span class="pl-name">' + sanitize(p.lastName || '') + ' ' + sanitize((p.firstName || '')[0] || '') + '.' + this.appointmentHtml(p) + '</span>' +
           '<span class="pl-pos">' + sanitize(p.position || '') + '</span>' +
           '<span class="pl-att">' + att + '%</span></div>';
       }).join('');

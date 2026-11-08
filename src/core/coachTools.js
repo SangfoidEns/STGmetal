@@ -1016,6 +1016,15 @@ CoachTools.deleteGift = function (uid) {
     if (!g) return false;
     return String(g.uid || '') !== key && String(g.id || '') !== key;
   });
+  if (Array.isArray(s.feed)) {
+    const drop = {};
+    doomed.forEach(function (g) {
+      if (g.uid) drop['gift:' + g.uid] = true;
+      if (g.id) drop['gift:' + g.id] = true;
+    });
+    drop['gift:' + key] = true;
+    s.feed = s.feed.filter(function (item) { return item && !drop[item.id]; });
+  }
   (s.players || []).forEach(p => {
     if (!p || !p.profile) return;
     if (String(p.profile.featuredGiftId || '') !== key) return;
@@ -1512,6 +1521,41 @@ const ClubFeed = {
     if (s.feed.length > 240) s.feed = s.feed.slice(-240);
     return true;
   },
+  _day(iso) {
+    const when = iso ? new Date(iso) : new Date();
+    if (isNaN(when.getTime())) return '';
+    const b = this._berlin(when);
+    const pad = function (n) { return String(n).padStart(2, '0'); };
+    return b.y + '-' + pad(b.m) + '-' + pad(b.d);
+  },
+  /** Прибирає видалений подарунок і згортає повтор тієї самої події за день. */
+  prune(s) {
+    if (!s || !Array.isArray(s.feed)) return false;
+    const live = {};
+    (s.gifts || []).forEach(function (g) {
+      if (!g) return;
+      if (g.uid) live['gift:' + g.uid] = true;
+      if (g.id) live['gift:' + g.id] = true;
+    });
+    const before = s.feed.length;
+    const sorted = s.feed.filter(Boolean).slice().sort(function (a, b) {
+      return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+    });
+    const seen = {};
+    const next = [];
+    sorted.forEach(function (item) {
+      if (item.kind === 'gift' && !live[item.id]) return;
+      const bucket = (item.kind === 'photo' || item.kind === 'status' || item.kind === 'rating')
+        ? (item.kind + ':' + (item.playerId || '') + ':' + ClubFeed._day(item.createdAt) + ':' + (item.title || ''))
+        : item.id;
+      if (seen[bucket]) return;
+      seen[bucket] = true;
+      next.push(item);
+    });
+    next.sort(function (a, b) { return String(a.createdAt || '').localeCompare(String(b.createdAt || '')); });
+    s.feed = next.slice(-240);
+    return s.feed.length !== before;
+  },
   _berlin(now) {
     try {
       const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -1542,7 +1586,7 @@ const ClubFeed = {
       const s = Store.get();
       if (!s) return;
       const meta = this._meta(s);
-      let dirty = false;
+      let dirty = this.prune(s);
       const today = this._berlin(new Date());
       (s.gifts || []).forEach(function (g) {
         if (!g) return;
@@ -1581,14 +1625,23 @@ const ClubFeed = {
           }
         }
         const photo = String(p.photoUrl || p.profilePhoto || (p.profile && p.profile.photo) || '');
-        const sig = photo ? (String(photo.length) + ':' + photo.slice(-24)) : '';
+        const sig = photo ? (String(photo.length) + ':' + photo.slice(0, 16) + ':' + photo.slice(-16)) : '';
         if (sig) {
+          const day = ClubFeed._day(new Date().toISOString());
+          const photoId = 'photo:' + pid + ':' + day;
           if (meta.photo[pid] == null) {
             meta.photo[pid] = sig;
             dirty = true;
           } else if (meta.photo[pid] !== sig) {
-            if (ClubFeed._push(s, {
-              id: 'photo:' + pid + ':' + sig.slice(0, 48),
+            const existing = (s.feed || []).find(function (x) {
+              return x && x.kind === 'photo' && String(x.playerId) === pid && ClubFeed._day(x.createdAt) === day;
+            });
+            if (existing) {
+              existing.createdAt = new Date().toISOString();
+              existing.text = who + ' додав нове фото';
+              dirty = true;
+            } else if (ClubFeed._push(s, {
+              id: photoId,
               kind: 'photo',
               playerId: p.id,
               title: 'Нове фото',
@@ -1645,6 +1698,7 @@ const ClubFeed = {
           })) dirty = true;
         }
       });
+      if (this.prune(s)) dirty = true;
       if (dirty) {
         try { if (typeof StorageManager !== 'undefined' && StorageManager.save) StorageManager.save(); } catch (_) {}
       }

@@ -11653,8 +11653,7 @@ body.role-guest .team-chat { display: none !important; }
 .club-player-card .fifa-gift-chip.nft-chip,
 .club-player-card .fifa-gift-chip.rarity-legendary,
 .coach-gift-panel .coach-gift-chip,
-.coach-gift-panel .gift-award-btn.rarity-legendary,
-.club-player-card .rarity-legendary {
+.coach-gift-panel .gift-award-btn.rarity-legendary {
   animation: none !important;
   transform: none !important;
   width: 100% !important;
@@ -12348,4 +12347,50 @@ body.mode-board-focus #boardToolbarTop.btb-top {
   height: 100% !important;
   object-fit: cover !important;
   object-position: center center !important;
+}
+.club-player-card .cpc-name {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  writing-mode: horizontal-tb !important;
+}
+.club-player-card .cpc-name-txt {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  writing-mode: horizontal-tb !important;
+}
+.club-player-card .cpc-name .role-mark {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: none !important;
+  position: static !important;
+}
+.club-player-card .cpc-name .gift-status-badge {
+  flex: 0 0 22px !important;
+  position: static !important;
+}
+.club-player-card .gift-status-badge {
+  width: 22px !important;
+  height: 22px !important;
+  max-width: 22px !important;
+  border-radius: 6px !important;
+  background: hsl(var(--art-hue, 42) 52% 42%) !important;
+}
+.gift-status-badge .gsb-ico {
+  font-size: 13px;
+  line-height: 1;
+}
+.club-feed-row {
+  background: linear-gradient(165deg, hsl(var(--feed-hue, 42) 42% 22%), hsl(var(--feed-hue, 42) 34% 11%));
+  border: 1.5px solid var(--feed-frame, #e8c547);
+}
+.club-feed-row .club-feed-body b {
+  color: hsl(var(--feed-hue, 42) 78% 72%);
 }
