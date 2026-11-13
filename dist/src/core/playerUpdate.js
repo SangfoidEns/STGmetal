@@ -63,6 +63,7 @@ const PlayerUpdate = {
     if (!player) return { ok: false, reason: 'missing' };
     const src = packet.player;
     const before = playersCount(state);
+    const prevBirth = String(player.birthDate || (player.profile && player.profile.birthDate) || '');
     if (src.firstName) player.firstName = String(src.firstName).slice(0, 80);
     if (src.lastName) player.lastName = String(src.lastName).slice(0, 80);
     if (!player.profile) player.profile = {};
@@ -77,12 +78,18 @@ const PlayerUpdate = {
     if (prof.status != null) player.statusText = player.profile.status;
     if (prof.bio != null) player.bio = player.profile.bio;
     if (src.themeHue != null) player.themeHue = src.themeHue;
+    const when = packet.exportedAt || new Date().toISOString();
+    player.stamps = player.stamps || {};
+    const nextPhoto = src.profilePhoto || src.photoUrl || '';
+    const prevPhoto = player.profilePhoto || player.photoUrl || '';
     if (src.profilePhoto) {
       player.profilePhoto = src.profilePhoto;
       player.photoUrl = src.photoUrl || src.profilePhoto;
     } else if (src.photoUrl) {
       player.photoUrl = src.photoUrl;
     }
+    if (nextPhoto && nextPhoto !== prevPhoto) player.stamps.photo = when;
+    if (String(player.birthDate || '') !== prevBirth) player.stamps.birthDate = when;
     if (packet.featuredGiftKey) {
       const key = String(packet.featuredGiftKey);
       (state.gifts || []).forEach(g => {

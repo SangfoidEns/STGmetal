@@ -755,9 +755,12 @@ const App = {
     if (first) p.firstName = first.slice(0, 80);
     if (last) p.lastName = last.slice(0, 80);
     const bd = String(field('ppBirth') || '').trim();
-    if (/^\d{4}-\d{2}-\d{2}$/.test(bd)) {
+    const now = new Date().toISOString();
+    p.stamps = Object.assign({}, p.stamps || {});
+    if (/^\d{4}-\d{2}-\d{2}$/.test(bd) && bd !== String(p.birthDate || '')) {
       p.birthDate = bd;
       p.profile.birthDate = bd;
+      p.stamps.birthDate = now;
       try { if (typeof Views !== 'undefined' && Views.syncBirthdays) Views.syncBirthdays(); } catch (_) {}
     }
     p.profile.phone = String(field('ppPhone') || '').slice(0, 40);
@@ -768,10 +771,12 @@ const App = {
     p.bio = p.profile.bio;
     p.phone = p.profile.phone;
     const photo = String(field('ppPhotoPicked') || '');
-    if (photo.indexOf('data:image/') === 0 && photo.length <= 400000) {
+    if (photo.indexOf('data:image/') === 0 && photo.length <= 400000 && photo !== String(p.profilePhoto || p.photoUrl || '')) {
       p.profilePhoto = photo;
       p.photoUrl = photo;
+      p.stamps.photo = now;
     }
+    p.updatedAt = now;
     const picked = document.querySelector('#modalBody input[name="ppFeatured"]:checked');
     if (picked && picked.value) {
       const s = Store.get();

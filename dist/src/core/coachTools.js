@@ -1668,7 +1668,7 @@ const ClubFeed = {
   },
   _meta(s) {
     if (!s.feedMeta || typeof s.feedMeta !== 'object') s.feedMeta = {};
-    ['status', 'photo', 'level', 'streak'].forEach(function (key) {
+    ['status', 'photo', 'photoAt', 'level', 'streak'].forEach(function (key) {
       if (!s.feedMeta[key] || typeof s.feedMeta[key] !== 'object') s.feedMeta[key] = {};
     });
     return s.feedMeta;
@@ -1711,9 +1711,12 @@ const ClubFeed = {
     const next = [];
     sorted.forEach(function (item) {
       if (item.kind === 'gift' && !live[item.id]) return;
-      const bucket = (item.kind === 'photo' || item.kind === 'status' || item.kind === 'rating')
-        ? (item.kind + ':' + (item.playerId || '') + ':' + ClubFeed._day(item.createdAt) + ':' + (item.title || ''))
-        : item.id;
+      const stampedPhoto = item.kind === 'photo' && /^photo:[^:]+:\d{4}-/.test(String(item.id || ''));
+      const bucket = stampedPhoto
+        ? item.id
+        : ((item.kind === 'photo' || item.kind === 'status' || item.kind === 'rating')
+          ? (item.kind + ':' + (item.playerId || '') + ':' + ClubFeed._day(item.createdAt) + ':' + (item.title || ''))
+          : item.id);
       if (seen[bucket]) return;
       seen[bucket] = true;
       next.push(item);
@@ -1791,29 +1794,42 @@ const ClubFeed = {
           }
         }
         const photo = String(p.photoUrl || p.profilePhoto || (p.profile && p.profile.photo) || '');
-        const sig = photo ? (String(photo.length) + ':' + photo.slice(0, 16) + ':' + photo.slice(-16)) : '';
+        const sig = photo ? (String(photo.length) + ':' + photo.slice(24, 64) + ':' + photo.slice(-24)) : '';
         if (sig) {
-          const day = ClubFeed._day(new Date().toISOString());
-          const photoId = 'photo:' + pid + ':' + day;
+          const photoAt = (p.stamps && (p.stamps.photo || p.stamps.photoUrl || p.stamps.profilePhoto)) || '';
+          const knownAt = Date.parse(meta.photoAt[pid] || '') || 0;
+          const nextAt = Date.parse(photoAt) || 0;
           if (meta.photo[pid] == null) {
             meta.photo[pid] = sig;
+            if (photoAt) meta.photoAt[pid] = photoAt;
             dirty = true;
-          } else if (meta.photo[pid] !== sig) {
-            const existing = (s.feed || []).find(function (x) {
+          } else if (meta.photo[pid] !== sig && nextAt > knownAt) {
+            if (ClubFeed._push(s, {
+              id: 'photo:' + pid + ':' + photoAt,
+              kind: 'photo',
+              playerId: p.id,
+              title: 'Нове фото',
+              text: who + ' додав нове фото',
+              createdAt: photoAt
+            })) dirty = true;
+            meta.photo[pid] = sig;
+            meta.photoAt[pid] = photoAt;
+          } else if (meta.photo[pid] !== sig && !photoAt) {
+            const day = ClubFeed._day(new Date().toISOString());
+            const already = (s.feed || []).some(function (x) {
               return x && x.kind === 'photo' && String(x.playerId) === pid && ClubFeed._day(x.createdAt) === day;
             });
-            if (existing) {
-              existing.createdAt = new Date().toISOString();
-              existing.text = who + ' додав нове фото';
-              dirty = true;
-            } else if (ClubFeed._push(s, {
-              id: photoId,
+            if (!already && ClubFeed._push(s, {
+              id: 'photo:' + pid + ':' + day,
               kind: 'photo',
               playerId: p.id,
               title: 'Нове фото',
               text: who + ' додав нове фото'
             })) dirty = true;
             meta.photo[pid] = sig;
+          } else if (meta.photo[pid] !== sig) {
+            meta.photo[pid] = sig;
+            dirty = true;
           }
         }
         let level = 1;

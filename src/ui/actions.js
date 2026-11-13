@@ -501,7 +501,8 @@ const Actions = {
       tactGoal: document.getElementById('tTact')?.value, techGoal: document.getElementById('tTech')?.value,
       psychGoal: document.getElementById('tPsych')?.value, comment: document.getElementById('tCom')?.value,
       status: document.getElementById('tSt')?.value || 'draft', structure,
-      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      stamps: { schedule: new Date().toISOString(), status: new Date().toISOString() }
     };
     Store.get().trainings.push(t);
     Store.get().calendar.push({ id: uid(), type: 'TRAINING', title: t.name, date: t.date, time: t.time, trainingId: t.id });
@@ -637,7 +638,9 @@ const Actions = {
     t.mainGoal = document.getElementById('teGoal')?.value;
     t.comment = document.getElementById('teCom')?.value;
     t.duration = (t.structure || []).reduce((a, b) => a + (b.duration || 0), 0);
-    t.updatedAt = new Date().toISOString();
+    const savedAt = new Date().toISOString();
+    t.updatedAt = savedAt;
+    t.stamps = Object.assign({}, t.stamps || {}, { schedule: savedAt, status: savedAt });
     if (document.getElementById('teAttachBoard')?.checked) {
       if (typeof BoardLink !== 'undefined') BoardLink.attachTo(t);
       else t.board = { objects: JSON.parse(JSON.stringify((Store.get().activeBoard || {}).objects || [])) };
@@ -652,8 +655,11 @@ const Actions = {
     const t = Store.get().trainings.find(x => x.id === id);
     if (!t) return;
     Modal.confirm('Скасувати тренування «' + (t.name || '') + '»? Воно не враховуватиметься в аналітиці.', () => {
+      const cancelledAt = new Date().toISOString();
       t.status = 'cancelled';
-      t.cancelledAt = new Date().toISOString();
+      t.cancelledAt = cancelledAt;
+      t.updatedAt = cancelledAt;
+      t.stamps = Object.assign({}, t.stamps || {}, { status: cancelledAt, schedule: cancelledAt });
       StorageManager.save();
       Toast.show('Тренування скасовано', 'ok');
       App.renderCurrent();
@@ -732,7 +738,14 @@ const Actions = {
       group: document.getElementById('plG')?.value || 'main', tags: [],
       telegramUsername: (document.getElementById('plTg')?.value || '').replace(/^@/, '').trim(),
       phone: (document.getElementById('plPhone')?.value || '').trim(),
-      birthDate: document.getElementById('plBirth')?.value || ''
+      birthDate: document.getElementById('plBirth')?.value || '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      stamps: {
+        birthDate: new Date().toISOString(),
+        phone: new Date().toISOString(),
+        status: new Date().toISOString()
+      }
     });
     try { if (typeof Views !== 'undefined' && Views.syncBirthdays) Views.syncBirthdays(); } catch (_) {}
     StorageManager.save();
@@ -792,6 +805,11 @@ const Actions = {
   savePlayer(id) {
     const p = Store.get().players.find(x => x.id === id);
     if (!p) return;
+    const before = {
+      firstName: p.firstName, lastName: p.lastName, number: p.number, position: p.position,
+      status: p.status, notes: p.notes, phone: p.phone, birthDate: p.birthDate,
+      photoUrl: p.photoUrl, profilePhoto: p.profilePhoto, telegramUsername: p.telegramUsername
+    };
     p.firstName = document.getElementById('peF')?.value || p.firstName;
     p.lastName = document.getElementById('peL')?.value || p.lastName;
     p.number = +document.getElementById('peN')?.value || p.number;
@@ -837,6 +855,13 @@ const Actions = {
     } catch (_) {}
 
     const finish = () => {
+      const now = new Date().toISOString();
+      p.stamps = Object.assign({}, p.stamps || {});
+      Object.keys(before).forEach(function (key) {
+        if (String(before[key] == null ? '' : before[key]) !== String(p[key] == null ? '' : p[key])) p.stamps[key] = now;
+      });
+      if (before.photoUrl !== p.photoUrl || before.profilePhoto !== p.profilePhoto) p.stamps.photo = now;
+      p.updatedAt = now;
       try { if (typeof Views !== 'undefined' && Views.syncBirthdays) Views.syncBirthdays(); } catch (_) {}
       try { StorageManager.save(); } catch (_) {}
       Modal.close();
@@ -851,6 +876,7 @@ const Actions = {
       Actions._compressImageFile(file, 512, 0.72).then(dataUrl => {
         if (dataUrl) {
           p.photoUrl = dataUrl;
+          p.profilePhoto = p.profilePhoto || dataUrl;
           Toast.show('Фото збережено (' + Math.round(dataUrl.length / 1024) + ' КБ)', 'ok');
         } else {
           Toast.show('Не вдалося обробити фото', 'warn');
@@ -1121,6 +1147,7 @@ const Actions = {
     // Тренер: присутній / пропуск
     const coachEl = document.getElementById('attCoachPresent');
     if (coachEl) t.coachPresent = !!coachEl.checked;
+    const markedAt = new Date().toISOString();
     document.querySelectorAll('.att-row').forEach(row => {
       const pid = row.dataset.pid;
       if (!pid) return;
@@ -1128,14 +1155,14 @@ const Actions = {
       const intensity = Math.max(1, Math.min(10, +row.querySelector('.att-rpe')?.value || t.intensity || 6));
       const prev = t.attendance[pid] || {};
       t.attendance[pid] = {
-        present, intensity, rpe: intensity, updatedAt: new Date().toISOString(),
+        present, intensity, rpe: intensity, updatedAt: markedAt,
         claimed: !!prev.claimed, claimedAt: prev.claimedAt || ''
       };
     });
-    t.updatedAt = new Date().toISOString();
-    if (t.status !== 'cancelled' && t.status !== 'canceled') {
+    t.stamps = Object.assign({}, t.stamps || {}, { attendance: markedAt });
+    if (t.status !== 'cancelled' && t.status !== 'canceled' && t.status !== 'done' && t.status !== 'completed') {
       t.status = 'done';
-      delete t.cancelledAt;
+      t.stamps.status = markedAt;
     }
     try { LoadModel.recomputePlayerLoads(Store.get().players, Store.get().trainings); } catch (_) {}
     StorageManager.save();

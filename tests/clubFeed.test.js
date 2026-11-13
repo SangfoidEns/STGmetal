@@ -70,6 +70,38 @@ describe('club feed and gift delete', () => {
     assert.equal(context.Store.state.feed.filter(x => x.kind === 'status').length, 1);
   });
 
+  it('does not announce the same photo again on the next import', () => {
+    const oldPhoto = 'data:image/jpeg;base64,OLDPHOTOVALUE1234567890';
+    const nextPhoto = 'data:image/jpeg;base64,NEWPHOTOVALUE1234567890';
+    context.Store.state = {
+      players: [{
+        id: 'johnson',
+        firstName: 'Johnson',
+        photoUrl: nextPhoto,
+        stamps: { photo: '2026-11-06T12:00:00.000Z' }
+      }],
+      gifts: [],
+      trainings: [],
+      settings: {},
+      feed: [],
+      feedMeta: { photo: { johnson: 'seed' }, photoAt: { johnson: '2026-11-06T12:00:00.000Z' } }
+    };
+    context.ClubFeed.sync();
+    assert.equal(context.Store.state.feed.filter(x => x.kind === 'photo').length, 0);
+    context.Store.state.players[0].photoUrl = oldPhoto;
+    context.ClubFeed.sync();
+    assert.equal(context.Store.state.feed.filter(x => x.kind === 'photo').length, 0);
+    context.Store.state.players[0].photoUrl = nextPhoto;
+    context.Store.state.players[0].stamps.photo = '2026-11-13T09:00:00.000Z';
+    context.ClubFeed.sync();
+    const photos = context.Store.state.feed.filter(x => x.kind === 'photo');
+    assert.equal(photos.length, 1);
+    assert.equal(photos[0].createdAt, '2026-11-13T09:00:00.000Z');
+    context.ClubFeed.sync();
+    assert.equal(context.Store.state.feed.filter(x => x.kind === 'photo').length, 1);
+    assert.equal(context.Store.state.feed[0].createdAt, '2026-11-13T09:00:00.000Z');
+  });
+
   it('keeps a deleted gift deleted and does not pin a gift taken off the profile', () => {
     context.Store.state = {
       players: [{ id: 'p1', profile: { featuredGiftId: 'g1' } }],

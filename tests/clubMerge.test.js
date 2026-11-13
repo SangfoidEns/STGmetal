@@ -213,6 +213,93 @@ describe('club snapshot merge', () => {
     assert.equal(merged.trainings[0].attendance.p1.present, true);
   });
 
+  it('keeps Johnson photo from last week when the phone card was edited later', () => {
+    const phone = {
+      players: [{
+        id: 'johnson',
+        firstName: 'Johnson',
+        lastName: 'Mensah',
+        number: 11,
+        photoUrl: 'data:image/jpeg;base64,OLDPHOTO',
+        updatedAt: '2026-11-13T10:00:00.000Z'
+      }],
+      trainings: [{
+        id: 't-cancel',
+        name: 'Тренування 12/11',
+        date: '2026-11-12',
+        status: 'done',
+        createdAt: '2026-11-01T10:00:00.000Z',
+        updatedAt: '2026-11-13T10:00:00.000Z',
+        attendance: { johnson: { present: true, updatedAt: '2026-11-13T10:00:00.000Z' } }
+      }]
+    };
+    const tablet = {
+      players: [{
+        id: 'johnson-tablet',
+        firstName: 'Johnson',
+        lastName: 'Mensah',
+        number: 11,
+        photoUrl: 'data:image/jpeg;base64,NEWPHOTO',
+        birthDate: '2002-04-04',
+        updatedAt: '2026-11-06T12:00:00.000Z',
+        stamps: { photo: '2026-11-06T12:00:00.000Z', birthDate: '2026-11-06T12:00:00.000Z' }
+      }],
+      trainings: [{
+        id: 't-cancel',
+        name: 'Тренування 12/11',
+        date: '2026-11-12',
+        status: 'cancelled',
+        cancelledAt: '2026-11-11T18:00:00.000Z',
+        updatedAt: '2026-11-11T18:00:00.000Z',
+        stamps: { status: '2026-11-11T18:00:00.000Z', schedule: '2026-11-11T18:00:00.000Z' },
+        attendance: { johnson: { present: false, updatedAt: '2026-11-10T18:00:00.000Z' } }
+      }],
+      calendar: [{ id: 'bday-johnson-tablet', type: 'birthday', date: '2002-04-04', playerId: 'johnson-tablet' }]
+    };
+    const merged = mergePayload(phone, tablet);
+    assert.equal(merged.players.length, 1);
+    assert.equal(merged.players[0].id, 'johnson');
+    assert.equal(merged.players[0].photoUrl, 'data:image/jpeg;base64,NEWPHOTO');
+    assert.equal(merged.players[0].birthDate, '2002-04-04');
+    assert.equal(merged.trainings.length, 1);
+    assert.equal(merged.trainings[0].status, 'cancelled');
+    assert.equal(merged.trainings[0].attendance.johnson.present, true);
+    const again = mergePayload(merged, tablet);
+    assert.equal(again.players.length, 1);
+    assert.equal(again.players[0].photoUrl, 'data:image/jpeg;base64,NEWPHOTO');
+    assert.equal(again.trainings.filter(t => t.status === 'cancelled').length, 1);
+  });
+
+  it('sums attendance from the phone and the tablet without a second session', () => {
+    const merged = mergePayload({
+      trainings: [{
+        id: 'night',
+        name: 'Вечір',
+        date: '2026-11-09',
+        status: 'planned',
+        createdAt: '2026-11-01T10:00:00.000Z',
+        updatedAt: '2026-11-01T10:00:00.000Z',
+        attendance: { a: { present: true, updatedAt: '2026-11-09T20:00:00.000Z' } }
+      }]
+    }, {
+      trainings: [{
+        id: 'night',
+        name: 'Вечір',
+        date: '2026-11-09',
+        status: 'planned',
+        createdAt: '2026-11-01T10:00:00.000Z',
+        updatedAt: '2026-11-01T10:00:00.000Z',
+        attendance: {
+          a: { present: false, updatedAt: '2026-11-09T18:00:00.000Z' },
+          b: { present: true, updatedAt: '2026-11-09T21:00:00.000Z' }
+        }
+      }]
+    });
+    assert.equal(merged.trainings.length, 1);
+    assert.equal(merged.trainings[0].attendance.a.present, true);
+    assert.equal(merged.trainings[0].attendance.b.present, true);
+  });
+
   it('does not fold a future 10/11 into an older session with the same name', () => {
     const merged = mergePayload({
       trainings: [

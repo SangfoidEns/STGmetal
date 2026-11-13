@@ -721,41 +721,47 @@ const StorageManager = {
 
   buildExportPayload() {
     const s = Store.get();
-    // Глибока копія players, щоб photoUrl точно потрапив у JSON
+    const clone = (value) => JSON.parse(JSON.stringify(value == null ? null : value));
+    try { if (typeof Views !== 'undefined' && Views.syncBirthdays) Views.syncBirthdays(); } catch (_) {}
     const players = (s.players || []).map(p => {
       const birth = p.birthDate || (p.profile && p.profile.birthDate) || p.birthday || '';
-      return {
-        ...p,
-        photoUrl: p.photoUrl || '',
-        birthDate: birth,
-        profile: Object.assign({}, p.profile || {}, birth ? { birthDate: birth } : {})
-      };
+      const copy = clone(p) || {};
+      copy.photoUrl = p.photoUrl || p.profilePhoto || '';
+      copy.profilePhoto = p.profilePhoto || '';
+      copy.birthDate = birth;
+      copy.profile = Object.assign({}, copy.profile || {}, birth ? { birthDate: birth } : {});
+      copy.stamps = Object.assign({}, p.stamps || {});
+      return copy;
     });
+    const exportedAt = new Date().toISOString();
     return {
+      type: 'metalist_full_migration',
       schemaVersion: SCHEMA_VERSION,
-      exportedAt: new Date().toISOString(),
-      settings: Object.assign({}, s.settings || {}, {
+      exportedAt: exportedAt,
+      updatedAt: s.updatedAt || exportedAt,
+      settings: Object.assign(clone(s.settings) || {}, {
         coachPhoto: (s.settings && s.settings.coachPhoto) || '',
         coachName: (s.settings && s.settings.coachName) || '',
         coachStats: (s.settings && s.settings.coachStats) || { appMs: 0, boardMs: 0 }
       }),
       players,
-      trainings: s.trainings,
-      exercises: s.exercises,
-      boards: s.boards,
-      calendar: s.calendar,
-      matches: s.matches,
-      diary: s.diary || [],
-      myExercises: s.myExercises || [],
-      animations: s.animations || [],
-      gifts: s.gifts || [],
-      moments: s.moments || [],
-      chat: s.chat || [],
-      feed: s.feed || [],
-      feedMeta: s.feedMeta || {},
+      trainings: clone(s.trainings) || [],
+      exercises: clone(s.exercises) || [],
+      boards: clone(s.boards) || [],
+      calendar: clone(s.calendar) || [],
+      matches: clone(s.matches) || [],
+      diary: clone(s.diary) || [],
+      myExercises: clone(s.myExercises) || [],
+      animations: clone(s.animations) || [],
+      gifts: clone(s.gifts) || [],
+      moments: clone(s.moments) || [],
+      chat: clone(s.chat) || [],
+      feed: clone(s.feed) || [],
+      feedMeta: clone(s.feedMeta) || {},
       activeBoard: {
-        objects: (s.activeBoard && s.activeBoard.objects) || [],
-        fieldView: (s.activeBoard && s.activeBoard.fieldView) || 'full'
+        objects: clone((s.activeBoard && s.activeBoard.objects) || []) || [],
+        fieldView: (s.activeBoard && s.activeBoard.fieldView) || 'full',
+        scheme: (s.activeBoard && s.activeBoard.scheme) || ''
       }
     };
   },
@@ -1208,6 +1214,7 @@ const StorageManager = {
       }
       if (ui) next.ui = Object.assign({}, next.ui || {}, ui);
       Store.set(next, { keepStamp: true });
+      try { if (typeof Views !== 'undefined' && Views.syncBirthdays) Views.syncBirthdays(); } catch (_) {}
       this.save(coachWriter ? undefined : { localOnly: true });
     };
 

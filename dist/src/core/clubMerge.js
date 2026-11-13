@@ -24,10 +24,52 @@ function recordStamp(obj) {
   return best;
 }
 
-/** Дата і статус тренування не залежать від печатки відвідування. */
+/** Дата тренування не залежить від печатки відвідування. */
 function scheduleStamp(obj) {
   if (!obj || typeof obj !== 'object') return 0;
-  return stamp(obj.updatedAt || obj.createdAt || obj.exportedAt);
+  if (obj.stamps && obj.stamps.schedule) return stamp(obj.stamps.schedule);
+  const rec = stamp(obj.updatedAt || obj.createdAt || obj.exportedAt);
+  let att = obj.stamps ? stamp(obj.stamps.attendance) : 0;
+  const attendance = obj.attendance;
+  if (attendance && typeof attendance === 'object') {
+    Object.keys(attendance).forEach(function (key) {
+      const cell = attendance[key];
+      if (cell && typeof cell === 'object') att = Math.max(att, stamp(cell.updatedAt));
+    });
+  }
+  if (att && obj.createdAt && Math.abs(att - rec) <= 2000) return stamp(obj.createdAt);
+  return rec;
+}
+
+function statusTime(obj) {
+  if (!obj || typeof obj !== 'object') return 0;
+  if (obj.stamps && obj.stamps.status) return stamp(obj.stamps.status);
+  const st = String(obj.status || '').toLowerCase();
+  if ((st === 'cancelled' || st === 'canceled') && obj.cancelledAt) return stamp(obj.cancelledAt);
+  return scheduleStamp(obj);
+}
+
+function fieldTime(obj, field) {
+  if (!obj || !obj.stamps) return 0;
+  const stamps = obj.stamps;
+  if (field === 'photo' || field === 'photoUrl' || field === 'profilePhoto') {
+    return Math.max(stamp(stamps.photo), stamp(stamps.photoUrl), stamp(stamps.profilePhoto));
+  }
+  if (field === 'birthDate' || field === 'birthday') {
+    return Math.max(stamp(stamps.birthDate), stamp(stamps.birthday));
+  }
+  return stamp(stamps[field]);
+}
+
+function mergeStampMap(a, b) {
+  const out = Object.assign({}, a || {}, b || {});
+  Object.keys(out).forEach(function (key) {
+    const left = a && a[key];
+    const right = b && b[key];
+    if (stamp(right) >= stamp(left)) out[key] = right || left || out[key];
+    else out[key] = left || right || out[key];
+  });
+  return out;
 }
 
 function isoDay(value) {
@@ -68,9 +110,23 @@ function applyTrainingSchedule(merged, winner, loser) {
     if (lRank > wRank) from = loser;
     else if (lRank === wRank && lDate && wDate && lDate > wDate) from = loser;
   }
-  ['name', 'date', 'time', 'status', 'duration', 'place', 'surface', 'intensity', 'mainGoal', 'comment', 'structure', 'playersCount', 'physGoal', 'tactGoal', 'techGoal', 'psychGoal'].forEach(function (key) {
+  ['name', 'date', 'time', 'duration', 'place', 'surface', 'intensity', 'mainGoal', 'comment', 'structure', 'playersCount', 'physGoal', 'tactGoal', 'techGoal', 'psychGoal'].forEach(function (key) {
     if (from && filled(from[key])) merged[key] = from[key];
   });
+  let statusFrom = winner;
+  const wStatus = statusTime(winner);
+  const lStatus = statusTime(loser);
+  if (lStatus > wStatus) statusFrom = loser;
+  else if (lStatus === wStatus && loser) {
+    const loserCancelled = planRank(loser) === 0;
+    const winnerCancelled = planRank(winner) === 0;
+    if (loserCancelled && !winnerCancelled) statusFrom = loser;
+    else if (!loserCancelled && !winnerCancelled && planRank(loser) > planRank(winner)) statusFrom = loser;
+  }
+  if (statusFrom && statusFrom.status) merged.status = statusFrom.status;
+  if (String((merged && merged.status) || '').toLowerCase() === 'cancelled' || String((merged && merged.status) || '').toLowerCase() === 'canceled') {
+    merged.cancelledAt = (statusFrom && statusFrom.cancelledAt) || merged.cancelledAt;
+  }
   const day = isoDay(merged.date);
   if (day) merged.date = day;
 }
@@ -114,8 +170,35 @@ function mergeRecord(baseItem, extraItem) {
   else if (!extraWins && baseItem && baseItem.coachPresent != null) merged.coachPresent = baseItem.coachPresent;
   if (training) applyTrainingSchedule(merged, winner, loser);
   keepFilled(merged, loser, winner);
+  applyStampedFields(merged, baseItem, extraItem);
   releaseWorkingSession(merged);
   return merged;
+}
+
+function applyStampedFields(merged, a, b) {
+  if (!merged) return;
+  ['birthDate', 'phone', 'bio', 'statusText', 'status', 'notes', 'firstName', 'lastName', 'position', 'telegramUsername'].forEach(function (field) {
+    const ta = fieldTime(a, field);
+    const tb = fieldTime(b, field);
+    if (!ta && !tb) return;
+    const src = tb > ta ? b : a;
+    if (filled(src && src[field])) merged[field] = src[field];
+  });
+  const photoAtA = fieldTime(a, 'photo');
+  const photoAtB = fieldTime(b, 'photo');
+  if (photoAtA || photoAtB) {
+    const src = photoAtB > photoAtA ? b : a;
+    if (filled(src && (src.photoUrl || src.profilePhoto))) {
+      merged.photoUrl = src.photoUrl || src.profilePhoto || merged.photoUrl;
+      merged.profilePhoto = src.profilePhoto || src.photoUrl || merged.profilePhoto;
+    }
+  }
+  if (merged.birthDate) {
+    merged.profile = Object.assign({}, merged.profile || {});
+    merged.profile.birthDate = String(merged.birthDate).slice(0, 10);
+  }
+  const stamps = mergeStampMap(a && a.stamps, b && b.stamps);
+  if (Object.keys(stamps).length) merged.stamps = stamps;
 }
 
   function filled(value) {
@@ -232,7 +315,7 @@ function mergeRecord(baseItem, extraItem) {
 
   function mergeFeedMeta(base, extra) {
     const out = {};
-    ['status', 'photo', 'level', 'streak'].forEach(function (key) {
+    ['status', 'photo', 'photoAt', 'level', 'streak'].forEach(function (key) {
       const a = (base && base[key]) || {};
       const b = (extra && extra[key]) || {};
       const merged = Object.assign({}, a, b);
@@ -241,9 +324,88 @@ function mergeRecord(baseItem, extraItem) {
           merged[id] = Math.max(Number(a[id]) || 0, Number(b[id]) || 0);
         });
       }
+      if (key === 'photoAt') {
+        Object.keys(merged).forEach(function (id) {
+          merged[id] = stamp(b[id]) >= stamp(a[id]) ? (b[id] || a[id]) : (a[id] || b[id]);
+        });
+      }
       out[key] = merged;
     });
     return out;
+  }
+
+  function playerAlias(item) {
+    if (!item) return '';
+    const tg = String(item.telegramUsername || item.telegram || '').replace(/^@/, '').trim().toLowerCase();
+    if (tg) return 'tg:' + tg;
+    const name = (String(item.firstName || '') + ' ' + String(item.lastName || '')).trim().toLowerCase().replace(/\s+/g, ' ');
+    const num = Number(item.number) || 0;
+    if (name && num) return 'nm:' + name + '#' + num;
+    return '';
+  }
+
+  function retargetId(value, idMap) {
+    if (value == null) return value;
+    const next = idMap[String(value)];
+    return next || value;
+  }
+
+  function collapsePlayers(payload) {
+    if (!payload || !Array.isArray(payload.players)) return { removed: 0, idMap: {} };
+    const groups = new Map();
+    payload.players.forEach(function (item) {
+      if (!item) return;
+      const alias = playerAlias(item) || ('id:' + (item.id || ''));
+      if (!groups.has(alias)) groups.set(alias, []);
+      groups.get(alias).push(item);
+    });
+    const kept = [];
+    const idMap = {};
+    groups.forEach(function (items) {
+      if (!items.length) return;
+      if (items.length === 1) {
+        kept.push(items[0]);
+        return;
+      }
+      let winner = items[0];
+      items.slice(1).forEach(function (loser) {
+        const merged = mergeRecord(winner, loser);
+        merged.id = winner.id;
+        if (loser && loser.id && loser.id !== winner.id) idMap[String(loser.id)] = winner.id;
+        winner = merged;
+      });
+      kept.push(winner);
+    });
+    payload.players = kept;
+    if (!Object.keys(idMap).length) return { removed: 0, idMap: idMap };
+    (payload.trainings || []).forEach(function (training) {
+      if (!training || !training.attendance) return;
+      const next = {};
+      Object.keys(training.attendance).forEach(function (pid) {
+        const id = retargetId(pid, idMap);
+        const cell = training.attendance[pid];
+        if (!next[id]) next[id] = cell;
+        else {
+          const pack = {};
+          pack[id] = next[id];
+          const extra = {};
+          extra[id] = cell;
+          next[id] = mergeAttendance(pack, extra)[id];
+        }
+      });
+      training.attendance = next;
+    });
+    ['gifts', 'moments', 'chat', 'feed', 'calendar', 'diary'].forEach(function (list) {
+      (payload[list] || []).forEach(function (item) {
+        if (item && item.playerId) item.playerId = retargetId(item.playerId, idMap);
+      });
+    });
+    (payload.matches || []).forEach(function (match) {
+      if (!match) return;
+      if (Array.isArray(match.xi)) match.xi = match.xi.map(function (id) { return retargetId(id, idMap); });
+      if (Array.isArray(match.bench)) match.bench = match.bench.map(function (id) { return retargetId(id, idMap); });
+    });
+    return { removed: Object.keys(idMap).length, idMap: idMap };
   }
 
   function trainingNameKey(name) {
@@ -309,8 +471,13 @@ function collapseTrainings(payload) {
     const day = isoDay(winner.date);
     if (day) winner.date = day;
     ranked.slice(1).forEach(function (loser) {
-      if (loser && loser.id) idMap[loser.id] = winner.id;
+      if (loser && loser.id && loser.id !== winner.id) idMap[loser.id] = winner.id;
       winner.attendance = mergeAttendance(winner.attendance, loser && loser.attendance);
+      if (statusTime(loser) > statusTime(winner)) {
+        winner.status = loser.status;
+        if (loser.cancelledAt) winner.cancelledAt = loser.cancelledAt;
+        winner.stamps = mergeStampMap(winner.stamps, loser.stamps);
+      }
     });
     releaseWorkingSession(winner);
     kept.push(winner);
@@ -346,6 +513,7 @@ function collapseTrainings(payload) {
       });
     }
     collapseTrainings(out);
+    collapsePlayers(out);
     return out;
   }
 
@@ -355,6 +523,7 @@ function collapseTrainings(payload) {
     mergeCoachStats: mergeCoachStats,
     recordStamp: recordStamp,
     collapseTrainings: collapseTrainings,
+    collapsePlayers: collapsePlayers,
     trainingNameKey: trainingNameKey
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
