@@ -12505,7 +12505,8 @@ body.mode-board-focus #boardToolbarTop.btb-top {
   color: inherit;
   cursor: pointer;
 }
-.match-plan { display: flex; flex-direction: column; gap: 12px; }
+.match-plan { display: flex; flex-direction: column; gap: 12px; padding-bottom: 28px; }
+.match-actions .btn { position: relative; z-index: 2; touch-action: manipulation; }
 .match-top { display: flex; align-items: center; gap: 10px; }
 .match-top .st { margin: 0; }
 .match-plan .fl {

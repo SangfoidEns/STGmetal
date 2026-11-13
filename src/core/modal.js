@@ -19,6 +19,7 @@ const Modal = {
     });
   },
   close(result) {
+    try { if (typeof App !== 'undefined' && App._armUiQuiet) App._armUiQuiet(700); } catch (_) {}
     document.getElementById('modal').classList.remove('show');
     const res = result != null ? result : { action: 'cancel' };
     if (typeof this._resolve === 'function') {

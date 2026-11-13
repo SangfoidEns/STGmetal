@@ -24,7 +24,7 @@ const ClickGuard = {
     const r = own.getBoundingClientRect();
     if (r.height < 2) return true;
     if (r.bottom <= band.top + 6) return false;
-    if (r.top >= band.top - 4) return false;
+    if (r.width >= 8 && r.height <= 72) return false;
     return true;
   },
 

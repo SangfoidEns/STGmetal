@@ -1368,9 +1368,15 @@ const Actions = {
         event.title = 'vs ' + (m.opponent || 'Матч');
       }
     });
+    const main = document.getElementById('main');
+    const scroll = main ? main.scrollTop : 0;
     StorageManager.save();
     Toast.show('План збережено', 'ok');
+    if (!s.ui) s.ui = {};
+    s.ui.view = 'matches';
+    s.ui.matchId = m.id;
     App.renderCurrent();
+    if (main) main.scrollTop = scroll;
   },
 
   fillMatchSquad() {

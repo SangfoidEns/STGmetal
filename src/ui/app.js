@@ -1159,6 +1159,47 @@ const App = {
     return !!node.closest('.card-training, [data-training-id], [data-next-training]');
   },
 
+  _eventNode(e) {
+    let node = e && e.target;
+    if (node && node.nodeType === 3) node = node.parentElement;
+    return node && node.closest ? node : null;
+  },
+
+  _armUiQuiet(ms) {
+    this._uiQuietUntil = Date.now() + (ms || 700);
+    this._trainingArm = null;
+  },
+
+  _noteTrainingArm(e) {
+    const node = this._eventNode(e);
+    if (!node) { this._trainingArm = null; return; }
+    const card = node.closest('.card-training[data-training-id], [data-edit-training], [data-next-training], [data-action="open-training"], [data-action="preview-next-training"]');
+    if (!card) { this._trainingArm = null; return; }
+    const own = node.closest('button, a, input, select, textarea, [data-action]');
+    if (own && own !== card) {
+      const action = own.getAttribute('data-action') || '';
+      if (action && action !== 'open-training' && action !== 'preview-next-training') {
+        this._trainingArm = null;
+        return;
+      }
+    }
+    const id = card.getAttribute('data-training-id')
+      || card.getAttribute('data-edit-training')
+      || card.getAttribute('data-next-training')
+      || card.getAttribute('data-tid')
+      || '';
+    this._trainingArm = { id: String(id), at: Date.now(), x: e.clientX, y: e.clientY };
+  },
+
+  _allowTrainingOpen(e, id) {
+    if (this._uiQuietUntil && Date.now() < this._uiQuietUntil) return false;
+    const arm = this._trainingArm;
+    if (!arm || String(arm.id) !== String(id || '')) return false;
+    if (Date.now() - arm.at > 900) return false;
+    if (Math.abs((e.clientX || 0) - arm.x) + Math.abs((e.clientY || 0) - arm.y) > 36) return false;
+    return true;
+  },
+
   _navButtonAt(x, y) {
     const nav = document.getElementById('mobileNav');
     if (!nav) return null;
@@ -1552,6 +1593,7 @@ const App = {
   },
 
   renderCurrent() {
+    try { this._armUiQuiet(700); } catch (_) {}
     try { this.startUsageTracker(); } catch (_) {}
     try { this.syncRoleClass(); } catch (_) {}
     try { if (!this._bdayChecked) { this._bdayChecked = true; this.checkBirthdays(); } } catch (_) {}
@@ -2218,6 +2260,12 @@ const App = {
   },
 
   bindEvents() {
+    if (!this._trainingArmBound) {
+      this._trainingArmBound = true;
+      document.addEventListener('pointerdown', (e) => {
+        try { App._noteTrainingArm(e); } catch (_) {}
+      }, true);
+    }
     if (!this._navGuardBound) {
       this._navGuardBound = true;
       document.addEventListener('click', (e) => {
@@ -2248,6 +2296,7 @@ const App = {
         e.preventDefault();
         e.stopPropagation();
         if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        if (!App._allowTrainingOpen(e, tid)) return;
         App._chatPointerDown = false;
         App._chatGuardUntil = 0;
         if (openBtn.getAttribute('data-action') === 'preview-next-training' || openBtn.hasAttribute('data-next-training')) {
@@ -2413,11 +2462,12 @@ const App = {
       }
       if (action === 'open-training') {
         e.preventDefault(); e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
         if (this._lpSuppressClick) return;
         const tid = t.dataset.trainingId || (t.closest && t.closest('[data-training-id]') && t.closest('[data-training-id]').dataset.trainingId);
-        if (tid) return this.openTrainingActionSheet(tid);
-        Toast.show('Тренування не знайдено', 'warn');
-        return;
+        if (!tid) { Toast.show('Тренування не знайдено', 'warn'); return; }
+        if (!this._allowTrainingOpen(e, tid)) return;
+        return this.openTrainingActionSheet(tid);
       }
       if (action === 'player-train-tab') {
         e.preventDefault(); e.stopPropagation();
@@ -2607,7 +2657,12 @@ const App = {
         App.renderCurrent();
         return;
       }
-      if (action === 'match-save') return Actions.saveMatch();
+      if (action === 'match-save') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        return Actions.saveMatch();
+      }
       if (action === 'match-xi') return Actions.fillMatchSquad();
       if (action === 'match-board') return Actions.openMatchBoard();
       if (action === 'match-week') return Actions.buildMatchWeek();
@@ -3796,15 +3851,15 @@ const App = {
         e.preventDefault();
         e.stopPropagation();
         if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
-        // Застарілий атрибут: відкриваємо sheet (план+статистика), не форсуємо edit
         if (this._lpSuppressClick) return;
+        if (!this._allowTrainingOpen(e, t.dataset.editTraining)) return;
         return this.openTrainingActionSheet(t.dataset.editTraining);
       }
-      // Короткий тап по картці тренування → план + статистика (не редагування)
       if (t.dataset.trainingId && t.classList && t.classList.contains('card-training')) {
         e.preventDefault();
         e.stopPropagation();
         if (this._lpSuppressClick) return;
+        if (!this._allowTrainingOpen(e, t.dataset.trainingId)) return;
         return this.openTrainingActionSheet(t.dataset.trainingId);
       }
       if (t.closest && t.closest('.card-training[data-training-id]') && (!t.dataset.action || t.dataset.action === 'open-training')) {
@@ -3813,6 +3868,7 @@ const App = {
           e.preventDefault();
           e.stopPropagation();
           if (this._lpSuppressClick) return;
+          if (!this._allowTrainingOpen(e, row.dataset.trainingId)) return;
           return this.openTrainingActionSheet(row.dataset.trainingId);
         }
       }
@@ -3823,6 +3879,7 @@ const App = {
           return;
         }
         if (this._lpSuppressClick) return;
+        if (!this._allowTrainingOpen(e, t.dataset.nextTraining)) return;
         return this.openNextTrainingPreview(t.dataset.nextTraining);
       }
       if (t.dataset.playerSort) {
