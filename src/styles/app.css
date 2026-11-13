@@ -6461,30 +6461,30 @@ body.role-player .fifa-card { display: block !important; }
   justify-self: end !important;
   display: flex !important;
   flex-direction: column !important;
-  align-items: flex-end !important;
+  align-items: center !important;
+  justify-content: center !important;
   gap: 2px !important;
-  max-width: 110px !important;
-  padding: 6px 8px !important;
+  width: 100% !important;
+  max-width: 108px !important;
+  padding: 2px 4px !important;
   border-radius: 12px !important;
   border: none !important;
   background: transparent !important;
   color: inherit !important;
   cursor: pointer !important;
-}
-.tg-next-label {
-  font-size: 9px !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.06em !important;
-  color: var(--muted) !important;
-  font-weight: 700 !important;
+  text-align: center !important;
 }
 .tg-next-val {
   font-size: 11px !important;
-  font-weight: 700 !important;
-  white-space: nowrap !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+  text-align: center !important;
+  white-space: normal !important;
   overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  max-width: 100px !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  max-width: 100% !important;
 }
 .cp-clean .cp-orbit { display: none !important; }
 .cp-clean {
@@ -6674,28 +6674,39 @@ body.role-player [data-io="export"] {
 .tg-next-btn {
   justify-self: end !important;
   align-self: center !important;
-  max-width: 46vw !important;
+  width: 100% !important;
+  max-width: 108px !important;
   min-width: 0 !important;
-  text-align: right !important;
-  padding: 4px 8px !important;
+  text-align: center !important;
+  padding: 2px 2px !important;
   border-radius: 14px !important;
   display: flex !important;
-  flex-direction: row !important;
+  flex-direction: column !important;
   align-items: center !important;
-  gap: 6px !important;
+  justify-content: center !important;
+  gap: 2px !important;
 }
-.tg-next-copy { display: flex; flex-direction: column; align-items: flex-end; min-width: 0; }
 .tg-next-crest {
-  width: 28px; height: 28px; border-radius: 50%; overflow: hidden; flex: 0 0 auto;
+  width: 36px; height: 36px; border-radius: 50%; overflow: hidden; flex: 0 0 auto;
   display: flex; align-items: center; justify-content: center;
   background: radial-gradient(circle at 35% 30%, #2a3342, #10141b 70%);
-  box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.85);
-  font-size: 8px; font-weight: 800;
+  box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.85), 0 6px 14px rgba(0, 0, 0, 0.35);
+  font-size: 9px; font-weight: 800; letter-spacing: 0.02em;
 }
 .tg-next-crest img { width: 100%; height: 100%; object-fit: cover; }
-.tg-next-label { font-size: 9px !important; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.04em; }
-.tg-next-val { font-size: 11px !important; font-weight: 800; max-width: 108px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tg-next-cd { font-size: 10px !important; color: var(--accent, #e8c547); }
+.tg-next-val {
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+  max-width: 100% !important;
+  text-align: center !important;
+  white-space: normal !important;
+  overflow: hidden !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+}
+.tg-next-cd { font-size: 10px !important; color: var(--accent, #e8c547); text-align: center; line-height: 1.15; }
 .mat-row { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
 .mat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 6px; }
 .mat-grid label { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: #9aa4b2; }
@@ -6789,7 +6800,8 @@ body.role-player [data-io="export"] {
   .tg-hdr-pill { min-height: 58px !important; padding: 6px 8px !important; gap: 4px !important; }
   .tg-emblem, .tg-emblem-face, .tg-emblem .logo-ph { width: 42px !important; height: 42px !important; }
   .tg-hdr-titles { max-width: 120px !important; }
-  .tg-next-val { max-width: 90px; }
+  .tg-next-btn { max-width: 92px !important; }
+  .tg-next-crest { width: 32px; height: 32px; }
 }
 
 
@@ -12574,14 +12586,23 @@ body.mode-board-focus #boardToolbarTop.btb-top {
   padding: 0;
 }
 .match-toolbar .btn { flex: 1 1 148px; min-height: 46px; }
-.cp-stat-past { padding: 6px !important; }
-.cp-stat-past .match-plaque { gap: 4px; padding: 8px 4px; }
-.cp-stat-past .match-plaque-crest { width: 40px; height: 40px; font-size: 11px; }
-.cp-stat-past .match-plaque-vs { font-size: 16px; }
-.cp-stat-past .match-plaque-kicker { letter-spacing: 0.06em; }
-.cp-stat-past .match-plaque-name,
-.cp-stat-past .match-plaque-when,
-.cp-stat-past .match-plaque-comp { font-size: 10px; }
+.cp-stat-match,
+.cp-stat-past {
+  align-items: stretch !important;
+  justify-content: center !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+  padding: 8px !important;
+}
+.cp-stat-past {
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(125, 211, 252, 0.14), transparent 55%),
+    radial-gradient(90% 80% at 0% 100%, rgba(232, 197, 71, 0.12), transparent 50%),
+    rgba(12, 16, 22, 0.72) !important;
+}
+.match-hero { padding: 8px !important; }
+.match-hero .match-plaque { background: transparent; }
+.match-stadium { text-align: center; margin: 4px 0 0; }
 .match-hero-crests {
   display: flex;
   align-items: center;
@@ -12632,12 +12653,15 @@ body.mode-board-focus #boardToolbarTop.btb-top {
 .match-plaque-crest img { width: 100%; height: 100%; object-fit: cover; }
 .match-plaque-name {
   max-width: 100%;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
   line-height: 1.2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  word-break: break-word;
 }
 .match-plaque-mid { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 84px; }
 .match-plaque-kicker {

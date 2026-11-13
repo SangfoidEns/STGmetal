@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z85',
+  APP_BUILD: 'z86',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -48,13 +48,18 @@ const Views = {
     const clubLogo = o.clubLogo || (s.settings && s.settings.logoData) || this.clubMark();
     const opp = m.opponent || 'Суперник';
     const letters = String(opp).replace(/[^A-Za-zА-Яа-яІіЇїЄєҐґ0-9]/g, '').slice(0, 3).toUpperCase() || 'VS';
-    const when = [m.date, m.time].filter(Boolean).join(' · ');
+    const dateBits = String(m.date || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const dateLabel = dateBits ? (dateBits[3] + '.' + dateBits[2] + '.' + dateBits[1]) : (m.date || '');
+    const when = [dateLabel, m.time].filter(Boolean).join(' · ');
     const where = m.home === false ? 'Виїзд' : 'Дім';
-    const comp = m.competition || where;
+    const comp = [m.competition, where].filter(Boolean).join(' · ') || where;
     const score = (m.scoreUs != null && m.scoreUs !== '' && m.scoreThem != null && m.scoreThem !== '')
       ? (m.scoreUs + ' : ' + m.scoreThem) : '';
     const kicker = o.kicker || (score ? 'Рахунок' : 'Наступний матч');
-    return '<button type="button" class="match-plaque" data-action="open-match" data-match-id="' + sanitize(m.id || '') + '">' +
+    const open = o.plain
+      ? '<div class="match-plaque">'
+      : ('<button type="button" class="match-plaque" data-action="open-match" data-match-id="' + sanitize(m.id || '') + '">');
+    return open +
       '<span class="match-plaque-side">' +
         '<span class="match-plaque-crest">' + this._crestHtml(clubLogo, short) + '</span>' +
         '<span class="match-plaque-name">' + sanitize(short) + '</span>' +
@@ -69,7 +74,7 @@ const Views = {
         '<span class="match-plaque-crest is-opp">' + this._crestHtml(m.opponentLogo, letters) + '</span>' +
         '<span class="match-plaque-name">' + sanitize(opp) + '</span>' +
       '</span>' +
-    '</button>';
+    (o.plain ? '</div>' : '</button>');
   },
 
   _gl(g) {
@@ -566,15 +571,15 @@ const Views = {
           <div class="cp-stat cp-stat-wide cp-stat-match">
             ${matchHtml}
           </div>
-          <button type="button" class="cp-stat sc-tap cp-stat-action" data-view="tactics">
+          ${pastMatch
+            ? ('<div class="cp-stat cp-stat-wide cp-stat-match cp-stat-past">' + this._matchPlaque(pastMatch, { clubShort: short, clubLogo: logo || this.clubMark(), kicker: 'Минулий матч' }) + '</div>')
+            : '<button type="button" class="cp-stat cp-stat-wide sc-tap cp-stat-action" data-view="matches"><span class="cp-stat-ic">🏟</span><span class="cp-stat-val">—</span><span class="cp-stat-lb">Минулий матч</span><span class="cp-stat-sub">Ще не зіграний</span></button>'}
+          <button type="button" class="cp-stat cp-stat-wide sc-tap cp-stat-action" data-view="tactics">
             <span class="cp-stat-ic">🗂</span>
             <span class="cp-stat-val">${boardCount}</span>
             <span class="cp-stat-lb">${t('schemes')}</span>
             <span class="cp-stat-sub">${recentBoards.map(b => sanitize((b.name||'Схема').slice(0,18))).join(' · ') || t('saved_boards')}</span>
           </button>
-          ${pastMatch
-            ? ('<div class="cp-stat cp-stat-past">' + this._matchPlaque(pastMatch, { clubShort: short, clubLogo: logo || this.clubMark(), kicker: 'Минулий матч' }) + '</div>')
-            : '<button type="button" class="cp-stat sc-tap cp-stat-action" data-view="matches"><span class="cp-stat-ic">🏟</span><span class="cp-stat-val">—</span><span class="cp-stat-lb">Минулий матч</span><span class="cp-stat-sub">Ще не зіграний</span></button>'}
         </div>
 
         <!-- Coach tools (collapse) -->
@@ -1193,7 +1198,12 @@ const Views = {
         <button type="button" class="cp-pill" data-view="analytics">📊 ${t('analytics')}</button>
       </div>
 
-      ${nextMatch ? this._matchPlaque(nextMatch) : ''}
+      ${nextMatch ? ('<div class="cp-stat cp-stat-wide cp-stat-match">' + this._matchPlaque(nextMatch) + '</div>') : ''}
+      ${(() => {
+        const past = (s.matches || []).filter(m => m && m.date && m.date < todayStr && (!nextMatch || String(m.id) !== String(nextMatch.id)))
+          .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.time || '').localeCompare(String(a.time || '')))[0];
+        return past ? ('<div class="cp-stat cp-stat-wide cp-stat-match cp-stat-past">' + this._matchPlaque(past, { kicker: 'Минулий матч' }) + '</div>') : '';
+      })()}
 
       ${next
         ? ('<div class="next-tr-wrap"><button type="button" class="card glass next-tr-card" data-action="preview-next-training" data-training-id="' + next.id + '">' +
@@ -2330,24 +2340,15 @@ trainings() {
       (canEdit
         ? ('<textarea class="fl-input" id="' + id + '">' + sanitize(value || '') + '</textarea>')
         : ('<p class="note-sm">' + sanitize(value || '—') + '</p>')) + '</label>';
-    const where = m.home === false ? 'Виїзд' : 'Дім';
     const score = (m.scoreUs != null && m.scoreUs !== '' && m.scoreThem != null && m.scoreThem !== '')
       ? (m.scoreUs + ':' + m.scoreThem) : '';
-    const oppLetters = String(m.opponent || 'VS').replace(/[^A-Za-zА-Яа-яІіЇїЄєҐґ0-9]/g, '').slice(0, 3).toUpperCase() || 'VS';
     const clubLogo = (s.settings && s.settings.logoData) || this.clubMark();
     const warmOn = !!(have.WU || (m.warmup && String(m.warmup).trim()) || m.warmupAt);
     return '<div class="match-plan" data-match-id="' + sanitize(m.id || '') + '">' +
       '<div class="match-top"><button type="button" class="btn btn-s btn-sm" data-action="match-back">‹ Матчі</button><div class="st">План матчу</div></div>' +
       '<section class="card glass match-hero">' +
-        '<div class="match-hero-crests">' +
-          '<span class="match-plaque-crest">' + this._crestHtml(clubLogo, (s.settings && s.settings.clubShort) || 'МШ') + '</span>' +
-          '<span class="match-plaque-vs">VS</span>' +
-          '<span class="match-plaque-crest is-opp">' + this._crestHtml(m.opponentLogo, oppLetters) + '</span>' +
-        '</div>' +
-        '<div class="ct">vs ' + sanitize(m.opponent || 'Суперник') + (score ? (' · ' + sanitize(score)) : '') + '</div>' +
-        '<p class="note-sm">' + sanitize(m.date || '') + (m.time ? (' · ' + sanitize(m.time)) : '') + ' · ' + where +
-        (m.stadium ? (' · ' + sanitize(m.stadium)) : '') +
-        (m.competition ? (' · ' + sanitize(m.competition)) : '') + '</p>' +
+        this._matchPlaque(m, { plain: true, clubLogo: clubLogo, clubShort: (s.settings && s.settings.clubShort) || 'МШ', kicker: score ? 'Рахунок' : 'Матч' }) +
+        (m.stadium ? ('<p class="note-sm match-stadium">' + sanitize(m.stadium) + '</p>') : '') +
         (call ? ('<p class="match-call">' + call + '</p>') : '') +
       '</section>' +
       (canEdit ? (

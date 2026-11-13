@@ -613,7 +613,6 @@ const I18n = (() => {
       ['[data-view="tactics"] .mni-label, [data-view="tactics"] .nl', 'nav_tactics'],
       ['[data-view="players"] .mni-label, [data-view="players"] .nl', 'nav_squad'],
       ['.mni-more .mni-label', 'nav_more'],
-      ['#nextTrBtn .tg-next-label', 'next_label'],
       ['#fsExitBtn', 'exit_board']
     ];
     map.forEach(([sel, key]) => {

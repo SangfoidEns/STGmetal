@@ -29,7 +29,18 @@ describe('calendar weekday letters', () => {
     assert.match(html, /title="Субота">Сб</);
     assert.match(html, /title="Неділя">Нд</);
     assert.equal(html.includes('>А<'), false);
-    assert.equal(context.Views.APP_BUILD, 'z85');
+    assert.equal(context.Views.APP_BUILD, 'z86');
+    const plaque = context.Views._matchPlaque({
+      id: 'm9', opponent: 'Turbine Leuschner', date: '2026-10-25', time: '20:00',
+      competition: 'Товариський матч', home: true, scoreUs: 2, scoreThem: 1
+    }, { kicker: 'Минулий матч', clubShort: 'Metalist' });
+    assert.match(plaque, /Turbine Leuschner/);
+    assert.match(plaque, /25\.10\.2026 · 20:00/);
+    assert.match(plaque, /Минулий матч/);
+    assert.match(plaque, /2 : 1/);
+    assert.match(plaque, /Товариський матч · Дім/);
+    assert.equal(plaque.includes('Далі'), false);
+    assert.equal(context.Views._matchPlaque({ id: 'm9', opponent: 'Turbine Leuschner', date: '2026-11-15' }, { plain: true }).includes('data-action'), false);
     assert.equal(context.Views.versionLetter('07.11.2026'), 'Д');
     assert.equal(context.Views.versionLetter('06.11.2026'), 'Ґ');
     assert.equal(context.Views.versionLetter('02.11.2026'), 'А');
