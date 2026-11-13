@@ -1382,6 +1382,83 @@ const BoardEngine = {
     return true;
   },
 
+  /** Ставить збережену заявку матчу: основа по слотах схеми, лавка окремо. */
+  placeMatchLineup(match) {
+    if (!match) return false;
+    const schemeName = match.scheme || '3-1-2-2-1-1';
+    const scheme = (typeof SCHEMES !== 'undefined' && SCHEMES[schemeName]) || null;
+    if (!scheme) return false;
+    const s = Store.get();
+    if (!s) return false;
+    if (!s.activeBoard) s.activeBoard = { objects: [], selectedId: null, tool: 'select', fieldView: 'full' };
+    s.activeBoard.sourceBoardId = null;
+    s.activeBoard.scheme = schemeName;
+    s.activeBoard.selectedId = null;
+    const roles = (typeof CoachTools !== 'undefined' && CoachTools.schemeRoles)
+      ? CoachTools.schemeRoles(schemeName)
+      : scheme.slice(0, 11).map(function () { return 'MID'; });
+    const byId = {};
+    (s.players || []).forEach(function (p) { if (p && p.id != null) byId[String(p.id)] = p; });
+    const chipColor = s.activeBoard.drawColor || '#c8a84b';
+    const nextId = function () {
+      return (typeof uid === 'function') ? uid() : ('mp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6));
+    };
+    const objects = [];
+    const used = {};
+    scheme.slice(0, 11).forEach(function (slot, i) {
+      const point = this.clampWorld(slot[1], slot[2]);
+      const player = (match.xi && match.xi[i] != null) ? byId[String(match.xi[i])] : null;
+      if (player) used[String(player.id)] = true;
+      const isGk = roles[i] === 'GK' || (player && typeof CoachTools !== 'undefined' && CoachTools.lineupRole(player) === 'GK');
+      const col = isGk ? this.GK_CHIP_COLOR : chipColor;
+      objects.push({
+        id: nextId(), type: 'player', x: point.x, y: point.y,
+        number: player ? player.number : (i + 1),
+        label: player ? (player.lastName || player.firstName || '') : (roles[i] || ''),
+        team: 'own',
+        playerId: player ? player.id : null,
+        readiness: player ? (player.readiness != null ? player.readiness : player.condition) : 80,
+        load: player && player.load != null ? player.load : 0,
+        position: player ? player.position : (roles[i] || null),
+        status: player ? player.status : null,
+        isCaptain: player ? !!player.isCaptain : false,
+        chipColor: col,
+        color: col,
+        onBench: false,
+        rotation: 0, locked: false, visible: true
+      });
+    }, this);
+    (match.bench || []).forEach(function (id) {
+      const player = byId[String(id)];
+      if (!player || used[String(player.id)]) return;
+      used[String(player.id)] = true;
+      objects.push({
+        id: nextId(), type: 'player', x: 0, y: 0,
+        number: player.number,
+        label: player.lastName || player.firstName || '',
+        team: 'own',
+        playerId: player.id,
+        readiness: player.readiness != null ? player.readiness : (player.condition != null ? player.condition : 80),
+        load: player.load != null ? player.load : 0,
+        position: player.position || null,
+        status: player.status || null,
+        isCaptain: !!player.isCaptain,
+        chipColor: chipColor,
+        color: chipColor,
+        onBench: true,
+        rotation: 0, locked: false, visible: true
+      });
+    });
+    s.activeBoard.objects = objects;
+    try { this.pushHistory(); } catch (_) {}
+    try { this.render(); } catch (_) {}
+    try { this.renderToolbar(); } catch (_) {}
+    const onPitch = objects.filter(function (o) { return o.playerId && !o.onBench; }).length;
+    const benchN = objects.filter(function (o) { return o.onBench; }).length;
+    try { Toast.show((match.opponent ? ('vs ' + match.opponent + ' · ') : '') + schemeName + ' · на полі ' + onPitch + ' · лавка ' + benchN, 'ok'); } catch (_) {}
+    return true;
+  },
+
   saveBoard() {
     const linked = Store.get().activeBoard && Store.get().activeBoard.sourceBoardId;
     if (linked && typeof Actions !== 'undefined' && Actions.saveSchemeDrawing) {

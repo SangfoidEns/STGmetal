@@ -2594,6 +2594,20 @@ const App = {
       if (action === 'new-player') return Actions.newPlayer();
       if (action === 'new-exercise') return Actions.newExercise();
       if (action === 'new-match') return Actions.newMatch();
+      if (action === 'open-match') return Actions.viewMatch(t.dataset.matchId || t.getAttribute('data-match-id'));
+      if (action === 'match-back') {
+        const ui = Store.get().ui || {};
+        ui.matchId = null;
+        Store.get().ui = ui;
+        App.renderCurrent();
+        return;
+      }
+      if (action === 'match-save') return Actions.saveMatch();
+      if (action === 'match-xi') return Actions.fillMatchSquad();
+      if (action === 'match-board') return Actions.openMatchBoard();
+      if (action === 'match-week') return Actions.buildMatchWeek();
+      if (action === 'match-toggle') return Actions.toggleMatchPlayer(t.dataset.playerId);
+      if (action === 'match-delete') return Actions.deleteMatch();
       if (action === 'new-event') return Actions.newEvent();
       if (action === 'toggle-rp') return document.getElementById('rightPanel').classList.toggle('force');
       // export / import — обробляються лише в capture (bindLogoAndImport), тут ігнор

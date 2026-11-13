@@ -1536,6 +1536,129 @@ CoachTools.assignFormation = function (xi, roles) {
   });
 };
 
+/** Ролі слотів схеми. Для 3-1-2-2-1-1 атакувальний півзахисник лишається півзахистом. */
+CoachTools.schemeRoles = function (schemeName) {
+  if (schemeName === '3-1-2-2-1-1') return ['GK', 'DEF', 'DEF', 'DEF', 'MID', 'MID', 'MID', 'ATT', 'ATT', 'MID', 'ATT'];
+  const scheme = (typeof SCHEMES !== 'undefined' && SCHEMES[schemeName]) || [];
+  return scheme.slice(0, 11).map(function (slot) {
+    const y = Number(slot && slot[2]) || 0;
+    if (y >= 0.88) return 'GK';
+    if (y >= 0.68) return 'DEF';
+    if (y >= 0.38) return 'MID';
+    return 'ATT';
+  });
+};
+
+/** Одинадцять за явкою в порядку слотів і решта заявки на лавці. */
+CoachTools.buildMatchSquad = function (players, schemeName, attOf) {
+  const roles = CoachTools.schemeRoles(schemeName);
+  const picked = CoachTools.pickLineup(players, attOf);
+  const assigned = CoachTools.assignFormation(picked.xi, roles);
+  const xiIds = {};
+  const xi = assigned.map(function (p) {
+    if (!p) return null;
+    xiIds[String(p.id)] = true;
+    return p.id;
+  });
+  while (xi.length < 11) xi.push(null);
+  return {
+    xi: xi.slice(0, 11),
+    bench: (picked.bench || []).filter(function (p) { return p && !xiIds[String(p.id)]; }).map(function (p) { return p.id; })
+  };
+};
+
+/** П'ять днів навколо матчу: MD-3 … MD+1. */
+CoachTools.matchWeekDays = function (isoDate) {
+  const base = new Date(String(isoDate || '') + 'T12:00:00');
+  if (isNaN(base.getTime())) return [];
+  const items = [
+    { offset: -3, md: 'MD-3', title: 'MD-3 Тактика', type: 'TRAINING', time: '19:00', goal: 'План на суперника, формація і пресинг', intensity: 6 },
+    { offset: -2, md: 'MD-2', title: 'MD-2 Стандарти', type: 'TRAINING', time: '19:00', goal: 'Інтенсивність і стандарти', intensity: 8 },
+    { offset: -1, md: 'MD-1', title: 'MD-1 Активація', type: 'TRAINING', time: '18:00', goal: 'Коротке включення і склад', intensity: 4 },
+    { offset: 0, md: 'MD', title: 'Матч', type: 'MATCH', time: '', goal: '', intensity: 0 },
+    { offset: 1, md: 'MD+1', title: 'MD+1 Відновлення', type: 'TRAINING', time: '11:00', goal: 'Відновлення після матчу', intensity: 2 }
+  ];
+  return items.map(function (item) {
+    const day = new Date(base.getTime());
+    day.setDate(base.getDate() + item.offset);
+    const ds = day.getFullYear() + '-' + String(day.getMonth() + 1).padStart(2, '0') + '-' + String(day.getDate()).padStart(2, '0');
+    return {
+      offset: item.offset, md: item.md, title: item.title, type: item.type,
+      time: item.time, goal: item.goal, intensity: item.intensity, date: ds
+    };
+  });
+};
+
+/** Додає тренування тижня і подію матчу. Повторний виклик не дублює ті самі дні. */
+CoachTools.applyMatchWeek = function (state, match) {
+  if (!state || !match || !match.id || !match.date) return { added: 0 };
+  const days = CoachTools.matchWeekDays(match.date);
+  state.trainings = state.trainings || [];
+  state.calendar = state.calendar || [];
+  const opponent = match.opponent || 'суперник';
+  const now = new Date().toISOString();
+  let added = 0;
+  days.forEach(function (day) {
+    if (day.type === 'MATCH') {
+      const has = state.calendar.some(function (event) {
+        return event && event.matchId === match.id && event.type === 'MATCH';
+      });
+      if (!has) {
+        state.calendar.push({
+          id: 'cal-' + match.id + '-MD',
+          type: 'MATCH',
+          title: 'vs ' + opponent,
+          date: match.date,
+          time: match.time || '15:00',
+          matchId: match.id,
+          md: 'MD'
+        });
+        added += 1;
+      }
+      return;
+    }
+    const exists = state.trainings.some(function (training) {
+      return training && training.matchId === match.id && training.md === day.md;
+    });
+    if (exists) return;
+    const id = 'tr-' + match.id + '-' + day.md;
+    const main = day.md === 'MD-2' ? 40 : 25;
+    state.trainings.push({
+      id: id,
+      name: day.title + ' · vs ' + opponent,
+      date: day.date,
+      time: day.time,
+      duration: 10 + main + 10,
+      place: match.stadium || 'Тренувальна база',
+      surface: 'Газон',
+      intensity: day.intensity,
+      mainGoal: day.goal,
+      status: 'planned',
+      matchId: match.id,
+      md: day.md,
+      structure: [
+        { id: id + '-w', title: 'Розминка', type: 'warmup', duration: 10, intensity: 3 },
+        { id: id + '-m', title: day.goal, type: 'tactical', duration: main, intensity: day.intensity },
+        { id: id + '-c', title: 'Заминка', type: 'cooldown', duration: 10, intensity: 2 }
+      ],
+      createdAt: now,
+      updatedAt: now
+    });
+    state.calendar.push({
+      id: 'cal-' + match.id + '-' + day.md,
+      type: 'TRAINING',
+      title: day.title + ' · vs ' + opponent,
+      date: day.date,
+      time: day.time,
+      trainingId: id,
+      matchId: match.id,
+      md: day.md
+    });
+    added += 1;
+  });
+  return { added: added };
+};
+
 /** Стрічка клубу: подарунки, серії, дні народження, статус, фото, рейтинг. */
 const ClubFeed = {
   MILESTONES: [3, 5, 8, 12, 16, 20, 24, 30],

@@ -1217,66 +1217,241 @@ const Actions = {
     });
   },
 
+  _coachOnly() {
+    if (typeof AuthManager !== 'undefined' && !(AuthManager.isCoach && AuthManager.isCoach())) {
+      try { Toast.show('Редагувати може лише тренер', 'warn'); } catch (_) {}
+      return false;
+    }
+    return true;
+  },
+
+  _matchByUi() {
+    const s = Store.get();
+    const id = s.ui && s.ui.matchId;
+    return (s.matches || []).find(m => m && String(m.id) === String(id)) || null;
+  },
+
+  _matchAttendance(player) {
+    try {
+      if (typeof PlayerProgress !== 'undefined' && PlayerProgress.compute) {
+        const progress = PlayerProgress.compute(player.id) || {};
+        if (progress.attPct != null) return progress.attPct;
+      }
+    } catch (_) {}
+    return 0;
+  },
+
+  _shiftTime(value, minutes) {
+    const parts = String(value || '15:00').split(':');
+    const clock = new Date(2000, 0, 1, Number(parts[0]) || 15, Number(parts[1]) || 0);
+    clock.setMinutes(clock.getMinutes() + minutes);
+    return String(clock.getHours()).padStart(2, '0') + ':' + String(clock.getMinutes()).padStart(2, '0');
+  },
+
   newMatch() {
+    if (!this._coachOnly()) return;
+    const schemes = (typeof SCHEMES !== 'undefined') ? Object.keys(SCHEMES) : ['3-1-2-2-1-1'];
     Modal.open('Новий матч', `
       <div class="fg">
-        <div class="fgr full"><label>Суперник</label><input id="mOpp"></div>
+        <div class="fgr full"><label>Суперник</label><input id="mOpp" placeholder="Назва команди"></div>
         <div class="fgr"><label>Дата</label><input type="date" id="mDate" value="${today()}"></div>
-        <div class="fgr"><label>Час</label><input type="time" id="mTime" value="15:00"></div>
-        <div class="fgr"><label>Домашній?</label><select id="mHome"><option value="true">Домашній</option><option value="false">Виїзний</option></select></div>
-        <div class="fgr"><label>Стадіон</label><input id="mStad" value="Стадіон Металіст"></div>
-        <div class="fgr"><label>Схема</label><select id="mSch">${Object.keys(SCHEMES).map(k=>`<option>${k}</option>`).join('')}</select></div>
-        <div class="fgr full"><label>План матчу</label><textarea id="mPlan"></textarea></div>
-        <div class="fgr"><label>1-й тайм</label><textarea id="mP1"></textarea></div>
-        <div class="fgr"><label>2-й тайм</label><textarea id="mP2"></textarea></div>
-        <div class="fgr full"><label>Стандарти / Пресинг / Переходи</label><textarea id="mTac"></textarea></div>
-        <div class="fgr full"><label>Передматчеві нотатки</label><textarea id="mPre"></textarea></div>
-        <div class="fgr full"><label>Післяматчевий аналіз</label><textarea id="mPost"></textarea></div>
+        <div class="fgr"><label>Початок</label><input type="time" id="mTime" value="15:00"></div>
+        <div class="fgr"><label>Де граємо</label><select id="mHome"><option value="true">Дім</option><option value="false">Виїзд</option></select></div>
+        <div class="fgr"><label>Турнір</label><input id="mComp" placeholder="Ліга, кубок"></div>
+        <div class="fgr full"><label>Стадіон</label><input id="mStad" value="Стадіон Металіст"></div>
+        <div class="fgr"><label>Схема</label><select id="mSch">${schemes.map(k => '<option' + (k === '3-1-2-2-1-1' ? ' selected' : '') + '>' + k + '</option>').join('')}</select></div>
+        <div class="fgr full"><label><input type="checkbox" id="mWeek" checked> Скласти тиждень MD-3…MD+1</label></div>
       </div>`, [
       { label: (typeof t==='function'?t('cancel'):'Скасувати'), cls: 'btn-s', action: 'cancel' },
-      { label: 'Створити', cls: 'btn-p', action: 'create-match' }
+      { label: 'До плану', cls: 'btn-p', action: 'create-match' }
     ]);
   },
 
   createMatch() {
+    if (!this._coachOnly()) return;
     const opponent = document.getElementById('mOpp')?.value?.trim();
     if (!opponent) { Toast.show('Вкажіть суперника', 'warn'); return; }
+    const s = Store.get();
+    const kick = document.getElementById('mTime')?.value || '15:00';
+    const scheme = document.getElementById('mSch')?.value || '3-1-2-2-1-1';
+    const squad = (typeof CoachTools !== 'undefined' && CoachTools.buildMatchSquad)
+      ? CoachTools.buildMatchSquad(s.players || [], scheme, (p) => this._matchAttendance(p))
+      : { xi: [], bench: [] };
+    const now = new Date().toISOString();
     const m = {
-      id: uid(), opponent, date: document.getElementById('mDate')?.value || today(),
-      time: document.getElementById('mTime')?.value, home: document.getElementById('mHome')?.value === 'true',
-      stadium: document.getElementById('mStad')?.value, scheme: document.getElementById('mSch')?.value,
-      plan: document.getElementById('mPlan')?.value, plan1: document.getElementById('mP1')?.value,
-      plan2: document.getElementById('mP2')?.value, tactics: document.getElementById('mTac')?.value,
-      preNotes: document.getElementById('mPre')?.value, postNotes: document.getElementById('mPost')?.value
+      id: uid(), opponent,
+      date: document.getElementById('mDate')?.value || today(),
+      time: kick,
+      home: document.getElementById('mHome')?.value !== 'false',
+      competition: document.getElementById('mComp')?.value?.trim() || '',
+      stadium: document.getElementById('mStad')?.value || '',
+      scheme,
+      meetTime: this._shiftTime(kick, -90),
+      gatherPlace: 'Роздягальня',
+      kickoff: this._shiftTime(kick, -15),
+      status: 'planned',
+      xi: squad.xi || [],
+      bench: squad.bench || [],
+      plan: '', plan1: '', plan2: '', tactics: '', preNotes: '', postNotes: '',
+      createdAt: now, updatedAt: now
     };
-    Store.get().matches.push(m);
-    Store.get().calendar.push({ id: uid(), type: 'MATCH', title: 'vs ' + opponent, date: m.date, time: m.time, matchId: m.id });
+    s.matches.push(m);
+    if (document.getElementById('mWeek')?.checked && typeof CoachTools !== 'undefined' && CoachTools.applyMatchWeek) {
+      CoachTools.applyMatchWeek(s, m);
+    } else if (!(s.calendar || []).some(e => e && e.matchId === m.id)) {
+      s.calendar.push({ id: uid(), type: 'MATCH', title: 'vs ' + opponent, date: m.date, time: m.time, matchId: m.id, md: 'MD' });
+    }
+    if (!s.ui) s.ui = {};
+    s.ui.matchId = m.id;
+    s.ui.view = 'matches';
     StorageManager.save();
     Modal.close();
-    Toast.show('Матч створено', 'ok');
+    Toast.show('План матчу відкрито', 'ok');
+    App.navigate('matches');
+  },
+
+  saveMatch() {
+    if (!this._coachOnly()) return;
+    const m = this._matchByUi();
+    if (!m) return;
+    const read = (id) => document.getElementById(id)?.value;
+    m.meetTime = read('mMeet') || m.meetTime || '';
+    m.gatherPlace = read('mGather') || '';
+    m.kickoff = read('mKick') || m.kickoff || '';
+    m.competition = read('mComp') || '';
+    if (read('mScheme')) m.scheme = read('mScheme');
+    if (read('mStatus')) m.status = read('mStatus');
+    if (read('mHome') != null) m.home = read('mHome') !== 'false';
+    const us = read('mScoreUs');
+    const them = read('mScoreThem');
+    m.scoreUs = us === '' || us == null ? '' : Number(us);
+    m.scoreThem = them === '' || them == null ? '' : Number(them);
+    ['mPlan', 'mP1', 'mP2', 'mTac', 'mPre', 'mPost'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const key = { mPlan: 'plan', mP1: 'plan1', mP2: 'plan2', mTac: 'tactics', mPre: 'preNotes', mPost: 'postNotes' }[id];
+      m[key] = el.value || '';
+    });
+    m.updatedAt = new Date().toISOString();
+    const s = Store.get();
+    (s.calendar || []).forEach(event => {
+      if (event && event.matchId === m.id && event.type === 'MATCH') {
+        event.date = m.date;
+        event.time = m.time;
+        event.title = 'vs ' + (m.opponent || 'Матч');
+      }
+    });
+    StorageManager.save();
+    Toast.show('План збережено', 'ok');
     App.renderCurrent();
   },
 
-  viewMatch(id) {
-    const m = Store.get().matches.find(x => x.id === id);
+  fillMatchSquad() {
+    if (!this._coachOnly()) return;
+    const m = this._matchByUi();
+    if (!m || typeof CoachTools === 'undefined' || !CoachTools.buildMatchSquad) return;
+    const scheme = document.getElementById('mScheme')?.value || m.scheme || '3-1-2-2-1-1';
+    m.scheme = scheme;
+    const squad = CoachTools.buildMatchSquad(Store.get().players || [], scheme, (p) => this._matchAttendance(p));
+    m.xi = squad.xi;
+    m.bench = squad.bench;
+    m.updatedAt = new Date().toISOString();
+    StorageManager.save();
+    Toast.show('Основа за явкою · ' + scheme, 'ok');
+    App.renderCurrent();
+  },
+
+  toggleMatchPlayer(playerId) {
+    if (!this._coachOnly()) return;
+    const m = this._matchByUi();
+    if (!m || playerId == null || playerId === '') return;
+    const id = String(playerId);
+    const xi = (m.xi || []).slice(0, 11);
+    while (xi.length < 11) xi.push(null);
+    const bench = (m.bench || []).map(String).filter(x => x && x !== id && !xi.some(slot => slot != null && String(slot) === x));
+    const at = xi.findIndex(slot => slot != null && String(slot) === id);
+    const onBench = (m.bench || []).some(slot => String(slot) === id);
+    if (at >= 0) {
+      xi[at] = null;
+      bench.push(id);
+      Toast.show('На лавку', 'ok');
+    } else if (onBench) {
+      const hole = xi.findIndex(slot => slot == null || slot === '');
+      if (hole >= 0) {
+        xi[hole] = id;
+        Toast.show('В основу', 'ok');
+      } else {
+        Toast.show('Основа повна. Гравця прибрано із заявки', 'warn');
+      }
+    } else {
+      const hole = xi.findIndex(slot => slot == null || slot === '');
+      if (hole >= 0) {
+        xi[hole] = id;
+        Toast.show('В основу', 'ok');
+      } else {
+        bench.push(id);
+        Toast.show('На лавку', 'ok');
+      }
+    }
+    m.xi = xi;
+    m.bench = bench;
+    m.updatedAt = new Date().toISOString();
+    StorageManager.save();
+    App.renderCurrent();
+  },
+
+  buildMatchWeek() {
+    if (!this._coachOnly()) return;
+    const m = this._matchByUi();
+    if (!m || typeof CoachTools === 'undefined' || !CoachTools.applyMatchWeek) return;
+    const result = CoachTools.applyMatchWeek(Store.get(), m);
+    m.updatedAt = new Date().toISOString();
+    StorageManager.save();
+    Toast.show(result.added ? ('Додано днів: ' + result.added) : 'Тиждень уже зібраний', 'ok');
+    App.renderCurrent();
+  },
+
+  openMatchBoard() {
+    const m = this._matchByUi();
     if (!m) return;
-    Modal.open('vs ' + m.opponent, `
-      <p style="font-size:13px;line-height:1.8;color:var(--muted)">
-        <strong>Дата:</strong> ${m.date} ${m.time || ''}<br>
-        <strong>Стадіон:</strong> ${sanitize(m.stadium || '')}<br>
-        <strong>Схема:</strong> ${m.scheme || '—'}<br>
-        <strong>План:</strong> ${sanitize(m.plan || '—')}<br>
-        <strong>1-й тайм:</strong> ${sanitize(m.plan1 || '—')}<br>
-        <strong>2-й тайм:</strong> ${sanitize(m.plan2 || '—')}<br>
-        <strong>Тактика:</strong> ${sanitize(m.tactics || '—')}<br>
-        <strong>Перед:</strong> ${sanitize(m.preNotes || '—')}<br>
-        <strong>Після:</strong> ${sanitize(m.postNotes || '—')}
-      </p>`, [
-      { label: 'Закрити', cls: 'btn-s', action: 'cancel' },
-      { label: 'На дошку', cls: 'btn-p', action: 'cancel' }
-    ]);
-    const btn = document.querySelector('#modalFooter .btn-p');
-    if (btn) btn.onclick = () => { if (m.scheme) BoardEngine.applyScheme(m.scheme); Modal.close(); Toast.show('Схему застосовано. Відкрийте дошку через логотип.','ok'); };
+    if ((!m.xi || !m.xi.filter(Boolean).length) && this._coachOnly() && typeof CoachTools !== 'undefined' && CoachTools.buildMatchSquad) {
+      const squad = CoachTools.buildMatchSquad(Store.get().players || [], m.scheme || '3-1-2-2-1-1', (p) => this._matchAttendance(p));
+      m.xi = squad.xi;
+      m.bench = squad.bench;
+      StorageManager.save();
+    }
+    if (typeof App.allowBoardOnce === 'function') App.allowBoardOnce('match');
+    App.navigate('board');
+    setTimeout(function () {
+      try {
+        if (typeof BoardEngine !== 'undefined' && BoardEngine.placeMatchLineup) BoardEngine.placeMatchLineup(m);
+      } catch (err) { console.warn(err); }
+    }, 60);
+  },
+
+  deleteMatch() {
+    if (!this._coachOnly()) return;
+    const m = this._matchByUi();
+    if (!m) return;
+    Modal.confirm('Видалити матч і незавершені тренування його тижня?', () => {
+      const s = Store.get();
+      s.matches = (s.matches || []).filter(item => item.id !== m.id);
+      s.calendar = (s.calendar || []).filter(event => !(event && event.matchId === m.id));
+      s.trainings = (s.trainings || []).filter(training => !(training && training.matchId === m.id && training.status !== 'done'));
+      if (s.ui) s.ui.matchId = null;
+      StorageManager.save();
+      Toast.show('Матч видалено', 'ok');
+      App.renderCurrent();
+    });
+  },
+
+  viewMatch(id) {
+    const s = Store.get();
+    const m = (s.matches || []).find(x => x && String(x.id) === String(id));
+    if (!m) { Toast.show('Матч не знайдено', 'warn'); return; }
+    if (!s.ui) s.ui = {};
+    s.ui.matchId = m.id;
+    App.navigate('matches');
   },
 
   newEvent() {

@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z76',
+  APP_BUILD: 'z77',
   APP_UPDATED: '13.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -426,7 +426,7 @@ const Views = {
       ? AuthManager.roleLabel() : 'Тренер';
 
     const matchHtml = nextMatch ? `
-      <div class="cp-match">
+      <div class="cp-match" data-action="open-match" data-match-id="${sanitize(nextMatch.id || '')}">
         <div class="cp-match-teams">
           <span class="cp-match-us">${sanitize(short)}</span>
           <span class="cp-match-vs">VS</span>
@@ -1159,11 +1159,11 @@ const Views = {
       </div>
 
       ${nextMatch ? `
-      <div class="card glass next-match-card">
+      <button type="button" class="card glass next-match-card" data-action="open-match" data-match-id="${sanitize(nextMatch.id || '')}">
         <div class="ct">⚽ Наступний матч</div>
         <div class="vl">${sanitize(nextMatch.opponent || nextMatch.title || 'Матч')}</div>
         <div class="sb">${sanitize(nextMatch.date || '')}${nextMatch.time ? ' · ' + sanitize(nextMatch.time) : ''}${nextMatch.competition ? ' · ' + sanitize(nextMatch.competition) : ''}</div>
-      </div>` : ''}
+      </button>` : ''}
 
       ${next
         ? ('<div class="next-tr-wrap"><button type="button" class="card glass next-tr-card" data-action="preview-next-training" data-training-id="' + next.id + '">' +
@@ -2067,14 +2067,15 @@ trainings() {
       if (!tr || !tr.date || tr.deleted || tr.removed) return;
       pushEvent({ date: tr.date, type: 'training', status: tr.status || 'planned', title: tr.name || 'Тренування', id: tr.id });
     });
+    (s.matches || []).forEach(mt => {
+      if (!mt || !mt.date) return;
+      pushEvent({ date: mt.date, type: 'match', status: mt.status || '', title: mt.opponent ? ('vs ' + mt.opponent) : 'Матч', id: mt.id });
+    });
     (s.calendar || []).forEach(ev => {
       if (!ev || !ev.date || ev.deleted || ev.removed) return;
       if (ev.trainingId && (s.trainings || []).some(t => t && t.id === ev.trainingId)) return;
-      pushEvent({ date: ev.date, type: normType(ev.type || 'event'), status: ev.status || '', title: ev.title || 'Подія', id: ev.id });
-    });
-    (s.matches || []).forEach(mt => {
-      if (!mt || !mt.date) return;
-      pushEvent({ date: mt.date, type: 'match', status: '', title: mt.opponent ? ('vs ' + mt.opponent) : 'Матч', id: mt.id });
+      if (ev.matchId && (s.matches || []).some(mt => mt && mt.id === ev.matchId)) return;
+      pushEvent({ date: ev.date, type: normType(ev.type || 'event'), status: ev.status || '', title: ev.title || 'Подія', id: ev.matchId || ev.id });
     });
     (s.players || []).forEach(p => {
       const raw = this._playerBirth(p);
@@ -2151,6 +2152,10 @@ trainings() {
                 extra = ' · відв. ' + present + '/' + (keys.length || '—');
               }
             }
+            if (e.type === 'match' && e.id) {
+              return '<button type="button" class="cal-ev-row" data-action="open-match" data-match-id="' + sanitize(e.id) + '">⚽ ' +
+                sanitize(e.title) + ' <span class="note-sm">(' + kind + ')</span></button>';
+            }
             return '<div class="cal-ev-row">' + sanitize(e.title) +
               ' <span class="note-sm">(' + kind + (state ? ', ' + state : '') + extra + ')</span></div>';
           }).join('') + '</div>';
@@ -2180,15 +2185,162 @@ trainings() {
 
   matches() {
     const s = Store.get();
-    const list = (s.matches || []).slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+    const openId = s.ui && s.ui.matchId;
+    if (openId) {
+      const match = (s.matches || []).find(m => m && String(m.id) === String(openId));
+      if (match) return this._matchPlan(match);
+    }
+    const todayStr = (typeof today === 'function') ? today() : '';
     const canEdit = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+    const list = (s.matches || []).slice().sort((a, b) => {
+      const aUp = String(a.date || '') >= todayStr && a.status !== 'played' && a.status !== 'cancelled';
+      const bUp = String(b.date || '') >= todayStr && b.status !== 'played' && b.status !== 'cancelled';
+      if (aUp !== bUp) return aUp ? -1 : 1;
+      const dir = aUp ? 1 : -1;
+      return String(a.date || '').localeCompare(String(b.date || '')) * dir;
+    });
     const rows = list.map(m => {
-      return '<div class="card glass" data-view-match="' + (m.id || '') + '">' +
-        '<div class="ct">' + sanitize(m.date || '') + ' · ' + sanitize(m.opponent || 'Суперник') + '</div>' +
-        '<div class="note-sm">' + sanitize(m.competition || '') + (m.score ? (' · ' + sanitize(m.score)) : '') + '</div></div>';
+      const xiN = (m.xi || []).filter(Boolean).length;
+      const benchN = (m.bench || []).length;
+      const where = m.home === false ? 'виїзд' : 'дім';
+      const state = m.status === 'played' ? 'зіграний' : (m.status === 'cancelled' ? 'скасований' : 'план');
+      const score = (m.scoreUs != null && m.scoreUs !== '' && m.scoreThem != null && m.scoreThem !== '')
+        ? (m.scoreUs + ':' + m.scoreThem) : '';
+      return '<button type="button" class="card glass match-list-card" data-action="open-match" data-match-id="' + sanitize(m.id || '') + '">' +
+        '<div class="ct">' + sanitize(m.date || '') + (m.time ? (' · ' + sanitize(m.time)) : '') + ' · vs ' + sanitize(m.opponent || 'Суперник') + '</div>' +
+        '<div class="note-sm">' + where + ' · ' + sanitize(m.scheme || '3-1-2-2-1-1') + ' · основа ' + xiN + ' · лавка ' + benchN +
+        (m.competition ? (' · ' + sanitize(m.competition)) : '') + ' · ' + state + (score ? (' · ' + sanitize(score)) : '') + '</div></button>';
     }).join('');
     return '<div class="st">Матчі' + (canEdit ? ' <button class="btn btn-p btn-sm" data-action="new-match">+ Матч</button>' : '') + '</div>' +
-      (rows || '<div class="es">Немає матчів</div>');
+      '<p class="note-sm">Заявка, схема, збір і тиждень MD-3…MD+1. Тап відкриває план матчу.</p>' +
+      (rows || '<div class="es">Немає матчів. Тренер додає суперника, склад і підготовку.</div>');
+  },
+
+  _matchPlan(m) {
+    const s = Store.get();
+    const canEdit = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+    const roles = (typeof CoachTools !== 'undefined' && CoachTools.schemeRoles)
+      ? CoachTools.schemeRoles(m.scheme || '3-1-2-2-1-1')
+      : [];
+    const roleUa = { GK: 'ВР', DEF: 'ЗХ', MID: 'ПЗ', ATT: 'НАП' };
+    const players = (s.players || []).slice().sort((a, b) => (Number(a.number) || 99) - (Number(b.number) || 99));
+    const byId = {};
+    players.forEach(p => { if (p && p.id != null) byId[String(p.id)] = p; });
+    const nameOf = (p) => p ? ('#' + (p.number || '—') + ' ' + (p.lastName || p.firstName || 'Гравець')) : 'вільно';
+    const xi = (m.xi || []).slice(0, 11);
+    while (xi.length < 11) xi.push(null);
+    const bench = (m.bench || []).slice();
+    const used = {};
+    xi.forEach(id => { if (id != null && id !== '') used[String(id)] = true; });
+    bench.forEach(id => { if (id != null && id !== '') used[String(id)] = true; });
+    const chip = (id, cls, label) => canEdit
+      ? ('<button type="button" class="match-chip ' + cls + '" data-action="match-toggle" data-player-id="' + sanitize(String(id)) + '">' + sanitize(label) + '</button>')
+      : ('<span class="match-chip ' + cls + '">' + sanitize(label) + '</span>');
+    const xiHtml = xi.map((id, i) => {
+      const p = id != null ? byId[String(id)] : null;
+      const role = roleUa[roles[i]] || roles[i] || (i + 1);
+      if (!p) return '<span class="match-chip is-empty">' + role + ' · вільно</span>';
+      return chip(p.id, 'is-xi', role + ' · ' + nameOf(p));
+    }).join('');
+    const benchHtml = bench.map(id => {
+      const p = byId[String(id)];
+      return p ? chip(p.id, 'is-bench', nameOf(p)) : '';
+    }).join('') || '<span class="note-sm">Лавка порожня</span>';
+    const outHtml = players.filter(p => !used[String(p.id)]).map(p => chip(p.id, 'is-out', nameOf(p))).join('') ||
+      '<span class="note-sm">Усі в заявці</span>';
+    let call = '';
+    try {
+      const me = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer) ? AuthManager.getLinkedPlayer() : null;
+      if (me && me.id != null) {
+        const mine = String(me.id);
+        if (xi.some(id => id != null && String(id) === mine)) call = 'Ти в основі';
+        else if (bench.some(id => String(id) === mine)) call = 'Ти на лавці';
+        else if (xi.some(Boolean) || bench.length) call = 'Тебе немає в заявці';
+      }
+    } catch (_) {}
+    const days = (typeof CoachTools !== 'undefined' && CoachTools.matchWeekDays) ? CoachTools.matchWeekDays(m.date) : [];
+    const have = {};
+    (s.trainings || []).forEach(t => { if (t && t.matchId === m.id && t.md) have[t.md] = true; });
+    (s.calendar || []).forEach(e => { if (e && e.matchId === m.id && e.md === 'MD') have.MD = true; });
+    const weekHtml = days.map(day => '<span class="match-day' + (have[day.md] ? ' is-on' : '') + '">' +
+      sanitize(day.md) + '<small>' + sanitize(String(day.date || '').slice(5)) + '</small></span>').join('');
+    const schemes = (typeof SCHEMES !== 'undefined') ? Object.keys(SCHEMES) : ['3-1-2-2-1-1'];
+    const scheme = m.scheme || '3-1-2-2-1-1';
+    const status = m.status || 'planned';
+    const field = (id, label, value, type) => '<label class="fl"><span class="fl-label">' + label + '</span>' +
+      '<input class="fl-input" id="' + id + '" type="' + (type || 'text') + '" value="' + sanitize(value || '') + '"' +
+      (canEdit ? '' : ' readonly') + '></label>';
+    const area = (id, label, value) => '<label class="fl"><span class="fl-label">' + label + '</span>' +
+      (canEdit
+        ? ('<textarea class="fl-input" id="' + id + '">' + sanitize(value || '') + '</textarea>')
+        : ('<p class="note-sm">' + sanitize(value || '—') + '</p>')) + '</label>';
+    const where = m.home === false ? 'Виїзд' : 'Дім';
+    const score = (m.scoreUs != null && m.scoreUs !== '' && m.scoreThem != null && m.scoreThem !== '')
+      ? (m.scoreUs + ':' + m.scoreThem) : '';
+    return '<div class="match-plan">' +
+      '<div class="match-top"><button type="button" class="btn btn-s btn-sm" data-action="match-back">‹ Матчі</button><div class="st">План матчу</div></div>' +
+      '<section class="card glass match-hero">' +
+        '<div class="ct">vs ' + sanitize(m.opponent || 'Суперник') + (score ? (' · ' + sanitize(score)) : '') + '</div>' +
+        '<p class="note-sm">' + sanitize(m.date || '') + (m.time ? (' · ' + sanitize(m.time)) : '') + ' · ' + where +
+        (m.stadium ? (' · ' + sanitize(m.stadium)) : '') +
+        (m.competition ? (' · ' + sanitize(m.competition)) : '') + '</p>' +
+        (call ? ('<p class="match-call">' + call + '</p>') : '') +
+      '</section>' +
+      '<section class="card glass"><div class="ct">Збір</div><div class="match-grid">' +
+        field('mMeet', 'Збір', m.meetTime, 'time') +
+        field('mGather', 'Місце збору', m.gatherPlace || '') +
+        field('mKick', 'Вихід на поле', m.kickoff || m.time, 'time') +
+        field('mComp', 'Турнір', m.competition || '') +
+      '</div></section>' +
+      '<section class="card glass"><div class="ct">Тиждень матчу</div>' +
+        '<div class="match-week">' + weekHtml + '</div>' +
+        '<p class="note-sm">MD-3 тактика, MD-2 стандарти, MD-1 активація, день матчу і відновлення.</p>' +
+        (canEdit ? '<button type="button" class="btn btn-s btn-sm" data-action="match-week">Скласти тиждень</button>' : '') +
+      '</section>' +
+      '<section class="card glass"><div class="ct">Заявка · ' + sanitize(scheme) + '</div>' +
+        (canEdit ? (
+          '<label class="fl"><span class="fl-label">Схема</span><select class="fl-input" id="mScheme">' +
+            schemes.map(name => '<option' + (name === scheme ? ' selected' : '') + '>' + sanitize(name) + '</option>').join('') +
+          '</select></label>' +
+          '<div class="match-actions">' +
+            '<button type="button" class="btn btn-s btn-sm" data-action="match-xi">За явкою</button>' +
+            '<button type="button" class="btn btn-p btn-sm" data-action="match-board">На дошку</button>' +
+          '</div><p class="note-sm">Тап по вільному або по гравцю поза заявкою ставить його в перший вільний слот. Тап по основі відправляє на лавку, тап по лавці піднімає в основу.</p>'
+        ) : '<p class="note-sm">Склад зібрав тренер.</p>') +
+        '<div class="match-block-label">Основа</div><div class="match-chips">' + xiHtml + '</div>' +
+        '<div class="match-block-label">Лавка</div><div class="match-chips">' + benchHtml + '</div>' +
+        '<div class="match-block-label">Поза заявкою</div><div class="match-chips">' + outHtml + '</div>' +
+      '</section>' +
+      '<section class="card glass"><div class="ct">План</div>' +
+        (canEdit ? (
+          '<div class="match-grid">' +
+            '<label class="fl"><span class="fl-label">Статус</span><select class="fl-input" id="mStatus">' +
+              '<option value="planned"' + (status === 'planned' ? ' selected' : '') + '>Запланований</option>' +
+              '<option value="played"' + (status === 'played' ? ' selected' : '') + '>Зіграний</option>' +
+              '<option value="cancelled"' + (status === 'cancelled' ? ' selected' : '') + '>Скасований</option>' +
+            '</select></label>' +
+            '<label class="fl"><span class="fl-label">Дім / виїзд</span><select class="fl-input" id="mHome">' +
+              '<option value="true"' + (m.home === false ? '' : ' selected') + '>Дім</option>' +
+              '<option value="false"' + (m.home === false ? ' selected' : '') + '>Виїзд</option>' +
+            '</select></label>' +
+            field('mScoreUs', 'Наші голи', m.scoreUs != null ? String(m.scoreUs) : '', 'number') +
+            field('mScoreThem', 'Голи суперника', m.scoreThem != null ? String(m.scoreThem) : '', 'number') +
+          '</div>'
+        ) : ('<p class="note-sm">' + (status === 'played' ? 'Зіграний' : (status === 'cancelled' ? 'Скасований' : 'Запланований')) +
+          (score ? (' · ' + sanitize(score)) : '') + '</p>')) +
+        area('mPlan', 'Загальний план', m.plan) +
+        area('mP1', '1-й тайм', m.plan1) +
+        area('mP2', '2-й тайм', m.plan2) +
+        area('mTac', 'Стандарти, пресинг, переходи', m.tactics) +
+        area('mPre', 'Перед матчем', m.preNotes) +
+        area('mPost', 'Після матчу', m.postNotes) +
+        (canEdit ? (
+          '<div class="match-actions">' +
+            '<button type="button" class="btn btn-p" data-action="match-save">Зберегти план</button>' +
+            '<button type="button" class="btn btn-d btn-sm" data-action="match-delete">Видалити матч</button>' +
+          '</div>'
+        ) : '') +
+      '</section></div>';
   },
 
   _analyticsCharts(players, getSt) {
