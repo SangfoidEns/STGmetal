@@ -1221,7 +1221,7 @@ const App = {
 
   _matchActionFrom(node) {
     if (!node || !node.closest) return null;
-    return node.closest('[data-action="match-save"], [data-action="match-warmup"], [data-action="match-logo"], [data-action="match-logo-clear"]');
+    return node.closest('[data-action="match-save"], [data-action="match-warmup"], [data-action="match-logo"], [data-action="match-logo-clear"], [data-action="match-attendance"]');
   },
 
   _takeMatchAction(e) {
@@ -1251,6 +1251,7 @@ const App = {
       else if (action === 'match-warmup') Actions.placeMatchWarmup();
       else if (action === 'match-logo') Actions.pickMatchLogo();
       else if (action === 'match-logo-clear') Actions.clearMatchLogo();
+      else if (action === 'match-attendance') Actions.openMatchAttendance();
     } catch (err) { console.error('[match-action]', err); }
     return true;
   },
@@ -1481,45 +1482,88 @@ const App = {
     if (name.length > 16) name = name.slice(0, 14) + '…';
     return name;
   },
-  updateTrainingCountdown() {
+  _nextHeaderEvent() {
+    const s = (typeof Store !== 'undefined' && Store.get) ? Store.get() : { matches: [], trainings: [] };
+    const todayStr = (typeof today === 'function') ? today() : '';
+    const match = (s.matches || []).filter(m => {
+      if (!m || !m.date) return false;
+      if (m.status === 'played' || m.status === 'cancelled' || m.status === 'canceled') return false;
+      return !todayStr || String(m.date) >= todayStr;
+    }).sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.time || '').localeCompare(String(b.time || '')))[0];
+    if (match) return { kind: 'match', match: match };
+    const training = (typeof Views !== 'undefined' && Views._nextPlanned) ? Views._nextPlanned(s.trainings) : null;
+    return training ? { kind: 'training', training: training } : null;
+  },
+  _countdownText(date, time) {
     try {
-      const el = document.getElementById('nextTr');
-      const sub = document.getElementById('nextTrCountdown');
-      const s = Store.get();
-      const next = (typeof Views !== 'undefined' && Views._nextPlanned) ? Views._nextPlanned(s.trainings) : null;
-      if (!next) {
-        if (el) el.textContent = '—';
-        if (sub) sub.textContent = '';
-        return;
+      const dt = new Date(String(date || '') + 'T' + (time || '15:00'));
+      const ms = dt.getTime() - Date.now();
+      if (!isFinite(ms)) return date || '';
+      if (ms > 0) {
+        const h = Math.floor(ms / 3600000);
+        const m = Math.floor((ms % 3600000) / 60000);
+        if (h >= 48) return 'через ' + Math.floor(h / 24) + 'д ' + (h % 24) + 'г';
+        return 'через ' + h + 'г ' + m + 'хв';
       }
-      const name = this.formatNextTr ? this.formatNextTr(next) : (next.name || 'Тр.');
-      if (el) { el.textContent = name; el.title = (next.name || '') + ' · ' + (next.date || '') + ' ' + (next.time || ''); }
-      // countdown
-      try {
-        const [hh, mm] = String(next.time || '18:00').split(':').map(Number);
-        const dt = new Date(next.date + 'T00:00:00');
-        if (!isNaN(hh)) dt.setHours(hh || 0, mm || 0, 0, 0);
-        const ms = dt.getTime() - Date.now();
-        let cd = '';
-        if (ms > 0) {
-          const h = Math.floor(ms / 3600000);
-          const m = Math.floor((ms % 3600000) / 60000);
-          cd = h > 48 ? (Math.floor(h/24) + 'д') : (h + 'г ' + m + 'хв');
-        } else if (ms > -7200000) cd = 'зараз';
-        else cd = '';
-        if (sub) sub.textContent = cd ? ('через ' + cd) : (next.date || '');
-      } catch (_) { if (sub) sub.textContent = next.date || ''; }
-    } catch (_) {}
+      if (ms > -7200000) return 'зараз';
+      return date || '';
+    } catch (_) { return date || ''; }
+  },
+  _paintNextHeader() {
+    const el = document.getElementById('nextTr');
+    const sub = document.getElementById('nextTrCountdown');
+    const crest = document.getElementById('nextTrCrest');
+    const btn = document.getElementById('nextTrBtn');
+    const ev = this._nextHeaderEvent();
+    if (!ev) {
+      if (el) { el.textContent = '—'; el.title = ''; }
+      if (sub) sub.textContent = '';
+      if (crest) { crest.hidden = true; crest.textContent = ''; }
+      return;
+    }
+    if (ev.kind === 'match') {
+      const m = ev.match;
+      const name = m.opponent || 'Матч';
+      if (el) { el.textContent = name; el.title = name + ' · ' + (m.date || '') + ' ' + (m.time || ''); }
+      if (sub) sub.textContent = this._countdownText(m.date, m.time);
+      if (crest) {
+        crest.hidden = false;
+        crest.textContent = '';
+        if (m.opponentLogo) {
+          const img = document.createElement('img');
+          img.alt = '';
+          img.src = m.opponentLogo;
+          crest.appendChild(img);
+        } else {
+          crest.textContent = String(name).replace(/[^A-Za-zА-Яа-яІіЇїЄєҐґ0-9]/g, '').slice(0, 3).toUpperCase() || 'VS';
+        }
+      }
+      if (btn) {
+        btn.dataset.action = 'open-match';
+        btn.dataset.matchId = m.id || '';
+        btn.removeAttribute('data-view');
+        btn.title = 'Наступний матч';
+      }
+      return;
+    }
+    const next = ev.training;
+    const name = this.formatNextTr ? this.formatNextTr(next) : (next.name || 'Тр.');
+    if (el) { el.textContent = name; el.title = (next.name || '') + ' · ' + (next.date || '') + ' ' + (next.time || ''); }
+    if (sub) sub.textContent = this._countdownText(next.date, next.time);
+    if (crest) { crest.hidden = true; crest.textContent = ''; }
+    if (btn) {
+      btn.dataset.action = 'preview-next-training';
+      btn.dataset.trainingId = next.id || '';
+      btn.removeAttribute('data-view');
+      btn.removeAttribute('data-match-id');
+      btn.title = 'Наступне тренування';
+    }
+  },
+  updateTrainingCountdown() {
+    try { this._paintNextHeader(); } catch (_) {}
   },
   updateNextTrLabel() {
-    try {
-      const el = document.getElementById('nextTr');
-      if (!el) return;
-      const s = Store.get();
-      const next = (typeof Views !== 'undefined' && Views._nextPlanned) ? Views._nextPlanned(s.trainings) : null;
-      el.textContent = next ? this.formatNextTr(next) : '—';
-      el.title = next ? ((next.name || '') + ' · ' + (next.date || '')) : '';
-    } catch (_) {}
+    try { this._paintNextHeader(); } catch (_) {}
   },
   checkBirthdays() {
     try {
@@ -1834,30 +1878,7 @@ const App = {
       const t = now.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
       el.innerHTML = '<strong>' + d + '</strong> · ' + t;
     }
-    const s = Store.get();
-    const next = (typeof Views !== 'undefined' && Views._nextPlanned) ? Views._nextPlanned(s.trainings) : null;
-    const nt = document.getElementById('nextTr');
-    const cdEl = document.getElementById('nextTrCountdown');
-    if (next) {
-      const short = this.formatNextTr ? this.formatNextTr(next) : (next.name || 'Тр.');
-      if (nt) {
-        nt.textContent = short;
-        nt.title = (next.name || '') + ' · ' + (next.date || '') + (next.time ? ' ' + next.time : '');
-      }
-      if (cdEl) {
-        try {
-          const dt = new Date(next.date + 'T' + (next.time || '10:00'));
-          const diff = dt - now;
-          if (diff > 0) {
-            const h = Math.floor(diff / 3600000), m = Math.floor((diff % 3600000) / 60000);
-            cdEl.textContent = 'через ' + h + 'г ' + m + 'хв';
-          } else cdEl.textContent = next.date || '';
-        } catch (_) { cdEl.textContent = next.date || ''; }
-      }
-    } else {
-      if (nt) { nt.textContent = '—'; nt.title = ''; }
-      if (cdEl) cdEl.textContent = '';
-    }
+    try { this._paintNextHeader(); } catch (_) {}
   },
 
 
@@ -1913,7 +1934,12 @@ const App = {
       </div>`;
     const planBlock = `
       <div class="tg-sheet-preview tr-plan-preview">
-        ${t.mainGoal ? ('<div class="tr-goal">🎯 ' + (typeof sanitize === 'function' ? sanitize(t.mainGoal) : t.mainGoal) + '</div>') : ''}
+        ${(function () {
+          const titles = (t.structure || []).map(b => String((b && (b.title || b.name)) || '').trim()).filter(Boolean);
+          const goalText = String(t.mainGoal || '').trim();
+          if (!goalText || t.md === 'WU' || titles.indexOf(goalText) >= 0 || titles.join('\n') === goalText) return '';
+          return '<div class="tr-goal">🎯 ' + (typeof sanitize === 'function' ? sanitize(goalText) : goalText) + '</div>';
+        })()}
         <div class="tr-plan-title">${(typeof I18n!=='undefined'?I18n.t('scheme_training','План тренування'):'План тренування')}</div>
         ${struct || ('<div class="note-sm">' + (typeof I18n!=='undefined'?I18n.t('no_trainings','Структура не задана'):'Структура не задана') + '</div>')}
         ${statsBlock}
@@ -2224,7 +2250,10 @@ const App = {
     const backdrop = document.createElement('div');
     backdrop.className = 'tg-sheet-backdrop';
     const tname = (typeof sanitize === 'function') ? sanitize(t.name) : t.name;
-    const goal = t.mainGoal ? ('🎯 ' + ((typeof sanitize === 'function') ? sanitize(t.mainGoal) : t.mainGoal) + '<br><br>') : '';
+    const titles = (t.structure || []).map(b => String((b && (b.title || b.name)) || '').trim()).filter(Boolean);
+    const goalText = String(t.mainGoal || '').trim();
+    const goalRepeats = t.md === 'WU' || (goalText && (titles.indexOf(goalText) >= 0 || titles.join('\n') === goalText));
+    const goal = (!goalRepeats && goalText) ? ('🎯 ' + ((typeof sanitize === 'function') ? sanitize(goalText) : goalText) + '<br><br>') : '';
     const isCoach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
     const coachBtns = isCoach
       ? ('<button type="button" class="tg-sheet-btn" data-nsheet="edit" data-tid="' + t.id + '">✏️ ' + (typeof I18n!=='undefined'?I18n.t('sheet_edit','Редагувати'):'Редагувати') + '</button>' +
@@ -2513,7 +2542,8 @@ const App = {
       const inModal = e.target.closest('#modal, .md, .modal-content, #modalBody, #modalFooter');
       const inSidebarNav = e.target.closest('#sidebar .nav, .sidebar .nav, .sb-scroll');
 
-      const t = e.target.closest('[data-action],[data-view],[data-tool],[data-ai],[data-edit-training],[data-attendance-training],[data-del-training],[data-dup-training],[data-edit-player],[data-del-player],[data-scheme],[data-load-board],[data-del-board],[data-special],[data-day],[data-view-exercise],[data-view-match],[data-del-match],[data-tpl],[data-modal-action],[data-b3-phase],[data-board-tpl],[data-b3-rot],[data-del-myex],[data-add-myex-tr],[data-load-myex-board],[data-del-diary],[data-edit-diary],[data-load-diary-board],[data-attach-diary-board],[data-diary-filter],[data-play-anim],[data-coach-tool],[data-player-sort],[data-player-id],[data-board-id],[data-next-training]');
+      const explicit = e.target.closest && e.target.closest('[data-action]');
+      const t = explicit || e.target.closest('[data-view],[data-tool],[data-ai],[data-edit-training],[data-attendance-training],[data-del-training],[data-dup-training],[data-edit-player],[data-del-player],[data-scheme],[data-load-board],[data-del-board],[data-special],[data-day],[data-view-exercise],[data-view-match],[data-del-match],[data-tpl],[data-modal-action],[data-b3-phase],[data-board-tpl],[data-b3-rot],[data-del-myex],[data-add-myex-tr],[data-load-myex-board],[data-del-diary],[data-edit-diary],[data-load-diary-board],[data-attach-diary-board],[data-diary-filter],[data-play-anim],[data-coach-tool],[data-player-sort],[data-player-id],[data-board-id],[data-next-training]');
       if (!t) {
         // close search
         if (!e.target.closest('.gs')) document.getElementById('gResults')?.classList.remove('show');
@@ -2735,7 +2765,15 @@ const App = {
       if (action === 'new-player') return Actions.newPlayer();
       if (action === 'new-exercise') return Actions.newExercise();
       if (action === 'new-match') return Actions.newMatch();
-      if (action === 'open-match') return Actions.viewMatch(t.dataset.matchId || t.getAttribute('data-match-id'));
+      if (action === 'open-match' || action === 'open-next-event') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (action === 'open-match') return Actions.viewMatch(t.dataset.matchId || t.getAttribute('data-match-id'));
+        const ev = this._nextHeaderEvent && this._nextHeaderEvent();
+        if (ev && ev.kind === 'match') return Actions.viewMatch(ev.match.id);
+        if (ev && ev.training) return this.openNextTrainingPreview(ev.training.id);
+        return;
+      }
       if (action === 'match-back') {
         try { Actions.flushMatchPlan(); } catch (_) {}
         const ui = Store.get().ui || {};
@@ -2765,6 +2803,12 @@ const App = {
         e.preventDefault();
         e.stopPropagation();
         return Actions.clearMatchLogo();
+      }
+      if (action === 'match-attendance') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        return Actions.openMatchAttendance(t.dataset.matchId || (Store.get().ui && Store.get().ui.matchId));
       }
       if (action === 'match-xi') return Actions.fillMatchSquad();
       if (action === 'match-board') return Actions.openMatchBoard();
@@ -3950,6 +3994,7 @@ const App = {
       if (action === 'microcycle') return Actions.applyMicrocycle();
       if (action === 'export-stats') return StorageManager.exportJSON();
 
+      if (action && action !== 'open-training' && action !== 'preview-next-training') return;
       if (inMatchPlan) return;
       if (t.dataset.editTraining) {
         e.preventDefault();
@@ -4217,6 +4262,7 @@ const App = {
       if (t.dataset.modalAction === 'save-training') return Actions.saveTraining(t.dataset.tid);
       if (t.dataset.modalAction === 'open-attendance') return Actions.openAttendance(t.dataset.tid);
       if (t.dataset.modalAction === 'save-attendance') return Actions.saveAttendance(t.dataset.tid);
+      if (t.dataset.modalAction === 'save-match-attendance') return Actions.saveMatchAttendance(t.dataset.matchId);
       if (t.dataset.modalAction === 'save-beats') return Actions.saveBeats(t.dataset.tid);
       if (t.dataset.modalAction === 'save-slides') return Actions.saveSlides(t.dataset.tid);
       if (t.dataset.modalAction === 'create-player') return Actions.createPlayer();

@@ -1321,6 +1321,9 @@ const PlayerProgress = {
   RULES: {
     present: 18,
     absent: -6,
+    matchPresent: 22,
+    matchStart: 8,
+    goal: 12,
     intensityBonusMax: 12, // from RPE 1..10
     giftBonus: 25,
     levelBase: 100,
@@ -1407,6 +1410,33 @@ const PlayerProgress = {
       const rpe = att.rpe != null ? +att.rpe : (att.intensity != null ? +att.intensity : 0);
       if (rpe > 0) xpIntensity += Math.min(this.RULES.intensityBonusMax, Math.round(rpe * 1.2));
     });
+    let xpMatch = 0;
+    let xpGoals = 0;
+    (s.matches || []).forEach(m => {
+      if (!m || m.status === 'cancelled' || m.status === 'canceled') return;
+      const cell = (m.attendance || {})[playerId];
+      if (!cell || cell.present == null) return;
+      const played = m.status === 'played' || cell.present === true || cell.present === false;
+      if (!played) return;
+      if (cell.present === false) {
+        xp += this.RULES.absent;
+        xpMatch += this.RULES.absent;
+        history.push({ date: m.date, name: 'Матч vs ' + (m.opponent || ''), delta: this.RULES.absent, kind: 'match' });
+        return;
+      }
+      let gain = this.RULES.matchPresent;
+      const xi = (m.xi || []).some(id => id != null && String(id) === String(playerId));
+      if (xi) gain += this.RULES.matchStart;
+      const goals = Math.max(0, Number(cell.goals) || 0);
+      const goalXp = goals * this.RULES.goal;
+      const rating = cell.rating != null ? Number(cell.rating) : 0;
+      if (rating > 0) gain += Math.min(10, Math.round(rating));
+      gain += goalXp;
+      xp += gain;
+      xpMatch += gain - goalXp;
+      xpGoals += goalXp;
+      history.push({ date: m.date, name: 'Матч vs ' + (m.opponent || '') + (goals ? (' · ' + goals + ' гол') : ''), delta: gain, kind: 'match' });
+    });
     const gifts = (s.gifts || []).filter(g => g.playerId === playerId);
     const xpGifts = gifts.length * this.RULES.giftBonus;
     xp += xpGifts;
@@ -1437,7 +1467,7 @@ const PlayerProgress = {
     return {
       xp, level, levelProgress: pct, xpIntoLevel: remain, xpToNext: need - remain, need,
       present, absent, sessions, attPct,
-      xpAttend, xpIntensity, xpGifts, xpStreak, streak,
+      xpAttend, xpIntensity, xpGifts, xpStreak, xpMatch, xpGoals, streak,
       form: level >= 80 ? '99' : level >= 50 ? 'elite' : level >= 25 ? 'pro' : 'rising',
       history: history.slice(-12).reverse()
     };
@@ -1734,7 +1764,7 @@ CoachTools.applyMatchWarmup = function (state, match) {
   training.place = place;
   training.surface = training.surface || 'Газон';
   training.intensity = 3;
-  training.mainGoal = text || 'Розминка перед матчем';
+  training.mainGoal = lines.length ? '' : 'Розминка перед матчем';
   training.status = keepStatus ? training.status : 'planned';
   training.matchId = match.id;
   training.md = 'WU';
@@ -1758,6 +1788,40 @@ CoachTools.applyMatchWarmup = function (state, match) {
   event.matchId = match.id;
   event.md = 'WU';
   return { added: added, training: training };
+};
+
+/** Картки одного турніру. 3 жовті або червона — пропуск наступного матчу. Друга жовта в грі йде як червона. */
+CoachTools.discipline = function (playerId, competition) {
+  const key = String(competition || '').trim().toLowerCase();
+  const empty = { yellows: 0, sit: 0, sitNext: false, competition: key };
+  if (!key || playerId == null) return empty;
+  let matches = [];
+  try { matches = (Store.get().matches || []).slice(); } catch (_) { return empty; }
+  matches = matches.filter(function (m) {
+    return m && String(m.competition || '').trim().toLowerCase() === key && m.status !== 'cancelled' && m.status !== 'canceled';
+  }).sort(function (a, b) {
+    return String(a.date || '').localeCompare(String(b.date || '')) || String(a.time || '').localeCompare(String(b.time || ''));
+  });
+  let yellows = 0;
+  let sit = 0;
+  matches.forEach(function (m) {
+    if (sit > 0) {
+      sit -= 1;
+      return;
+    }
+    const cell = (m.attendance || {})[playerId];
+    if (!cell || cell.present === false) return;
+    let y = Math.max(0, Number(cell.yellow) || 0);
+    let r = Math.max(0, Number(cell.red) || 0);
+    if (y >= 2) { r += 1; y = 0; }
+    yellows += y;
+    if (yellows >= 3) {
+      sit += Math.floor(yellows / 3);
+      yellows = yellows % 3;
+    }
+    sit += r;
+  });
+  return { yellows: yellows, sit: sit, sitNext: sit > 0, competition: key };
 };
 
 /** Стрічка клубу: подарунки, серії, дні народження, статус, фото, рейтинг. */

@@ -21,7 +21,7 @@ const context = {
 };
 context.globalThis = context;
 vm.createContext(context);
-vm.runInContext(readFileSync(new URL('../src/core/coachTools.js', import.meta.url), 'utf8') + '\nthis.ClubFeed = ClubFeed;\nthis.CoachTools = CoachTools;', context);
+vm.runInContext(readFileSync(new URL('../src/core/coachTools.js', import.meta.url), 'utf8') + '\nthis.ClubFeed = ClubFeed;\nthis.CoachTools = CoachTools;\nthis.PlayerProgress = PlayerProgress;', context);
 
 function berlinToday() {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -210,6 +210,40 @@ describe('club feed and gift delete', () => {
     assert.equal(slots[0].position, 'GK');
     assert.equal(slots.filter(Boolean).length, 11);
     assert.equal(new Set(slots.map(p => p.id)).size, 11);
+  });
+
+  it('counts cards in one tournament and gives match and goal XP', () => {
+    const cell = (yellow, red) => ({ present: true, yellow: yellow, red: red, rating: 6 });
+    context.Store.state = {
+      players: [{ id: 'p1', firstName: 'Ілля', lastName: 'Гордійчук' }],
+      gifts: [],
+      trainings: [],
+      matches: [
+        { id: 'm1', date: '2026-10-01', competition: 'Ліга', status: 'played', attendance: { p1: cell(1, 0) } },
+        { id: 'm2', date: '2026-10-08', competition: 'Ліга', status: 'played', attendance: { p1: cell(1, 0) } },
+        { id: 'm3', date: '2026-10-15', competition: 'Кубок', status: 'played', attendance: { p1: cell(1, 0) } }
+      ],
+      settings: {},
+      feed: []
+    };
+    assert.equal(context.CoachTools.discipline('p1', 'Ліга').yellows, 2);
+    assert.equal(context.CoachTools.discipline('p1', 'Ліга').sitNext, false);
+    assert.equal(context.CoachTools.discipline('p1', 'Кубок').yellows, 1);
+    context.Store.state.matches.push({
+      id: 'm4', date: '2026-10-22', competition: 'Ліга', status: 'played',
+      xi: ['p1'], attendance: { p1: { present: true, yellow: 1, red: 0, goals: 2, rating: 8 } }
+    });
+    const ban = context.CoachTools.discipline('p1', 'Ліга');
+    assert.equal(ban.sitNext, true);
+    assert.equal(ban.yellows, 0);
+    const prog = context.PlayerProgress.compute('p1');
+    assert.equal(prog.xpGoals, 24);
+    assert.ok(prog.xpMatch >= 22);
+    context.Store.state.matches = [{
+      id: 'red', date: '2026-11-01', competition: 'Ліга', status: 'played',
+      attendance: { p1: { present: true, yellow: 2, red: 0, goals: 0, rating: 5 } }
+    }];
+    assert.equal(context.CoachTools.discipline('p1', 'Ліга').sitNext, true);
   });
 
   it('records a later load change and stays quiet on the first known value', () => {

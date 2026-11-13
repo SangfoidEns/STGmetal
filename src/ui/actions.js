@@ -947,6 +947,81 @@ const Actions = {
     });
   },
 
+  openMatchAttendance(matchId) {
+    const s = Store.get();
+    const m = (s.matches || []).find(x => x && String(x.id) === String(matchId || (s.ui && s.ui.matchId)));
+    if (!m) { Toast.show('Матч не відкритий', 'warn'); return; }
+    if (!m.attendance) m.attendance = {};
+    const players = (s.players || []).slice().sort((a, b) => (Number(a.number) || 99) - (Number(b.number) || 99));
+    const called = {};
+    (m.xi || []).forEach(id => { if (id != null && id !== '') called[String(id)] = true; });
+    (m.bench || []).forEach(id => { if (id != null && id !== '') called[String(id)] = true; });
+    const rows = players.filter(p => called[String(p.id)]).map(p => {
+      const a = m.attendance[p.id] || {};
+      const present = a.present !== false;
+      const rating = a.rating != null ? a.rating : 6;
+      const goals = a.goals != null ? a.goals : 0;
+      const yellow = Number(a.yellow) || 0;
+      const red = Number(a.red) || 0;
+      let cards = '';
+      try {
+        if (m.competition && typeof CoachTools !== 'undefined' && CoachTools.discipline) {
+          const d = CoachTools.discipline(p.id, m.competition);
+          if (d && (d.yellows || d.sitNext)) {
+            cards = '<span class="note-sm">' + (d.sitNext ? 'Дискваліфікація на наступний матч турніру' : ('Жовті в турнірі ' + d.yellows + '/3')) + '</span>';
+          }
+        }
+      } catch (_) {}
+      return '<div class="mat-row" data-pid="' + p.id + '">' +
+        '<label class="att-check"><input type="checkbox" class="mat-present"' + (present ? ' checked' : '') + '> <span>#' +
+        (p.number || '—') + ' ' + sanitize(p.lastName || p.firstName || '') + '</span></label>' +
+        cards +
+        '<div class="mat-grid">' +
+          '<label>Оцінка<input type="number" class="mat-rating" min="1" max="10" value="' + rating + '"></label>' +
+          '<label>Голи<input type="number" class="mat-goals" min="0" max="9" value="' + goals + '"></label>' +
+          '<label>Жовта<input type="number" class="mat-yellow" min="0" max="2" value="' + yellow + '"></label>' +
+          '<label>Червона<input type="number" class="mat-red" min="0" max="1" value="' + red + '"></label>' +
+        '</div></div>';
+    }).join('');
+    Modal.open('Матч · ' + sanitize(m.opponent || ''), `
+      <p class="note-sm">Як на тренуванні: хто був, оцінка тренера 1–10, голи і картки. У одному турнірі 3 жовті або червона — пропуск наступного матчу. Друга жовта в одній грі йде як червона. За матч +22 XP, за вихід в основі ще +8, за гол +12, оцінка додає до 10 XP.</p>
+      <div class="att-list">${rows || '<div class="es">У заявці ще нікого</div>'}</div>
+    `, [
+      { label: 'Скасувати', cls: 'btn-s', action: 'cancel' },
+      { label: 'Зберегти матч', cls: 'btn-p', action: 'save-match-attendance' }
+    ]);
+    const btn = document.querySelector('[data-modal-action="save-match-attendance"]');
+    if (btn) btn.dataset.matchId = m.id;
+  },
+
+  saveMatchAttendance(matchId) {
+    const s = Store.get();
+    const m = (s.matches || []).find(x => x && String(x.id) === String(matchId));
+    if (!m) return;
+    if (!m.attendance) m.attendance = {};
+    const markedAt = new Date().toISOString();
+    let goals = 0;
+    document.querySelectorAll('.mat-row').forEach(row => {
+      const pid = row.dataset.pid;
+      if (!pid) return;
+      const present = !!row.querySelector('.mat-present')?.checked;
+      const rating = Math.max(1, Math.min(10, +row.querySelector('.mat-rating')?.value || 6));
+      const g = Math.max(0, Math.min(9, +row.querySelector('.mat-goals')?.value || 0));
+      const yellow = Math.max(0, Math.min(2, +row.querySelector('.mat-yellow')?.value || 0));
+      const red = Math.max(0, Math.min(1, +row.querySelector('.mat-red')?.value || 0));
+      if (present) goals += g;
+      m.attendance[pid] = { present, rating, goals: present ? g : 0, yellow: present ? yellow : 0, red: present ? red : 0, updatedAt: markedAt };
+    });
+    m.stamps = Object.assign({}, m.stamps || {}, { attendance: markedAt });
+    if (m.status !== 'cancelled' && m.status !== 'canceled') m.status = 'played';
+    if (m.scoreUs == null || m.scoreUs === '') m.scoreUs = goals;
+    m.updatedAt = markedAt;
+    try { StorageManager.save(); } catch (_) {}
+    Modal.close({ action: 'ok' });
+    Toast.show('Матч збережено · голів ' + goals, 'ok');
+    App.renderCurrent();
+  },
+
   openAttendance(trainingId) {
     const t = Store.get().trainings.find(x => x.id === trainingId);
     if (!t) { Toast.show('Тренування не знайдено', 'warn'); return; }

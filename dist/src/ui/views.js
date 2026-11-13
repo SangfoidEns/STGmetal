@@ -1,7 +1,7 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z84',
-  APP_UPDATED: '13.11.2026',
+  APP_BUILD: 'z85',
+  APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
   versionLetter(stamp) {
@@ -1705,6 +1705,7 @@ trainings() {
       const date = this._isoDay(t.date);
       if (!date || (todayStr && date < todayStr)) return false;
       if (this._trainingCancelled && this._trainingCancelled(t)) return false;
+      if (t.md === 'WU' || t.kind === 'warmup') return false;
       const st = String(t.status || '').toLowerCase();
       return st === 'planned' || st === 'pinned';
     }).sort((a, b) => this._isoDay(a.date).localeCompare(this._isoDay(b.date)) || String(a.time || '').localeCompare(String(b.time || '')))[0] || null;
@@ -2269,6 +2270,14 @@ trainings() {
     const used = {};
     xi.forEach(id => { if (id != null && id !== '') used[String(id)] = true; });
     bench.forEach(id => { if (id != null && id !== '') used[String(id)] = true; });
+    const compName = m.competition || '';
+    const banOf = (p) => {
+      try {
+        if (!p || !compName || typeof CoachTools === 'undefined' || !CoachTools.discipline) return null;
+        const row = CoachTools.discipline(p.id, compName);
+        return row && row.sitNext ? row : null;
+      } catch (_) { return null; }
+    };
     const chip = (id, cls, role, name, meta) => {
       const body = '<span class="match-chip-role">' + sanitize(role || '•') + '</span>' +
         '<span class="match-chip-name">' + sanitize(name) + '</span>' +
@@ -2281,13 +2290,19 @@ trainings() {
       const p = id != null ? byId[String(id)] : null;
       const role = roleUa[roles[i]] || roles[i] || (i + 1);
       if (!p) return '<span class="match-chip is-empty"><span class="match-chip-role">' + sanitize(String(role)) + '</span><span class="match-chip-name">вільно</span></span>';
-      return chip(p.id, 'is-xi', role, surnameOf(p), metaOf(p));
+      const banned = banOf(p);
+      return chip(p.id, 'is-xi' + (banned ? ' is-banned' : ''), role, surnameOf(p), metaOf(p) + (banned ? ' · дискваліфікація' : ''));
     }).join('');
     const benchHtml = bench.map(id => {
       const p = byId[String(id)];
-      return p ? chip(p.id, 'is-bench', p.position || 'Л', surnameOf(p), metaOf(p)) : '';
+      if (!p) return '';
+      const banned = banOf(p);
+      return chip(p.id, 'is-bench' + (banned ? ' is-banned' : ''), p.position || 'Л', surnameOf(p), metaOf(p) + (banned ? ' · дискваліфікація' : ''));
     }).join('') || '<span class="note-sm">Лавка порожня</span>';
-    const outHtml = players.filter(p => !used[String(p.id)]).map(p => chip(p.id, 'is-out', p.position || '•', surnameOf(p), metaOf(p))).join('') ||
+    const outHtml = players.filter(p => !used[String(p.id)]).map(p => {
+      const banned = banOf(p);
+      return chip(p.id, 'is-out' + (banned ? ' is-banned' : ''), p.position || '•', surnameOf(p), metaOf(p) + (banned ? ' · дискваліфікація' : ''));
+    }).join('') ||
       '<span class="note-sm">Усі в заявці</span>';
     let call = '';
     try {
@@ -2341,6 +2356,7 @@ trainings() {
           '<button type="button" class="btn btn-s" data-action="match-warmup">Розминка в день матчу</button>' +
           '<button type="button" class="btn btn-s" data-action="match-logo">Логотип суперника</button>' +
           (m.opponentLogo ? '<button type="button" class="btn btn-s" data-action="match-logo-clear">Прибрати логотип</button>' : '') +
+          '<button type="button" class="btn btn-s" data-action="match-attendance">Явка, голи, картки</button>' +
         '</div>'
       ) : '') +
       '<section class="card glass"><div class="ct">Збір</div><div class="match-grid">' +
@@ -2375,6 +2391,13 @@ trainings() {
             '<button type="button" class="btn btn-p btn-sm" data-action="match-board">На дошку</button>' +
           '</div><p class="note-sm">Основа — 11 гравців із найбільшим лоадом з анкети. Решта на лавці. Травмовані не виходять в основу. Тап міняє місце гравця.</p>'
         ) : '<p class="note-sm">Склад зібрав тренер.</p>') +
+        (function () {
+          return players.map(p => {
+            const row = banOf(p);
+            if (!row) return '';
+            return '<p class="note-sm match-ban">' + sanitize(surnameOf(p)) + ' · дискваліфікація в цьому турнірі</p>';
+          }).filter(Boolean).join('');
+        })() +
         '<div class="match-block-label">Основа</div><div class="match-chips">' + xiHtml + '</div>' +
         '<div class="match-block-label">Лавка</div><div class="match-chips">' + benchHtml + '</div>' +
         '<div class="match-block-label">Поза заявкою</div><div class="match-chips">' + outHtml + '</div>' +

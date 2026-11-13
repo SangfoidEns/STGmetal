@@ -126,6 +126,22 @@ describe('click guard', () => {
     assert.equal(guard.trainingOpensSheet(card), true);
   });
 
+  it('does not open a training from another button inside the next session', () => {
+    const guard = boot(null);
+    const card = node({
+      tag: 'div',
+      className: 'sc-next-training',
+      attrs: { 'data-next-training': 'wu-1', 'data-action': 'preview-next-training' }
+    });
+    const matchBtn = node({
+      tag: 'button',
+      className: 'btn',
+      attrs: { 'data-action': 'open-match', 'data-match-id': 'm1' }
+    }, card);
+    assert.equal(guard.trainingOpensSheet(matchBtn), false);
+    assert.equal(guard.trainingOpensSheet(card), true);
+  });
+
   it('does not open a training from the save button inside a training card', () => {
     const guard = boot(null);
     const card = node({

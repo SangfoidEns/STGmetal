@@ -38,7 +38,12 @@ const ClickGuard = {
 
   trainingOpensSheet(node) {
     if (!node || !node.closest) return false;
-    if (this.matchSquadClick(node) || node.closest('.match-plan, #modal, .mo, .roster-pick')) return false;
+    if (this.matchSquadClick(node) || node.closest('.match-plan, #modal, .mo, .roster-pick, .tg-next-btn, .match-plaque, .match-toolbar')) return false;
+    const explicit = node.closest('[data-action]');
+    if (explicit) {
+      const act = explicit.getAttribute('data-action') || '';
+      if (act && act !== 'open-training' && act !== 'preview-next-training') return false;
+    }
     const opener = node.closest('[data-action="open-training"], [data-action="preview-next-training"], [data-next-training]');
     if (!opener) return false;
     const own = node.closest('[data-action], [data-edit-training], [data-attendance-training], [data-del-training], [data-dup-training]');
