@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z77',
+  APP_BUILD: 'z78',
   APP_UPDATED: '13.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -1749,11 +1749,14 @@ trainings() {
       const hue = player ? this._feedHue(player) : 42;
       const frame = frames[kind] || '#9aa4b2';
       const open = pid ? (' data-action="open-player-card" data-player-id="' + pid + '"') : '';
-      return '<button type="button" class="club-feed-row kind-' + kind + '" style="--feed-hue:' + hue + ';--feed-frame:' + frame + '"' + open + '>' +
-        '<span class="club-feed-ico" aria-hidden="true">' + (icons[kind] || '•') + '</span>' +
-        '<span class="club-feed-body"><b>' + sanitize(item.title || 'Новина') + '</b><span>' + sanitize(item.text || '') + '</span></span>' +
-        (time ? ('<span class="club-feed-time">' + sanitize(time) + '</span>') : '') +
-        '</button>';
+      return '<div role="button" tabindex="0" class="club-feed-row kind-' + kind + '" style="--feed-hue:' + hue + ';--feed-frame:' + frame + '"' + open + '>' +
+        '<span class="club-feed-top">' +
+          '<span class="club-feed-ico" aria-hidden="true">' + (icons[kind] || '•') + '</span>' +
+          '<span class="club-feed-body"><b>' + sanitize(item.title || 'Новина') + '</b></span>' +
+          (time ? ('<span class="club-feed-time">' + sanitize(time) + '</span>') : '') +
+        '</span>' +
+        '<span class="club-feed-text">' + sanitize(item.text || '') + '</span>' +
+        '</div>';
     }).join('');
     return '<section class="team-chat club-feed" id="teamChat">' +
       '<div class="ct">Стрічка клубу</div>' +
