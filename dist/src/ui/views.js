@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z81',
+  APP_BUILD: 'z82',
   APP_UPDATED: '13.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -1751,10 +1751,10 @@ trainings() {
     try { if (typeof ClubFeed !== 'undefined' && ClubFeed.sync) ClubFeed.sync(); } catch (_) {}
     const s = Store.get();
     const list = (s.feed || []).slice().sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))).slice(0, 40);
-    const icons = { gift: '🎁', streak: '🔥', birthday: '🎂', status: '✨', photo: '📷', rating: '⭐' };
-    const kinds = ['gift', 'streak', 'birthday', 'status', 'photo', 'rating'];
+    const icons = { gift: '🎁', streak: '🔥', birthday: '🎂', status: '✨', photo: '📷', rating: '⭐', load: '📈' };
+    const kinds = ['gift', 'streak', 'birthday', 'status', 'photo', 'rating', 'load'];
     const players = s.players || [];
-    const frames = { gift: '#e8c547', photo: '#60a5fa', rating: '#f5c542', streak: '#fb923c', birthday: '#f472b6', status: '#c084fc' };
+    const frames = { gift: '#e8c547', photo: '#60a5fa', rating: '#f5c542', streak: '#fb923c', birthday: '#f472b6', status: '#c084fc', load: '#34d399' };
     const rows = list.map(item => {
       if (!item) return '';
       let time = '';
@@ -2611,6 +2611,7 @@ trainings() {
       this._clubForgeHtml() +
       '<div class="card glass an-summary"><div class="ct">Проведені тренування: <b>' + trainings.length + '</b></div>' +
       '<div class="an-summary-line">Середня відвідуваність <b>' + avgAtt + '%</b> · візити <b>' + presentSum + '</b></div></div>' +
+      this._loadHistoryCard() +
       this._analyticsCharts(players, getSt) +
       '<div class="card glass an-table">' +
       '<div class="an-head">' +
@@ -2633,9 +2634,33 @@ trainings() {
       cell((cond === '—' ? cond : cond + '%'), 'Готовність') +
       cell(st.attPct != null ? (st.attPct + '%') : '—', 'Відвідування') +
       cell(st.avgRpe != null ? st.avgRpe : '—', 'RPE') +
-      cell(p.load != null ? p.load : '—', 'Load') +
+      cell(p.load != null ? p.load : '—', 'Лоад') +
       '</div><p class="sheet-mini-note">Був ' + (st.present || 0) + ' · пропуск ' + (st.absent || 0) +
-      ' · load 28д ' + (st.load28 != null ? st.load28 : '—') + '</p>';
+      ' · load 28д ' + (st.load28 != null ? st.load28 : '—') +
+      (this._loadChangeNote(p) ? (' · ' + sanitize(this._loadChangeNote(p))) : '') + '</p>';
+  },
+
+  _loadChangeNote(p) {
+    const log = p && Array.isArray(p.loadLog) ? p.loadLog : [];
+    const last = log.length ? log[log.length - 1] : null;
+    if (!last || last.prev == null || last.prev === '' || String(last.prev) === String(p.load)) return '';
+    const when = String(last.at || '').slice(0, 16).replace('T', ' ');
+    return 'лоад ' + last.prev + ' → ' + p.load + (when ? (' · ' + when) : '');
+  },
+
+  _loadHistoryCard() {
+    const s = Store.get();
+    const rows = (s.players || []).slice().sort((a, b) => (Number(b.load) || 0) - (Number(a.load) || 0));
+    if (!rows.length) return '';
+    const line = rows.map(p => {
+      const name = [p.lastName, p.firstName].filter(Boolean).join(' ') || p.name || ('#' + (p.number || '—'));
+      const note = this._loadChangeNote(p);
+      const value = p.load != null && p.load !== '' ? String(p.load) : '—';
+      return '<div class="load-hist-row"><span>' + sanitize(name) + '</span><b>' + sanitize(value) + '</b><small>' +
+        sanitize(note || 'без змін') + '</small></div>';
+    }).join('');
+    return '<div class="card glass load-hist"><div class="ct">Лоад з анкети</div>' +
+      '<p class="note-sm">Кожна зміна тренера записується тут і в новинах клубу.</p>' + line + '</div>';
   },
 
   _staffCard() {
@@ -2765,8 +2790,8 @@ trainings() {
       </div>
       <div class="card glass settings-card">
         <div class="ct">Дані клубу</div>
-        <p class="note-sm">Спільні дані — файл club.json. Експортуйте JSON, замініть ним club.json у репозиторії й запуште. Усі в Telegram отримають цей файл.</p>
-        <p class="note-sm">Імпорт також приймає анкету гравця. Присутність у ній не змінюється: її ставить тренер.</p>
+        <p class="note-sm">Спільні дані передаються лише файлом JSON: експорт з одного пристрою і імпорт на іншому. Файл клубу на сайті не використовується.</p>
+        <p class="note-sm">Анкета гравця приносить його вибір подарунка біля імені і подарунки, яких ще немає у тренера. Явку лишає тренер.</p>
         <p class="note-sm" id="clubSyncLine">${sanitize((typeof StorageManager !== 'undefined' && StorageManager._clubSyncText) || 'Клубний обмін: підключення…')}</p>
         <div class="settings-actions">
           <button type="button" class="btn btn-s" data-action="export-json">Експорт JSON</button>

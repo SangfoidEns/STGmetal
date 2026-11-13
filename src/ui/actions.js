@@ -808,7 +808,8 @@ const Actions = {
     const before = {
       firstName: p.firstName, lastName: p.lastName, number: p.number, position: p.position,
       status: p.status, notes: p.notes, phone: p.phone, birthDate: p.birthDate,
-      photoUrl: p.photoUrl, profilePhoto: p.profilePhoto, telegramUsername: p.telegramUsername
+      photoUrl: p.photoUrl, profilePhoto: p.profilePhoto, telegramUsername: p.telegramUsername,
+      load: p.load
     };
     p.firstName = document.getElementById('peF')?.value || p.firstName;
     p.lastName = document.getElementById('peL')?.value || p.lastName;
@@ -861,6 +862,11 @@ const Actions = {
         if (String(before[key] == null ? '' : before[key]) !== String(p[key] == null ? '' : p[key])) p.stamps[key] = now;
       });
       if (before.photoUrl !== p.photoUrl || before.profilePhoto !== p.profilePhoto) p.stamps.photo = now;
+      if (String(before.load == null ? '' : before.load) !== String(p.load == null ? '' : p.load)) {
+        p.stamps.load = now;
+        const row = { at: now, value: p.load, prev: before.load == null ? '' : before.load };
+        p.loadLog = (Array.isArray(p.loadLog) ? p.loadLog : []).concat([row]).slice(-40);
+      }
       p.updatedAt = now;
       try { if (typeof Views !== 'undefined' && Views.syncBirthdays) Views.syncBirthdays(); } catch (_) {}
       try { StorageManager.save(); } catch (_) {}

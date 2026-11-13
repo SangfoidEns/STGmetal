@@ -780,16 +780,21 @@ const App = {
     const picked = document.querySelector('#modalBody input[name="ppFeatured"]:checked');
     if (picked && picked.value) {
       const s = Store.get();
+      let chosen = null;
       (s.gifts || []).forEach(function (g) {
         if (!g || String(g.playerId) !== String(p.id)) return;
-        g.featured = String(g.uid || g.id || '') === picked.value;
-        if (g.featured) {
-          const gh = (typeof CoachTools !== 'undefined' && CoachTools.giftHue) ? CoachTools.giftHue(g) : g.hue;
-          p.themeHue = gh;
-          p.profile.themeHue = gh;
-          p.featuredGiftId = g.giftId || '';
-        }
+        const hit = String(g.uid || g.id || '') === picked.value;
+        g.featured = hit;
+        if (hit) chosen = g;
       });
+      if (chosen) {
+        const gh = (typeof CoachTools !== 'undefined' && CoachTools.giftHue) ? CoachTools.giftHue(chosen) : chosen.hue;
+        p.themeHue = gh;
+        p.profile.themeHue = gh;
+        p.featuredGiftId = chosen.giftId || '';
+        p.wornGift = { key: chosen.uid || chosen.id || picked.value, giftId: chosen.giftId || '', at: now, by: 'player' };
+        p.stamps.wornGift = now;
+      }
     }
     return true;
   },

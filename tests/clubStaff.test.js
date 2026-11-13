@@ -89,6 +89,6 @@ describe('club staff and classic player card', () => {
     assert.match(html, /Готовність/);
     assert.match(html, /84%/);
     assert.match(html, /Відвідування/);
-    assert.match(html, /Load/);
+    assert.match(html, /Лоад/);
   });
 });

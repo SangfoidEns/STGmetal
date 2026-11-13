@@ -1,4 +1,4 @@
-const CACHE_NAME = 'metalist-coach-v20261113z81';
+const CACHE_NAME = 'metalist-coach-v20261113z82';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './assets/metalist-mark.svg',
   './src/styles/app.css',
@@ -20,10 +20,6 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
   if (url.pathname.indexOf('/api/') === 0) return;
-  if (url.pathname.endsWith('/club.json')) {
-    event.respondWith(fetch(event.request, { cache: 'no-store' }));
-    return;
-  }
   event.respondWith(fetch(event.request).then(response => {
     if (response && response.ok) caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
     return response;

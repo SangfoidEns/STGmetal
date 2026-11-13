@@ -159,4 +159,24 @@ describe('club feed and gift delete', () => {
     assert.equal(slots.filter(Boolean).length, 11);
     assert.equal(new Set(slots.map(p => p.id)).size, 11);
   });
+
+  it('records a later load change and stays quiet on the first known value', () => {
+    context.Store.state = {
+      players: [{ id: 'p1', firstName: 'Джонсон', lastName: 'Джонсон', load: 3, stamps: { load: '2026-11-10T10:00:00.000Z' } }],
+      gifts: [],
+      trainings: [],
+      settings: {},
+      feed: []
+    };
+    context.ClubFeed.sync();
+    assert.equal(context.Store.state.feed.filter(x => x.kind === 'load').length, 0);
+    context.Store.state.players[0].load = 7;
+    context.Store.state.players[0].stamps.load = '2026-11-13T10:00:00.000Z';
+    context.ClubFeed.sync();
+    const rows = context.Store.state.feed.filter(x => x.kind === 'load');
+    assert.equal(rows.length, 1);
+    assert.match(rows[0].text, /3 → 7/);
+    context.ClubFeed.sync();
+    assert.equal(context.Store.state.feed.filter(x => x.kind === 'load').length, 1);
+  });
 });

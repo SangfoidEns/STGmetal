@@ -64,16 +64,17 @@ describe('telegram session cache', () => {
     assert.equal(applied, 0);
   });
 
-  it('loads club.json only when the phone has no session yet', async () => {
+  it('does not load a club file from the site when the phone has no session', async () => {
     const ctx = boot();
+    let fetched = 0;
     let applied = 0;
-    ctx.StorageManager.fetchClub = async () => ({
-      updatedAt: '2026-10-30T21:34:29.990Z',
-      payload: { schemaVersion: 2, players: [{ id: 'file-player' }] }
-    });
+    ctx.StorageManager.fetchClub = async () => { fetched++; return { updatedAt: '2026-10-30T21:34:29.990Z', payload: { players: [{ id: 'file-player' }] } }; };
     ctx.StorageManager.applyClubPayload = () => { applied++; return true; };
     await ctx.StorageManager.bootstrapClubSync();
-    assert.equal(applied, 1);
+    await ctx.StorageManager.pullClub();
+    assert.equal(fetched, 0);
+    assert.equal(applied, 0);
+    assert.equal(ctx.StorageManager._clubSyncText.indexOf('JSON') >= 0, true);
   });
 
   it('still saves the session when embedded photos do not fit', () => {

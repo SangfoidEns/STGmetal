@@ -85,18 +85,18 @@ const StorageManager = {
     return Number.isFinite(n) ? n : 0;
   },
 
-  /** club.json — або конверт { updatedAt, payload }, або прямий експорт з додатка. */
+  /** Конверт { updatedAt, payload } або прямий експорт з додатка. */
   _normalizeClubFile(data) {
     if (!data || typeof data !== 'object') return { error: true };
     if (data.payload && typeof data.payload === 'object') {
       const updatedAt = data.updatedAt || data.payload.updatedAt || data.payload.exportedAt || data.exportedAt || null;
       if (!updatedAt) return { empty: true };
-      return { updatedAt, updatedBy: data.updatedBy || 'club.json', payload: data.payload };
+      return { updatedAt, updatedBy: data.updatedBy || 'json', payload: data.payload };
     }
     if (data.players || data.trainings || data.boards || data.schemaVersion) {
       const updatedAt = data.updatedAt || data.exportedAt || null;
       if (!updatedAt) return { empty: true };
-      return { updatedAt, updatedBy: data.updatedBy || 'club.json', payload: data };
+      return { updatedAt, updatedBy: data.updatedBy || 'json', payload: data };
     }
     return { empty: true };
   },
@@ -109,22 +109,7 @@ const StorageManager = {
   },
 
   async fetchClub() {
-    if (this._staticClubOnly()) {
-      try {
-        const url = new URL('club.json', window.location.href);
-        const res = await fetch(url.toString(), { cache: 'no-store' });
-        if (!res.ok) {
-          this._setClubSyncLine('Немає файлу club.json');
-          return { error: true };
-        }
-        const club = this._normalizeClubFile(await res.json());
-        if (club.empty) this._setClubSyncLine('Покладіть експорт у club.json');
-        return club;
-      } catch (_) {
-        this._setClubSyncLine('Немає файлу club.json');
-        return { error: true };
-      }
-    }
+    if (this._staticClubOnly()) return { empty: true };
     try {
       const res = await fetch(this._clubApi('/api/club-data'), { cache: 'no-store' });
       if (!res.ok) return { error: true };
@@ -242,7 +227,7 @@ const StorageManager = {
 
   async pullClub() {
     if (this._holdRemote) return false;
-    if (this._staticClubOnly() && this._sessionIsCached()) return false;
+    if (this._staticClubOnly()) return false;
     const remote = await this.fetchClub();
     if (!remote || remote.error || remote.empty || !remote.payload || !remote.updatedAt) return false;
     if (this._clubUpdatedAt && remote.updatedAt === this._clubUpdatedAt) return false;
@@ -272,28 +257,19 @@ const StorageManager = {
   },
 
   async bootstrapClubSync() {
-    if (this._staticClubOnly() && this._sessionIsCached()) {
+    if (this._staticClubOnly()) {
       clearTimeout(this._clubPushTimer);
       if (this._clubPoll) clearInterval(this._clubPoll);
       this._clubReady = true;
       this._freshInstall = false;
-      this._setClubSyncLine('Сесія з цього Telegram');
+      this._setClubSyncLine(this._sessionIsCached()
+        ? 'Дані з цього пристрою. Передача лише файлом JSON.'
+        : 'Імпортуйте клубний JSON. Файл на сайті не використовується.');
       return;
     }
     let remote = null;
     try { remote = await this.fetchClub(); } catch (_) { remote = { error: true }; }
     const offline = !remote || remote.error;
-    if (this._staticClubOnly()) {
-      if (!offline && remote.payload && remote.updatedAt && !this._sessionIsCached()) {
-        this.applyClubPayload(remote, { quiet: true });
-        this._setClubSyncLine('Сесію збережено в цьому Telegram');
-      }
-      clearTimeout(this._clubPushTimer);
-      if (this._clubPoll) clearInterval(this._clubPoll);
-      this._clubReady = true;
-      this._freshInstall = false;
-      return;
-    }
     if (!offline && remote.payload && remote.updatedAt) {
       this.applyClubPayload(remote, { quiet: true });
       this._clubDirty = false;
@@ -323,7 +299,7 @@ const StorageManager = {
 
   save(opts) {
     /* DATA INTEGRITY: never wipe keys on error */
-    /* Кеш Telegram тримає останню сесію. club.json лише для першого запуску. */
+    /* Кеш Telegram тримає останню сесію. На сайт клубний файл не викладається. */
     const localOnly = !!(opts && opts.localOnly) || this._staticClubOnly();
     try {
       const s = Store.get();

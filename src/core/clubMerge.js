@@ -171,6 +171,7 @@ function mergeRecord(baseItem, extraItem) {
   if (training) applyTrainingSchedule(merged, winner, loser);
   keepFilled(merged, loser, winner);
   keepMatchPlan(merged, loser, winner);
+  keepPlayerChoice(merged, loser, winner);
   applyStampedFields(merged, baseItem, extraItem);
   releaseWorkingSession(merged);
   return merged;
@@ -287,6 +288,62 @@ function applyStampedFields(merged, a, b) {
     };
     if (!squad(winner && winner.xi) && squad(loser && loser.xi)) merged.xi = loser.xi;
     if (!squad(winner && winner.bench) && squad(loser && loser.bench)) merged.bench = loser.bench;
+  }
+
+  function isPerson(item) {
+    return !!(item && (item.firstName || item.lastName || item.telegramUsername || item.wornGift || item.loadLog));
+  }
+
+  /** Вибір гравця біля імені сильніший за пізніший вибір тренера. Лоад береться з новішої позначки. */
+  function keepPlayerChoice(merged, loser, winner) {
+    if (!merged || (!isPerson(loser) && !isPerson(winner))) return;
+    const score = function (item) {
+      const worn = item && item.wornGift;
+      if (!worn || (!worn.key && !worn.giftId)) return null;
+      return { worn: worn, player: worn.by === 'player' ? 2 : 1, at: stamp(worn.at) };
+    };
+    const left = score(loser);
+    const right = score(winner);
+    let worn = null;
+    if (left && right) {
+      if (left.player !== right.player) worn = left.player > right.player ? left.worn : right.worn;
+      else worn = right.at >= left.at ? right.worn : left.worn;
+    } else worn = (left && left.worn) || (right && right.worn) || null;
+    if (worn) merged.wornGift = worn;
+    const log = {};
+    [loser && loser.loadLog, winner && winner.loadLog].forEach(function (list) {
+      (Array.isArray(list) ? list : []).forEach(function (row) {
+        if (!row || !row.at) return;
+        log[String(row.at)] = row;
+      });
+    });
+    const history = Object.keys(log).sort().map(function (key) { return log[key]; });
+    if (history.length) merged.loadLog = history.slice(-40);
+    const leftLoad = fieldTime(loser, 'load');
+    const rightLoad = fieldTime(winner, 'load');
+    if (leftLoad || rightLoad) {
+      const src = rightLoad >= leftLoad ? winner : loser;
+      if (src && src.load != null && src.load !== '') merged.load = src.load;
+    }
+  }
+
+  function applyWornGifts(payload) {
+    if (!payload) return;
+    (payload.players || []).forEach(function (player) {
+      const worn = player && player.wornGift;
+      if (!worn || (!worn.key && !worn.giftId)) return;
+      const mine = (payload.gifts || []).filter(function (gift) {
+        return gift && String(gift.playerId) === String(player.id);
+      });
+      let chosen = mine.find(function (gift) {
+        return String(gift.uid || '') === String(worn.key) || String(gift.id || '') === String(worn.key);
+      });
+      if (!chosen && worn.giftId) {
+        chosen = mine.find(function (gift) { return String(gift.giftId || '') === String(worn.giftId); });
+      }
+      if (!chosen) return;
+      mine.forEach(function (gift) { gift.featured = gift === chosen; });
+    });
   }
 
   /** Чернетка, план і проведене не стають скасованими через стару мітку cancelledAt. */
@@ -548,6 +605,7 @@ function collapseTrainings(payload) {
     }
     collapseTrainings(out);
     collapsePlayers(out);
+    applyWornGifts(out);
     return out;
   }
 

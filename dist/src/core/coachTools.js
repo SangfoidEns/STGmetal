@@ -976,13 +976,19 @@ CoachTools.giveGift = function (playerId, giftId, momentText) {
     attached: true,
     createdAt: new Date().toISOString()
   };
-  s.gifts.forEach(g => { if (g && String(g.playerId) === String(playerId)) g.featured = false; });
-  s.gifts.push(entry);
   const player = (s.players || []).find(x => x && String(x.id) === String(playerId));
+  const keepWorn = player && player.wornGift && player.wornGift.by === 'player';
+  if (keepWorn) entry.featured = false;
+  else s.gifts.forEach(g => { if (g && String(g.playerId) === String(playerId)) g.featured = false; });
+  s.gifts.push(entry);
   if (player) {
     if (!player.profile) player.profile = {};
-    player.profile.themeHue = entry.hue;
-    player.profile.featuredGiftId = entry.uid;
+    if (!keepWorn) {
+      player.profile.themeHue = entry.hue;
+      player.profile.featuredGiftId = entry.uid;
+      player.wornGift = { key: entry.uid, giftId: entry.giftId || '', at: entry.createdAt, by: 'coach' };
+      player.stamps = Object.assign({}, player.stamps || {}, { wornGift: entry.createdAt });
+    }
   }
   try { StorageManager.save(); } catch (_) {}
   try {
@@ -1080,11 +1086,20 @@ CoachTools.setFeaturedGift = function (playerId, uid) {
   if (!g) return false;
   if (playerId && String(g.playerId) !== String(playerId)) return false;
   if (!CoachTools.canFeatureGift(g)) return false;
+  const p = (s.players || []).find(x => x && String(x.id) === String(g.playerId));
+  let by = 'coach';
+  try {
+    if (typeof AuthManager !== 'undefined' && AuthManager.isPlayer && AuthManager.isPlayer()) by = 'player';
+  } catch (_) {}
+  if (p && p.wornGift && p.wornGift.by === 'player' && by !== 'player') {
+    try { if (typeof Toast !== 'undefined') Toast.show('Подарунок біля імені обрав гравець', 'warn'); } catch (_) {}
+    return false;
+  }
   (s.gifts || []).forEach(x => { if (x && String(x.playerId) === String(g.playerId)) x.featured = false; });
   g.featured = true;
   if (!g.id) g.id = g.uid || ('g_' + Date.now());
   if (!g.uid) g.uid = g.id;
-  const p = (s.players || []).find(x => x && String(x.id) === String(g.playerId));
+  const now = new Date().toISOString();
   if (p) {
     if (!p.profile) p.profile = {};
     const hue = CoachTools.giftHue ? CoachTools.giftHue(g) : g.hue;
@@ -1093,6 +1108,8 @@ CoachTools.setFeaturedGift = function (playerId, uid) {
       p.themeHue = Number(hue);
     }
     p.profile.featuredGiftId = g.uid || g.id;
+    p.wornGift = { key: g.uid || g.id, giftId: g.giftId || '', at: now, by: by };
+    p.stamps = Object.assign({}, p.stamps || {}, { wornGift: now });
   }
   try { StorageManager.save(); } catch (_) {}
   return true;
@@ -1451,6 +1468,18 @@ CoachTools.ensureWornGift = function (playerId) {
     if (!s.gifts) return null;
     const mine = s.gifts.filter(g => g && String(g.playerId) === String(playerId) && g.attached !== false);
     if (!mine.length) return null;
+    const person = (s.players || []).find(p => p && String(p.id) === String(playerId));
+    const worn = person && person.wornGift;
+    if (worn && (worn.key || worn.giftId)) {
+      const chosen = mine.find(g => String(g.uid || '') === String(worn.key) || String(g.id || '') === String(worn.key))
+        || (worn.giftId ? mine.find(g => String(g.giftId || '') === String(worn.giftId)) : null);
+      if (!chosen) return null;
+      if (!chosen.featured) {
+        mine.forEach(x => { x.featured = x === chosen; });
+        try { StorageManager.save(); } catch (_) {}
+      }
+      return chosen;
+    }
     let featured = mine.find(g => g.featured);
     if (!featured) {
       featured = mine.slice().sort((a, b) => CoachTools.rarityRank(b.rarity) - CoachTools.rarityRank(a.rarity))[0];
@@ -1740,7 +1769,7 @@ const ClubFeed = {
   },
   _meta(s) {
     if (!s.feedMeta || typeof s.feedMeta !== 'object') s.feedMeta = {};
-    ['status', 'photo', 'photoAt', 'level', 'streak'].forEach(function (key) {
+    ['status', 'photo', 'photoAt', 'level', 'streak', 'load', 'loadAt'].forEach(function (key) {
       if (!s.feedMeta[key] || typeof s.feedMeta[key] !== 'object') s.feedMeta[key] = {};
     });
     return s.feedMeta;
@@ -1783,7 +1812,7 @@ const ClubFeed = {
     const next = [];
     sorted.forEach(function (item) {
       if (item.kind === 'gift' && !live[item.id]) return;
-      const stampedPhoto = item.kind === 'photo' && /^photo:[^:]+:\d{4}-/.test(String(item.id || ''));
+      const stampedPhoto = (item.kind === 'photo' || item.kind === 'load') && /:\d{4}-/.test(String(item.id || ''));
       const bucket = stampedPhoto
         ? item.id
         : ((item.kind === 'photo' || item.kind === 'status' || item.kind === 'rating')
@@ -1935,6 +1964,27 @@ const ClubFeed = {
             text: who + ' тримає серію ' + hit + ' тренувань поспіль'
           })) dirty = true;
           meta.streak[pid] = hit;
+        }
+        const loadAt = (p.stamps && p.stamps.load) || '';
+        if (loadAt) {
+          if (meta.loadAt[pid] == null) {
+            meta.loadAt[pid] = loadAt;
+            meta.load[pid] = p.load;
+            dirty = true;
+          } else if (String(meta.loadAt[pid]) !== String(loadAt)) {
+            const prev = meta.load[pid];
+            const text = who + ': лоад ' + (prev != null && prev !== '' ? (prev + ' → ' + p.load) : p.load);
+            if (ClubFeed._push(s, {
+              id: 'load:' + pid + ':' + loadAt,
+              kind: 'load',
+              playerId: p.id,
+              title: 'Лоад',
+              text: text,
+              createdAt: loadAt
+            })) dirty = true;
+            meta.loadAt[pid] = loadAt;
+            meta.load[pid] = p.load;
+          }
         }
         const birth = p.birthDate || (p.profile && p.profile.birthDate) || p.birthday || '';
         const when = ClubFeed._daysUntil(birth, today);

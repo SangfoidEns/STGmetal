@@ -2151,11 +2151,14 @@ const BoardEngine = {
         '<circle cx="20" cy="20" r="15" fill="none" stroke="rgba(0,0,0,0.35)" stroke-width="3.5"/>' +
         '<circle cx="20" cy="20" r="15" fill="none" stroke="' + loadCol + '" stroke-width="3.5" stroke-dasharray="' +
         (loadPct * circ) + ' ' + circ + '" stroke-linecap="round" transform="rotate(-90 20 20)"/></svg>';
-      return '<div class="bench-chip' + on + '" data-id="' + o.id + '" title="Перетягніть на поле · готовність ' + Math.round(readiness) + '%">' +
+      const surname = (pl && (pl.lastName || pl.firstName)) || o.label || 'Гравець';
+      const loadText = loadVal != null && loadVal !== '' ? ('L' + loadVal) : '';
+      return '<div class="bench-chip' + on + '" data-id="' + o.id + '" title="Перетягніть на поле · ' + sanitize(surname) + '">' +
         '<div class="bench-avatar-wrap">' + ringSvg +
         '<div class="bench-avatar" style="' + bgStyle + '"><span class="bench-num">' + (o.number || '') + '</span></div></div>' +
-        '<div class="bench-meta"><span class="bench-pos">' + (o.position || (pl && pl.position) || '') + '</span> ' +
-        '<span class="bench-name">' + sanitize(o.label || '') + '</span>' + tag + '</div></div>';
+        '<div class="bench-copy"><span class="bench-name">' + sanitize(surname) + '</span>' +
+        '<span class="bench-sub">' + sanitize(o.position || (pl && pl.position) || '') +
+        (loadText ? (' · ' + loadText) : '') + tag + '</span></div></div>';
     };
     const stOf = (o) => o.status || ((s.players || []).find(p => p.id === o.playerId) || {}).status || '';
     const grOf = (o) => ((s.players || []).find(p => p.id === o.playerId) || {}).group || '';

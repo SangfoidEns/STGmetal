@@ -335,6 +335,46 @@ describe('club snapshot merge', () => {
     assert.deepEqual(merged.matches[0].xi, ['gk']);
   });
 
+  it('keeps the player gift choice and the newer coach load', () => {
+    const merged = mergePayload({
+      players: [{
+        id: 'johnson',
+        firstName: 'Джонсон',
+        lastName: 'Джонсон',
+        load: 2,
+        loadLog: [{ at: '2026-11-10T10:00:00.000Z', value: 2, prev: 0 }],
+        wornGift: { key: 'ball', giftId: 'ball', at: '2026-11-12T10:00:00.000Z', by: 'player' },
+        stamps: { load: '2026-11-10T10:00:00.000Z', wornGift: '2026-11-12T10:00:00.000Z' }
+      }],
+      gifts: [
+        { id: 'ball', uid: 'ball', playerId: 'johnson', giftId: 'ball', featured: true },
+        { id: 'crest', uid: 'crest', playerId: 'johnson', giftId: 'crest', featured: false }
+      ]
+    }, {
+      players: [{
+        id: 'johnson',
+        firstName: 'Джонсон',
+        lastName: 'Джонсон',
+        load: 7,
+        loadLog: [{ at: '2026-11-13T10:00:00.000Z', value: 7, prev: 2 }],
+        wornGift: { key: 'crest', giftId: 'crest', at: '2026-11-13T11:00:00.000Z', by: 'coach' },
+        updatedAt: '2026-11-13T11:00:00.000Z',
+        stamps: { load: '2026-11-13T10:00:00.000Z', wornGift: '2026-11-13T11:00:00.000Z' }
+      }],
+      gifts: [
+        { id: 'ball', uid: 'ball', playerId: 'johnson', giftId: 'ball', featured: false },
+        { id: 'crest', uid: 'crest', playerId: 'johnson', giftId: 'crest', featured: true }
+      ]
+    });
+    assert.equal(merged.players.length, 1);
+    assert.equal(merged.players[0].wornGift.by, 'player');
+    assert.equal(merged.players[0].wornGift.giftId, 'ball');
+    assert.equal(merged.players[0].load, 7);
+    assert.equal(merged.players[0].loadLog.length, 2);
+    assert.equal(merged.gifts.find(g => g.id === 'ball').featured, true);
+    assert.equal(merged.gifts.find(g => g.id === 'crest').featured, false);
+  });
+
   it('does not fold a future 10/11 into an older session with the same name', () => {
     const merged = mergePayload({
       trainings: [
