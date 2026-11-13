@@ -18,7 +18,7 @@ const ClickGuard = {
     const inBand = y >= band.top - 4 && y <= band.bottom + 4 && x >= band.left - 8 && x <= band.right + 8;
     if (node.closest('#mobileNav, .mn')) return true;
     if (!inBand) return false;
-    if (node.closest('#sidebar, .sidebar, #modal, .md, .mo, .tg-sheet, .tg-sheet-backdrop, .sw-sheet')) return false;
+    if (node.closest('#sidebar, .sidebar, #modal, .md, .mo, .tg-sheet, .tg-sheet-backdrop, .sw-sheet, .match-savebar, [data-action="match-save"], [data-action="match-warmup"], [data-action="match-logo"]')) return false;
     const own = this.ownControl(node);
     if (!own || !own.getBoundingClientRect) return true;
     const r = own.getBoundingClientRect();

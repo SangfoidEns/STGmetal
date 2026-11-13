@@ -1501,19 +1501,26 @@ CoachTools.lineupRole = function (player) {
   if (['ST', 'CF', 'LW', 'RW', 'SS', 'LF', 'RF', 'ATT', 'FW'].indexOf(pos) >= 0) return 'ATT';
   return 'MID';
 };
-/** Одинадцять здорових за явкою. Решта, включно з лазаретом, іде на лавку. */
-CoachTools.pickLineup = function (players, attOf) {
+/** Одинадцять із найбільшим лоадом, який тренер ставить в анкеті. Решта йде на лавку. */
+CoachTools.pickLineup = function (players) {
   const list = (players || []).filter(function (p) { return p && p.id != null; });
   const hurt = function (p) {
     const st = String(p.status || '').toLowerCase();
-    return st === 'injured' || st === 'rehab' || st === 'recovery';
+    return st === 'injured' || st === 'rehab' || st === 'recovery' || st === 'suspended' || st === 'unavailable';
   };
-  const score = function (p) {
-    try { return Number(attOf ? attOf(p) : 0) || 0; } catch (_) { return 0; }
+  const loadOf = function (p) {
+    const n = Number(p && p.load);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const ready = function (p) {
+    const n = Number(p && (p.readiness != null ? p.readiness : p.condition));
+    return Number.isFinite(n) ? n : 0;
   };
   const available = list.filter(function (p) { return !hurt(p); }).slice().sort(function (a, b) {
-    const diff = score(b) - score(a);
+    const diff = loadOf(b) - loadOf(a);
     if (diff) return diff;
+    const rd = ready(b) - ready(a);
+    if (rd) return rd;
     return (Number(a.number) || 99) - (Number(b.number) || 99);
   });
   const xi = available.slice(0, 11);
@@ -1549,10 +1556,10 @@ CoachTools.schemeRoles = function (schemeName) {
   });
 };
 
-/** Одинадцять за явкою в порядку слотів і решта заявки на лавці. */
-CoachTools.buildMatchSquad = function (players, schemeName, attOf) {
+/** Одинадцять за лоадом з анкети в порядку слотів і решта заявки на лавці. */
+CoachTools.buildMatchSquad = function (players, schemeName) {
   const roles = CoachTools.schemeRoles(schemeName);
-  const picked = CoachTools.pickLineup(players, attOf);
+  const picked = CoachTools.pickLineup(players);
   const assigned = CoachTools.assignFormation(picked.xi, roles);
   const xiIds = {};
   const xi = assigned.map(function (p) {
@@ -1657,6 +1664,71 @@ CoachTools.applyMatchWeek = function (state, match) {
     added += 1;
   });
   return { added: added };
+};
+
+/** Одна розминка в день матчу. Повторний виклик оновлює той самий запис. */
+CoachTools.applyMatchWarmup = function (state, match) {
+  if (!state || !match || !match.id || !match.date) return { added: 0 };
+  state.trainings = state.trainings || [];
+  state.calendar = state.calendar || [];
+  const id = 'tr-' + match.id + '-WU';
+  const now = new Date().toISOString();
+  const minutes = Math.max(10, Number(match.warmupMin) || 20);
+  const time = match.warmupAt || '';
+  const place = match.warmupPlace || match.stadium || 'Поле';
+  const text = String(match.warmup || '').trim();
+  const lines = text.split(/\n+/).map(function (line) { return line.trim(); }).filter(Boolean);
+  const blocks = (lines.length ? lines : ['Розминка перед матчем']).map(function (line, index, all) {
+    return {
+      id: id + '-w' + index,
+      title: line,
+      type: 'warmup',
+      duration: Math.max(3, Math.round(minutes / all.length)),
+      intensity: 3
+    };
+  });
+  const name = 'Розминка · vs ' + (match.opponent || 'суперник');
+  let training = state.trainings.find(function (item) {
+    return item && (item.id === id || (item.matchId === match.id && item.md === 'WU'));
+  });
+  let added = 0;
+  if (!training) {
+    training = { id: id, createdAt: now, matchId: match.id, md: 'WU' };
+    state.trainings.push(training);
+    added += 1;
+  }
+  const keepStatus = training.status === 'done' || training.status === 'cancelled' || training.status === 'canceled';
+  training.name = name;
+  training.date = match.date;
+  training.time = time || training.time || '';
+  training.duration = minutes;
+  training.place = place;
+  training.surface = training.surface || 'Газон';
+  training.intensity = 3;
+  training.mainGoal = text || 'Розминка перед матчем';
+  training.status = keepStatus ? training.status : 'planned';
+  training.matchId = match.id;
+  training.md = 'WU';
+  training.structure = blocks;
+  training.updatedAt = now;
+  training.stamps = Object.assign({}, training.stamps || {}, { schedule: now, status: training.stamps && training.stamps.status || now });
+  const calId = 'cal-' + match.id + '-WU';
+  let event = state.calendar.find(function (item) {
+    return item && (item.id === calId || (item.matchId === match.id && item.md === 'WU'));
+  });
+  if (!event) {
+    event = { id: calId, type: 'TRAINING', matchId: match.id, md: 'WU', trainingId: training.id };
+    state.calendar.push(event);
+    added += 1;
+  }
+  event.type = 'TRAINING';
+  event.title = name;
+  event.date = match.date;
+  event.time = time || '';
+  event.trainingId = training.id;
+  event.matchId = match.id;
+  event.md = 'WU';
+  return { added: added, training: training };
 };
 
 /** Стрічка клубу: подарунки, серії, дні народження, статус, фото, рейтинг. */

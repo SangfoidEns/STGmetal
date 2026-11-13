@@ -300,6 +300,41 @@ describe('club snapshot merge', () => {
     assert.equal(merged.trainings[0].attendance.b.present, true);
   });
 
+  it('keeps a saved match plan when a newer shell has empty text', () => {
+    const merged = mergePayload({
+      matches: [{
+        id: 'm1',
+        opponent: 'Кастель',
+        date: '2026-11-15',
+        status: 'planned',
+        plan: 'Пресинг',
+        plan1: 'Низький блок',
+        warmup: 'Рондо',
+        opponentLogo: 'data:image/png;base64,AAA',
+        xi: ['gk'],
+        updatedAt: '2026-11-13T10:00:00.000Z',
+        stamps: { plan: '2026-11-13T10:00:00.000Z' }
+      }]
+    }, {
+      matches: [{
+        id: 'm1',
+        opponent: 'Кастель',
+        date: '2026-11-15',
+        status: 'planned',
+        plan: '',
+        plan1: '',
+        warmup: '',
+        updatedAt: '2026-11-13T12:00:00.000Z'
+      }]
+    });
+    assert.equal(merged.matches.length, 1);
+    assert.equal(merged.matches[0].plan, 'Пресинг');
+    assert.equal(merged.matches[0].plan1, 'Низький блок');
+    assert.equal(merged.matches[0].warmup, 'Рондо');
+    assert.equal(merged.matches[0].opponentLogo, 'data:image/png;base64,AAA');
+    assert.deepEqual(merged.matches[0].xi, ['gk']);
+  });
+
   it('does not fold a future 10/11 into an older session with the same name', () => {
     const merged = mergePayload({
       trainings: [

@@ -142,15 +142,13 @@ describe('club feed and gift delete', () => {
     assert.equal(photos.length, 1);
   });
 
-  it('puts the eleven best attenders on the pitch and everyone else on the bench', () => {
+  it('puts the eleven highest loads on the pitch and everyone else on the bench', () => {
     const players = [];
     for (let i = 1; i <= 12; i++) {
-      players.push({ id: 'a' + i, number: i, position: i === 1 ? 'GK' : (i < 5 ? 'CB' : (i < 9 ? 'CM' : 'ST')), status: 'active' });
+      players.push({ id: 'a' + i, number: i, position: i === 1 ? 'GK' : (i < 5 ? 'CB' : (i < 9 ? 'CM' : 'ST')), status: 'active', load: i === 12 ? 0 : 8 });
     }
-    players.push({ id: 'hurt', number: 99, position: 'ST', status: 'injured' });
-    const att = { hurt: 100 };
-    players.forEach(function (p, i) { if (p.id !== 'hurt') att[p.id] = 100 - i; });
-    const picked = context.CoachTools.pickLineup(players, function (p) { return att[p.id]; });
+    players.push({ id: 'hurt', number: 99, position: 'ST', status: 'injured', load: 10 });
+    const picked = context.CoachTools.pickLineup(players);
     assert.equal(picked.xi.length, 11);
     assert.equal(picked.xi.some(p => p.id === 'a12'), false);
     assert.equal(picked.bench.some(p => p.id === 'a12'), true);

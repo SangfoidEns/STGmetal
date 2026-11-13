@@ -1256,6 +1256,7 @@ const App = {
   },
 
     navigate(view) {
+    try { if (typeof Actions !== 'undefined' && Actions.flushMatchPlan) Actions.flushMatchPlan(); } catch (_) {}
     if (view === 'trainings' && this._chatBlocksTraining() && !this._navTap) return;
     if (view === 'trainings' && typeof AuthManager !== 'undefined' && AuthManager.isGuest && AuthManager.isGuest()) view = 'analytics';
     // Aliases for dashboard pills / legacy links
@@ -1593,6 +1594,7 @@ const App = {
   },
 
   renderCurrent() {
+    try { if (typeof Actions !== 'undefined' && Actions.flushMatchPlan) Actions.flushMatchPlan(); } catch (_) {}
     try { this._armUiQuiet(700); } catch (_) {}
     try { this.startUsageTracker(); } catch (_) {}
     try { this.syncRoleClass(); } catch (_) {}
@@ -2651,6 +2653,7 @@ const App = {
       if (action === 'new-match') return Actions.newMatch();
       if (action === 'open-match') return Actions.viewMatch(t.dataset.matchId || t.getAttribute('data-match-id'));
       if (action === 'match-back') {
+        try { Actions.flushMatchPlan(); } catch (_) {}
         const ui = Store.get().ui || {};
         ui.matchId = null;
         Store.get().ui = ui;
@@ -2662,6 +2665,22 @@ const App = {
         e.stopPropagation();
         if (e.stopImmediatePropagation) e.stopImmediatePropagation();
         return Actions.saveMatch();
+      }
+      if (action === 'match-warmup') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        return Actions.placeMatchWarmup();
+      }
+      if (action === 'match-logo') {
+        e.preventDefault();
+        e.stopPropagation();
+        return Actions.pickMatchLogo();
+      }
+      if (action === 'match-logo-clear') {
+        e.preventDefault();
+        e.stopPropagation();
+        return Actions.clearMatchLogo();
       }
       if (action === 'match-xi') return Actions.fillMatchSquad();
       if (action === 'match-board') return Actions.openMatchBoard();
@@ -4127,6 +4146,12 @@ const App = {
 
     // Filters
     document.addEventListener('input', e => {
+      if (e.target.closest && e.target.closest('#v-matches .match-plan')) {
+        clearTimeout(this._matchPlanTimer);
+        this._matchPlanTimer = setTimeout(() => {
+          try { Actions.flushMatchPlan(); } catch (_) {}
+        }, 400);
+      }
       if (e.target.dataset.filter === 'trainings') {
         const q = (document.getElementById('trSearch')?.value || '').toLowerCase();
         const st = document.getElementById('trStatus')?.value || '';

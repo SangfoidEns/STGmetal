@@ -778,7 +778,7 @@ const Actions = {
         <p class="note-sm" style="grid-column:1/-1;margin:0">Капітана призначає головний тренер у Налаштування → Склад тренерів.</p>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_condition','Стан %'):'Стан %')}</label><input type="number" id="peC" value="${p.condition}"></div>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_readiness','Готовність %'):'Готовність %')}</label><input type="number" id="peR" value="${p.readiness}"></div>
-        <div class="fgr"><label>Load (0-10)</label><input type="number" id="peLoad" value="${p.load||0}" min="0" max="10"></div>
+        <div class="fgr"><label>Лоад основи (0–10)</label><input type="number" id="peLoad" value="${p.load||0}" min="0" max="10"></div>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_group','Група'):'Група')}</label><select id="peG">
           <option value="main" ${p.group==='main'?'selected':''}>Основний</option>
           <option value="reserve" ${p.group==='reserve'?'selected':''}>Резерв</option>
@@ -1258,14 +1258,93 @@ const Actions = {
     return (s.matches || []).find(m => m && String(m.id) === String(id)) || null;
   },
 
-  _matchAttendance(player) {
+  _matchEditable() {
     try {
-      if (typeof PlayerProgress !== 'undefined' && PlayerProgress.compute) {
-        const progress = PlayerProgress.compute(player.id) || {};
-        if (progress.attPct != null) return progress.attPct;
-      }
+      if (typeof AuthManager !== 'undefined' && AuthManager.isCoach && !AuthManager.isCoach()) return false;
     } catch (_) {}
-    return 0;
+    return true;
+  },
+
+  _matchRoot() {
+    const view = document.getElementById('v-matches');
+    if (!view || !view.classList.contains('on')) return null;
+    const root = view.querySelector('.match-plan');
+    if (!root) return null;
+    const open = Store.get().ui && Store.get().ui.matchId;
+    const shown = root.getAttribute('data-match-id');
+    if (open && shown && String(open) !== String(shown)) return null;
+    return root;
+  },
+
+  /** Забирає поля плану з екрана в матч. Не перемальовує сторінку. */
+  flushMatchPlan() {
+    if (!this._matchEditable()) return false;
+    const m = this._matchByUi();
+    const root = this._matchRoot();
+    if (!m || !root) return false;
+    return this._writeMatchFromForm(m, root);
+  },
+
+  _writeMatchFromForm(m, root) {
+    if (!m) return false;
+    const box = root || this._matchRoot();
+    if (!box) return false;
+    const node = (id) => box.querySelector('#' + id);
+    const val = (id) => {
+      const el = node(id);
+      return el ? el.value : null;
+    };
+    let changed = false;
+    const put = (key, value) => {
+      const prev = m[key] == null ? '' : m[key];
+      const next = value == null ? '' : value;
+      if (String(prev) !== String(next)) changed = true;
+      m[key] = value;
+    };
+    const set = (key, id) => {
+      const value = val(id);
+      if (value == null) return;
+      put(key, value);
+    };
+    set('meetTime', 'mpMeet');
+    set('gatherPlace', 'mpGather');
+    set('kickoff', 'mpKick');
+    set('competition', 'mpComp');
+    const scheme = val('mpScheme');
+    if (scheme) put('scheme', scheme);
+    const status = val('mpStatus');
+    if (status) put('status', status);
+    const home = val('mpHome');
+    if (home != null && home !== '') put('home', home !== 'false');
+    const us = val('mpScoreUs');
+    const them = val('mpScoreThem');
+    if (us != null) put('scoreUs', us === '' ? '' : Number(us));
+    if (them != null) put('scoreThem', them === '' ? '' : Number(them));
+    set('plan', 'mpPlan');
+    set('plan1', 'mpP1');
+    set('plan2', 'mpP2');
+    set('tactics', 'mpTac');
+    set('preNotes', 'mpPre');
+    set('postNotes', 'mpPost');
+    set('warmup', 'mpWarm');
+    set('warmupAt', 'mpWarmAt');
+    set('warmupPlace', 'mpWarmPlace');
+    const mins = val('mpWarmMin');
+    if (mins != null) put('warmupMin', mins === '' ? '' : Number(mins));
+    if (!changed) return true;
+    const now = new Date().toISOString();
+    m.updatedAt = now;
+    m.stamps = Object.assign({}, m.stamps || {}, { plan: now });
+    const s = Store.get();
+    (s.calendar || []).forEach(event => {
+      if (event && event.matchId === m.id && event.type === 'MATCH') {
+        event.date = m.date;
+        event.time = m.time;
+        event.title = 'vs ' + (m.opponent || 'Матч');
+      }
+    });
+    try { StorageManager.save(); } catch (_) {}
+    return true;
   },
 
   _shiftTime(value, minutes) {
@@ -1302,7 +1381,7 @@ const Actions = {
     const kick = document.getElementById('mTime')?.value || '15:00';
     const scheme = document.getElementById('mSch')?.value || '3-1-2-2-1-1';
     const squad = (typeof CoachTools !== 'undefined' && CoachTools.buildMatchSquad)
-      ? CoachTools.buildMatchSquad(s.players || [], scheme, (p) => this._matchAttendance(p))
+      ? CoachTools.buildMatchSquad(s.players || [], scheme)
       : { xi: [], bench: [] };
     const now = new Date().toISOString();
     const m = {
@@ -1320,7 +1399,10 @@ const Actions = {
       xi: squad.xi || [],
       bench: squad.bench || [],
       plan: '', plan1: '', plan2: '', tactics: '', preNotes: '', postNotes: '',
-      createdAt: now, updatedAt: now
+      warmup: '', warmupAt: this._shiftTime(kick, -40), warmupMin: 20, warmupPlace: '',
+      opponentLogo: '',
+      createdAt: now, updatedAt: now,
+      stamps: { plan: now }
     };
     s.matches.push(m);
     if (document.getElementById('mWeek')?.checked && typeof CoachTools !== 'undefined' && CoachTools.applyMatchWeek) {
@@ -1337,41 +1419,22 @@ const Actions = {
     App.navigate('matches');
   },
 
-  saveMatch() {
+  saveMatch(opts) {
     if (!this._coachOnly()) return;
     const m = this._matchByUi();
-    if (!m) return;
-    const read = (id) => document.getElementById(id)?.value;
-    m.meetTime = read('mMeet') || m.meetTime || '';
-    m.gatherPlace = read('mGather') || '';
-    m.kickoff = read('mKick') || m.kickoff || '';
-    m.competition = read('mComp') || '';
-    if (read('mScheme')) m.scheme = read('mScheme');
-    if (read('mStatus')) m.status = read('mStatus');
-    if (read('mHome') != null) m.home = read('mHome') !== 'false';
-    const us = read('mScoreUs');
-    const them = read('mScoreThem');
-    m.scoreUs = us === '' || us == null ? '' : Number(us);
-    m.scoreThem = them === '' || them == null ? '' : Number(them);
-    ['mPlan', 'mP1', 'mP2', 'mTac', 'mPre', 'mPost'].forEach(id => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      const key = { mPlan: 'plan', mP1: 'plan1', mP2: 'plan2', mTac: 'tactics', mPre: 'preNotes', mPost: 'postNotes' }[id];
-      m[key] = el.value || '';
-    });
-    m.updatedAt = new Date().toISOString();
-    const s = Store.get();
-    (s.calendar || []).forEach(event => {
-      if (event && event.matchId === m.id && event.type === 'MATCH') {
-        event.date = m.date;
-        event.time = m.time;
-        event.title = 'vs ' + (m.opponent || 'Матч');
-      }
-    });
+    if (!m) { Toast.show('Матч не відкритий', 'warn'); return; }
+    const wrote = this._writeMatchFromForm(m);
+    if (!wrote) { Toast.show('План не на екрані', 'warn'); return; }
+    const wantWarm = !opts || opts.warmup !== false;
+    const hasWarm = !!(String(m.warmup || '').trim() || m.warmupAt || m.warmupPlace);
+    if (wantWarm && hasWarm && typeof CoachTools !== 'undefined' && CoachTools.applyMatchWarmup) {
+      try { CoachTools.applyMatchWarmup(Store.get(), m); } catch (_) {}
+      try { StorageManager.save(); } catch (_) {}
+    }
     const main = document.getElementById('main');
     const scroll = main ? main.scrollTop : 0;
-    StorageManager.save();
-    Toast.show('План збережено', 'ok');
+    Toast.show((opts && opts.toast) || 'План збережено', 'ok');
+    const s = Store.get();
     if (!s.ui) s.ui = {};
     s.ui.view = 'matches';
     s.ui.matchId = m.id;
@@ -1379,18 +1442,69 @@ const Actions = {
     if (main) main.scrollTop = scroll;
   },
 
+  placeMatchWarmup() {
+    return this.saveMatch({ warmup: true, toast: 'Розминку поставлено на день матчу' });
+  },
+
+  pickMatchLogo() {
+    if (!this._coachOnly()) return;
+    const m = this._matchByUi();
+    if (!m) return;
+    this.flushMatchPlan();
+    try { if (typeof StorageManager !== 'undefined' && StorageManager.beginIoLock) StorageManager.beginIoLock(4000); } catch (_) {}
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const done = (url) => {
+        if (!url) { Toast.show('Не вдалося прочитати логотип', 'warn'); return; }
+        this.flushMatchPlan();
+        m.opponentLogo = url;
+        m.updatedAt = new Date().toISOString();
+        m.stamps = Object.assign({}, m.stamps || {}, { plan: m.updatedAt });
+        try { StorageManager.save(); } catch (_) {}
+        Toast.show('Логотип суперника збережено', 'ok');
+        App.renderCurrent();
+      };
+      if (this._compressImageFile) {
+        this._compressImageFile(file, 192, 0.82).then(done).catch(() => done(''));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => done(reader.result || '');
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  },
+
+  clearMatchLogo() {
+    if (!this._coachOnly()) return;
+    const m = this._matchByUi();
+    if (!m) return;
+    this.flushMatchPlan();
+    m.opponentLogo = '';
+    m.updatedAt = new Date().toISOString();
+    m.stamps = Object.assign({}, m.stamps || {}, { plan: m.updatedAt });
+    try { StorageManager.save(); } catch (_) {}
+    Toast.show('Логотип прибрано', 'ok');
+    App.renderCurrent();
+  },
+
   fillMatchSquad() {
     if (!this._coachOnly()) return;
     const m = this._matchByUi();
     if (!m || typeof CoachTools === 'undefined' || !CoachTools.buildMatchSquad) return;
-    const scheme = document.getElementById('mScheme')?.value || m.scheme || '3-1-2-2-1-1';
+    this.flushMatchPlan();
+    const scheme = this._matchRoot()?.querySelector('#mpScheme')?.value || m.scheme || '3-1-2-2-1-1';
     m.scheme = scheme;
-    const squad = CoachTools.buildMatchSquad(Store.get().players || [], scheme, (p) => this._matchAttendance(p));
+    const squad = CoachTools.buildMatchSquad(Store.get().players || [], scheme);
     m.xi = squad.xi;
     m.bench = squad.bench;
     m.updatedAt = new Date().toISOString();
     StorageManager.save();
-    Toast.show('Основа за явкою · ' + scheme, 'ok');
+    Toast.show('Основа за лоадом · ' + scheme, 'ok');
     App.renderCurrent();
   },
 
@@ -1448,7 +1562,7 @@ const Actions = {
     const m = this._matchByUi();
     if (!m) return;
     if ((!m.xi || !m.xi.filter(Boolean).length) && this._coachOnly() && typeof CoachTools !== 'undefined' && CoachTools.buildMatchSquad) {
-      const squad = CoachTools.buildMatchSquad(Store.get().players || [], m.scheme || '3-1-2-2-1-1', (p) => this._matchAttendance(p));
+      const squad = CoachTools.buildMatchSquad(Store.get().players || [], m.scheme || '3-1-2-2-1-1');
       m.xi = squad.xi;
       m.bench = squad.bench;
       StorageManager.save();
@@ -1479,6 +1593,7 @@ const Actions = {
   },
 
   viewMatch(id) {
+    try { this.flushMatchPlan(); } catch (_) {}
     const s = Store.get();
     const m = (s.matches || []).find(x => x && String(x.id) === String(id));
     if (!m) { Toast.show('Матч не знайдено', 'warn'); return; }

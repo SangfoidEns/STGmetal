@@ -170,6 +170,7 @@ function mergeRecord(baseItem, extraItem) {
   else if (!extraWins && baseItem && baseItem.coachPresent != null) merged.coachPresent = baseItem.coachPresent;
   if (training) applyTrainingSchedule(merged, winner, loser);
   keepFilled(merged, loser, winner);
+  keepMatchPlan(merged, loser, winner);
   applyStampedFields(merged, baseItem, extraItem);
   releaseWorkingSession(merged);
   return merged;
@@ -253,6 +254,39 @@ function applyStampedFields(merged, a, b) {
       profile.birthDate = merged.birthDate;
     }
     if (Object.keys(profile).length) merged.profile = profile;
+  }
+
+  /** Новіший порожній знімок не стирає план матчу, розминку і логотип суперника. */
+  function keepMatchPlan(merged, loser, winner) {
+    if (!merged) return;
+    const looks = function (item) {
+      return !!(item && (item.opponent || item.xi || item.plan != null || item.warmup != null || item.opponentLogo));
+    };
+    if (!looks(loser) && !looks(winner)) return;
+    const keys = ['plan', 'plan1', 'plan2', 'tactics', 'preNotes', 'postNotes', 'warmup', 'warmupAt', 'warmupPlace', 'opponentLogo', 'meetTime', 'gatherPlace', 'kickoff', 'competition', 'scheme'];
+    const loserAt = fieldTime(loser, 'plan');
+    const winnerAt = fieldTime(winner, 'plan');
+    if (loserAt || winnerAt) {
+      const src = winnerAt > loserAt ? winner : loser;
+      keys.forEach(function (key) {
+        if (src && Object.prototype.hasOwnProperty.call(src, key)) merged[key] = src[key];
+      });
+      if (src && src.warmupMin != null && src.warmupMin !== '') merged.warmupMin = src.warmupMin;
+      if (Array.isArray(src && src.xi)) merged.xi = src.xi;
+      if (Array.isArray(src && src.bench)) merged.bench = src.bench;
+      return;
+    }
+    keys.forEach(function (key) {
+      if (!filled(winner && winner[key]) && filled(loser && loser[key])) merged[key] = loser[key];
+    });
+    if ((winner == null || winner.warmupMin == null || winner.warmupMin === '') && loser && loser.warmupMin != null && loser.warmupMin !== '') {
+      merged.warmupMin = loser.warmupMin;
+    }
+    const squad = function (list) {
+      return Array.isArray(list) && list.some(function (id) { return id != null && id !== ''; });
+    };
+    if (!squad(winner && winner.xi) && squad(loser && loser.xi)) merged.xi = loser.xi;
+    if (!squad(winner && winner.bench) && squad(loser && loser.bench)) merged.bench = loser.bench;
   }
 
   /** Чернетка, план і проведене не стають скасованими через стару мітку cancelledAt. */

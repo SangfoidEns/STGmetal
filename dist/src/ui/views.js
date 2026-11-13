@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z80',
+  APP_BUILD: 'z81',
   APP_UPDATED: '13.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -33,6 +33,42 @@ const Views = {
   /** Нова емблема лише в головного тренера. У решти лишається основний герб. */
   clubMark() {
     return this.isHeadCoach() ? 'assets/coach-crest.png' : 'assets/metalist-crest.png';
+  },
+
+  _crestHtml(src, letters) {
+    if (src) return '<img src="' + sanitize(src) + '" alt="">';
+    return '<span>' + sanitize(letters || '—') + '</span>';
+  },
+
+  _matchPlaque(m, opts) {
+    if (!m) return '';
+    const o = opts || {};
+    const s = Store.get();
+    const short = o.clubShort || (s.settings && s.settings.clubShort) || 'МШ';
+    const clubLogo = o.clubLogo || (s.settings && s.settings.logoData) || this.clubMark();
+    const opp = m.opponent || 'Суперник';
+    const letters = String(opp).replace(/[^A-Za-zА-Яа-яІіЇїЄєҐґ0-9]/g, '').slice(0, 3).toUpperCase() || 'VS';
+    const when = [m.date, m.time].filter(Boolean).join(' · ');
+    const where = m.home === false ? 'Виїзд' : 'Дім';
+    const comp = m.competition || where;
+    const score = (m.scoreUs != null && m.scoreUs !== '' && m.scoreThem != null && m.scoreThem !== '')
+      ? (m.scoreUs + ' : ' + m.scoreThem) : '';
+    return '<button type="button" class="match-plaque" data-action="open-match" data-match-id="' + sanitize(m.id || '') + '">' +
+      '<span class="match-plaque-side">' +
+        '<span class="match-plaque-crest">' + this._crestHtml(clubLogo, short) + '</span>' +
+        '<span class="match-plaque-name">' + sanitize(short) + '</span>' +
+      '</span>' +
+      '<span class="match-plaque-mid">' +
+        '<span class="match-plaque-kicker">' + (score ? 'Рахунок' : 'Наступний матч') + '</span>' +
+        '<span class="match-plaque-vs">' + (score ? sanitize(score) : 'VS') + '</span>' +
+        '<span class="match-plaque-when">' + sanitize(when || 'дата уточнюється') + '</span>' +
+        '<span class="match-plaque-comp">' + sanitize(comp) + '</span>' +
+      '</span>' +
+      '<span class="match-plaque-side is-opp">' +
+        '<span class="match-plaque-crest is-opp">' + this._crestHtml(m.opponentLogo, letters) + '</span>' +
+        '<span class="match-plaque-name">' + sanitize(opp) + '</span>' +
+      '</span>' +
+    '</button>';
   },
 
   _gl(g) {
@@ -425,15 +461,9 @@ const Views = {
     const coachRole = (typeof AuthManager !== 'undefined' && AuthManager.roleLabel)
       ? AuthManager.roleLabel() : 'Тренер';
 
-    const matchHtml = nextMatch ? `
-      <div class="cp-match" data-action="open-match" data-match-id="${sanitize(nextMatch.id || '')}">
-        <div class="cp-match-teams">
-          <span class="cp-match-us">${sanitize(short)}</span>
-          <span class="cp-match-vs">VS</span>
-          <span class="cp-match-them">${sanitize(nextMatch.opponent || t('opponent','Суперник'))}</span>
-        </div>
-        <div class="cp-match-meta">${sanitize(nextMatch.date || '')}${nextMatch.time ? ' · ' + sanitize(nextMatch.time) : ''}</div>
-      </div>` : `<div class="cp-match is-empty">${t('next_match_none','Наступний матч не заплановано')}</div>`;
+    const matchHtml = nextMatch
+      ? this._matchPlaque(nextMatch, { clubShort: short, clubLogo: logo || this.clubMark() })
+      : `<div class="cp-match is-empty">${t('next_match_none','Наступний матч не заплановано')}</div>`;
 
     const statusLabel = next
       ? ('Наступне: ' + (next.name || 'Тренування') + (next.date ? ' · ' + next.date : ''))
@@ -529,9 +559,7 @@ const Views = {
             <span class="cp-stat-sub">за останні дні</span>
             <div class="cp-stat-spark">${this._sparkline(teamXpByDay, { color: '#f5c542', fill: 'rgba(245,197,66,.15)' })}</div>
           </div>
-          <div class="cp-stat cp-stat-wide">
-            <span class="cp-stat-ic">📅</span>
-            <span class="cp-stat-lb">${t('next_match')}</span>
+          <div class="cp-stat cp-stat-wide cp-stat-match">
             ${matchHtml}
           </div>
           <button type="button" class="cp-stat sc-tap cp-stat-action" data-view="tactics">
@@ -1158,12 +1186,7 @@ const Views = {
         <button type="button" class="cp-pill" data-view="analytics">📊 ${t('analytics')}</button>
       </div>
 
-      ${nextMatch ? `
-      <button type="button" class="card glass next-match-card" data-action="open-match" data-match-id="${sanitize(nextMatch.id || '')}">
-        <div class="ct">⚽ Наступний матч</div>
-        <div class="vl">${sanitize(nextMatch.opponent || nextMatch.title || 'Матч')}</div>
-        <div class="sb">${sanitize(nextMatch.date || '')}${nextMatch.time ? ' · ' + sanitize(nextMatch.time) : ''}${nextMatch.competition ? ' · ' + sanitize(nextMatch.competition) : ''}</div>
-      </button>` : ''}
+      ${nextMatch ? this._matchPlaque(nextMatch) : ''}
 
       ${next
         ? ('<div class="next-tr-wrap"><button type="button" class="card glass next-tr-card" data-action="preview-next-training" data-training-id="' + next.id + '">' +
@@ -2229,7 +2252,9 @@ trainings() {
     const players = (s.players || []).slice().sort((a, b) => (Number(a.number) || 99) - (Number(b.number) || 99));
     const byId = {};
     players.forEach(p => { if (p && p.id != null) byId[String(p.id)] = p; });
-    const nameOf = (p) => p ? ('#' + (p.number || '—') + ' ' + (p.lastName || p.firstName || 'Гравець')) : 'вільно';
+    const nameOf = (p) => p
+      ? ('#' + (p.number || '—') + ' ' + (p.lastName || p.firstName || 'Гравець') + (p.load != null && p.load !== '' ? (' · L' + p.load) : ''))
+      : 'вільно';
     const xi = (m.xi || []).slice(0, 11);
     while (xi.length < 11) xi.push(null);
     const bench = (m.bench || []).slice();
@@ -2271,7 +2296,7 @@ trainings() {
     const scheme = m.scheme || '3-1-2-2-1-1';
     const status = m.status || 'planned';
     const field = (id, label, value, type) => '<label class="fl"><span class="fl-label">' + label + '</span>' +
-      '<input class="fl-input" id="' + id + '" type="' + (type || 'text') + '" value="' + sanitize(value || '') + '"' +
+      '<input class="fl-input" id="' + id + '" type="' + (type || 'text') + '" value="' + sanitize(value == null ? '' : String(value)) + '"' +
       (canEdit ? '' : ' readonly') + '></label>';
     const area = (id, label, value) => '<label class="fl"><span class="fl-label">' + label + '</span>' +
       (canEdit
@@ -2280,35 +2305,60 @@ trainings() {
     const where = m.home === false ? 'Виїзд' : 'Дім';
     const score = (m.scoreUs != null && m.scoreUs !== '' && m.scoreThem != null && m.scoreThem !== '')
       ? (m.scoreUs + ':' + m.scoreThem) : '';
-    return '<div class="match-plan">' +
+    const oppLetters = String(m.opponent || 'VS').replace(/[^A-Za-zА-Яа-яІіЇїЄєҐґ0-9]/g, '').slice(0, 3).toUpperCase() || 'VS';
+    const clubLogo = (s.settings && s.settings.logoData) || this.clubMark();
+    const warmOn = !!(have.WU || (m.warmup && String(m.warmup).trim()) || m.warmupAt);
+    return '<div class="match-plan" data-match-id="' + sanitize(m.id || '') + '">' +
       '<div class="match-top"><button type="button" class="btn btn-s btn-sm" data-action="match-back">‹ Матчі</button><div class="st">План матчу</div></div>' +
       '<section class="card glass match-hero">' +
+        '<div class="match-hero-crests">' +
+          '<span class="match-plaque-crest">' + this._crestHtml(clubLogo, (s.settings && s.settings.clubShort) || 'МШ') + '</span>' +
+          '<span class="match-plaque-vs">VS</span>' +
+          '<span class="match-plaque-crest is-opp">' + this._crestHtml(m.opponentLogo, oppLetters) + '</span>' +
+        '</div>' +
         '<div class="ct">vs ' + sanitize(m.opponent || 'Суперник') + (score ? (' · ' + sanitize(score)) : '') + '</div>' +
         '<p class="note-sm">' + sanitize(m.date || '') + (m.time ? (' · ' + sanitize(m.time)) : '') + ' · ' + where +
         (m.stadium ? (' · ' + sanitize(m.stadium)) : '') +
         (m.competition ? (' · ' + sanitize(m.competition)) : '') + '</p>' +
+        (canEdit ? (
+          '<div class="match-actions">' +
+            '<button type="button" class="btn btn-s btn-sm" data-action="match-logo">Логотип суперника</button>' +
+            (m.opponentLogo ? '<button type="button" class="btn btn-s btn-sm" data-action="match-logo-clear">Прибрати логотип</button>' : '') +
+          '</div>'
+        ) : '') +
         (call ? ('<p class="match-call">' + call + '</p>') : '') +
       '</section>' +
       '<section class="card glass"><div class="ct">Збір</div><div class="match-grid">' +
-        field('mMeet', 'Збір', m.meetTime, 'time') +
-        field('mGather', 'Місце збору', m.gatherPlace || '') +
-        field('mKick', 'Вихід на поле', m.kickoff || m.time, 'time') +
-        field('mComp', 'Турнір', m.competition || '') +
+        field('mpMeet', 'Збір', m.meetTime, 'time') +
+        field('mpGather', 'Місце збору', m.gatherPlace || '') +
+        field('mpKick', 'Вихід на поле', m.kickoff || m.time, 'time') +
+        field('mpComp', 'Турнір', m.competition || '') +
       '</div></section>' +
+      '<section class="card glass"><div class="ct">Розминка перед матчем</div>' +
+        '<div class="match-grid">' +
+          field('mpWarmAt', 'Початок', m.warmupAt || '', 'time') +
+          field('mpWarmMin', 'Хвилини', m.warmupMin != null && m.warmupMin !== '' ? m.warmupMin : 20, 'number') +
+          field('mpWarmPlace', 'Місце', m.warmupPlace || '') +
+        '</div>' +
+        area('mpWarm', 'Що робимо', m.warmup) +
+        '<p class="note-sm">Кожен рядок стає окремим блоком розминки в день гри.</p>' +
+      '</section>' +
       '<section class="card glass"><div class="ct">Тиждень матчу</div>' +
-        '<div class="match-week">' + weekHtml + '</div>' +
-        '<p class="note-sm">MD-3 тактика, MD-2 стандарти, MD-1 активація, день матчу і відновлення.</p>' +
+        '<div class="match-week">' + weekHtml +
+          '<span class="match-day' + (warmOn ? ' is-on' : '') + '">WU<small>розминка</small></span>' +
+        '</div>' +
+        '<p class="note-sm">MD-3 тактика, MD-2 стандарти, MD-1 активація, розминка в день матчу і відновлення.</p>' +
         (canEdit ? '<button type="button" class="btn btn-s btn-sm" data-action="match-week">Скласти тиждень</button>' : '') +
       '</section>' +
       '<section class="card glass"><div class="ct">Заявка · ' + sanitize(scheme) + '</div>' +
         (canEdit ? (
-          '<label class="fl"><span class="fl-label">Схема</span><select class="fl-input" id="mScheme">' +
+          '<label class="fl"><span class="fl-label">Схема</span><select class="fl-input" id="mpScheme">' +
             schemes.map(name => '<option' + (name === scheme ? ' selected' : '') + '>' + sanitize(name) + '</option>').join('') +
           '</select></label>' +
           '<div class="match-actions">' +
-            '<button type="button" class="btn btn-s btn-sm" data-action="match-xi">За явкою</button>' +
+            '<button type="button" class="btn btn-s btn-sm" data-action="match-xi">За лоадом</button>' +
             '<button type="button" class="btn btn-p btn-sm" data-action="match-board">На дошку</button>' +
-          '</div><p class="note-sm">Тап по вільному або по гравцю поза заявкою ставить його в перший вільний слот. Тап по основі відправляє на лавку, тап по лавці піднімає в основу.</p>'
+          '</div><p class="note-sm">Основа — 11 гравців із найбільшим лоадом з анкети. Решта на лавці. Травмовані не виходять в основу. Тап міняє місце гравця.</p>'
         ) : '<p class="note-sm">Склад зібрав тренер.</p>') +
         '<div class="match-block-label">Основа</div><div class="match-chips">' + xiHtml + '</div>' +
         '<div class="match-block-label">Лавка</div><div class="match-chips">' + benchHtml + '</div>' +
@@ -2317,33 +2367,35 @@ trainings() {
       '<section class="card glass"><div class="ct">План</div>' +
         (canEdit ? (
           '<div class="match-grid">' +
-            '<label class="fl"><span class="fl-label">Статус</span><select class="fl-input" id="mStatus">' +
+            '<label class="fl"><span class="fl-label">Статус</span><select class="fl-input" id="mpStatus">' +
               '<option value="planned"' + (status === 'planned' ? ' selected' : '') + '>Запланований</option>' +
               '<option value="played"' + (status === 'played' ? ' selected' : '') + '>Зіграний</option>' +
               '<option value="cancelled"' + (status === 'cancelled' ? ' selected' : '') + '>Скасований</option>' +
             '</select></label>' +
-            '<label class="fl"><span class="fl-label">Дім / виїзд</span><select class="fl-input" id="mHome">' +
+            '<label class="fl"><span class="fl-label">Дім / виїзд</span><select class="fl-input" id="mpHome">' +
               '<option value="true"' + (m.home === false ? '' : ' selected') + '>Дім</option>' +
               '<option value="false"' + (m.home === false ? ' selected' : '') + '>Виїзд</option>' +
             '</select></label>' +
-            field('mScoreUs', 'Наші голи', m.scoreUs != null ? String(m.scoreUs) : '', 'number') +
-            field('mScoreThem', 'Голи суперника', m.scoreThem != null ? String(m.scoreThem) : '', 'number') +
+            field('mpScoreUs', 'Наші голи', m.scoreUs != null ? String(m.scoreUs) : '', 'number') +
+            field('mpScoreThem', 'Голи суперника', m.scoreThem != null ? String(m.scoreThem) : '', 'number') +
           '</div>'
         ) : ('<p class="note-sm">' + (status === 'played' ? 'Зіграний' : (status === 'cancelled' ? 'Скасований' : 'Запланований')) +
           (score ? (' · ' + sanitize(score)) : '') + '</p>')) +
-        area('mPlan', 'Загальний план', m.plan) +
-        area('mP1', '1-й тайм', m.plan1) +
-        area('mP2', '2-й тайм', m.plan2) +
-        area('mTac', 'Стандарти, пресинг, переходи', m.tactics) +
-        area('mPre', 'Перед матчем', m.preNotes) +
-        area('mPost', 'Після матчу', m.postNotes) +
-        (canEdit ? (
-          '<div class="match-actions">' +
-            '<button type="button" class="btn btn-p" data-action="match-save">Зберегти план</button>' +
-            '<button type="button" class="btn btn-d btn-sm" data-action="match-delete">Видалити матч</button>' +
-          '</div>'
-        ) : '') +
-      '</section></div>';
+        area('mpPlan', 'Загальний план', m.plan) +
+        area('mpP1', '1-й тайм', m.plan1) +
+        area('mpP2', '2-й тайм', m.plan2) +
+        area('mpTac', 'Стандарти, пресинг, переходи', m.tactics) +
+        area('mpPre', 'Перед матчем', m.preNotes) +
+        area('mpPost', 'Після матчу', m.postNotes) +
+        (canEdit ? '<button type="button" class="btn btn-d btn-sm" data-action="match-delete">Видалити матч</button>' : '') +
+      '</section>' +
+      (canEdit ? (
+        '<div class="match-savebar">' +
+          '<button type="button" class="btn btn-p" data-action="match-save">Зберегти план</button>' +
+          '<button type="button" class="btn btn-s" data-action="match-warmup">Розминка в день матчу</button>' +
+        '</div>'
+      ) : '') +
+      '</div>';
   },
 
   _analyticsCharts(players, getSt) {

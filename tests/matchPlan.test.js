@@ -18,17 +18,19 @@ function player(id, number, position, status) {
 }
 
 describe('match planning', () => {
-  it('keeps the 3-1-2-2-1-1 roles and seats the best eleven', () => {
+  it('seats the eleven with the highest coach load and benches the rest', () => {
     const roles = Array.from(context.CoachTools.schemeRoles('3-1-2-2-1-1'));
     assert.equal(roles.join(','), 'GK,DEF,DEF,DEF,MID,MID,MID,ATT,ATT,MID,ATT');
     const players = [player('gk', 1, 'GK')];
     for (let i = 2; i <= 13; i++) players.push(player('p' + i, i, i < 6 ? 'CB' : (i < 10 ? 'CM' : 'ST')));
     players.push(player('hurt', 99, 'ST', 'injured'));
-    const att = { hurt: 100 };
-    players.forEach((item, index) => { if (item.id !== 'hurt') att[item.id] = 90 - index; });
-    const squad = context.CoachTools.buildMatchSquad(players, '3-1-2-2-1-1', (item) => att[item.id]);
+    players.forEach((item, index) => {
+      item.load = item.id === 'hurt' ? 10 : (item.id === 'p13' ? 1 : (30 - index));
+    });
+    const squad = context.CoachTools.buildMatchSquad(players, '3-1-2-2-1-1', () => 100);
     assert.equal(squad.xi[0], 'gk');
     assert.equal(squad.xi.filter(Boolean).length, 11);
+    assert.equal(squad.xi.includes('p13'), false);
     assert.equal(squad.bench.includes('p13'), true);
     assert.equal(squad.bench.includes('hurt'), true);
     assert.equal(squad.xi.includes('hurt'), false);
@@ -48,5 +50,24 @@ describe('match planning', () => {
     assert.equal(state.trainings.length, 4);
     assert.equal(state.trainings.filter(item => item.matchId === 'm1' && item.status === 'planned').length, 4);
     assert.equal(state.calendar.filter(item => item.type === 'MATCH').length, 1);
+  });
+
+  it('places one pre-match warmup and updates it in place', () => {
+    const state = { trainings: [], calendar: [] };
+    const match = {
+      id: 'm1', date: '2026-11-15', time: '15:00', opponent: 'Кастель',
+      warmup: 'Мобільність\nРондо', warmupAt: '14:20', warmupMin: 25, warmupPlace: 'Поле'
+    };
+    const first = context.CoachTools.applyMatchWarmup(state, match);
+    match.warmup = 'Мобільність\nРондо\nУдари';
+    const second = context.CoachTools.applyMatchWarmup(state, match);
+    assert.equal(first.added, 2);
+    assert.equal(second.added, 0);
+    assert.equal(state.trainings.length, 1);
+    assert.equal(state.trainings[0].md, 'WU');
+    assert.equal(state.trainings[0].time, '14:20');
+    assert.equal(state.trainings[0].duration, 25);
+    assert.equal(state.trainings[0].structure.length, 3);
+    assert.equal(state.calendar.filter(item => item.md === 'WU').length, 1);
   });
 });
