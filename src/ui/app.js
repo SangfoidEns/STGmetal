@@ -1205,6 +1205,35 @@ const App = {
     return true;
   },
 
+  _matchChipAt(x, y) {
+    try {
+      const stack = document.elementsFromPoint ? document.elementsFromPoint(x, y) : [];
+      for (let i = 0; i < stack.length; i++) {
+        const el = stack[i];
+        if (!el || !el.closest) continue;
+        if (el.closest('#mobileNav, .mn, .match-savebar')) continue;
+        const chip = el.closest('.match-chip, [data-action="match-toggle"]');
+        if (chip && chip.getAttribute('data-action') === 'match-toggle') return chip;
+      }
+    } catch (_) {}
+    return null;
+  },
+
+  _takeMatchChip(e) {
+    const node = e && e.target;
+    if (node && node.closest && node.closest('.match-savebar')) return false;
+    const direct = node && node.closest && node.closest('.match-chip, [data-action="match-toggle"]');
+    const chip = (direct && direct.getAttribute('data-action') === 'match-toggle')
+      ? direct
+      : ((node && node.closest && node.closest('#mobileNav, .mn')) ? this._matchChipAt(e.clientX, e.clientY) : null);
+    if (!chip) return false;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+    try { Actions.toggleMatchPlayer(chip.getAttribute('data-player-id')); } catch (err) { console.error('[match-toggle]', err); }
+    return true;
+  },
+
   _navButtonAt(x, y) {
     const nav = document.getElementById('mobileNav');
     if (!nav) return null;
@@ -2214,7 +2243,7 @@ const App = {
     };
 
     root.addEventListener('pointerdown', e => {
-      if (e.target.closest && e.target.closest('#teamChat, #teamChatForm, .team-chat, .team-chat-form, .scheme-card-detail, #modal')) return;
+      if (e.target.closest && e.target.closest('#teamChat, #teamChatForm, .team-chat, .team-chat-form, .scheme-card-detail, #modal, .match-plan, .match-chip')) return;
       const schemeCard = e.target.closest && e.target.closest('.scheme-card[data-board-id]');
       if (!schemeCard && e.target.closest && e.target.closest('button:not(.coach-tools-handle), a, input, select, textarea')) return;
       const row = schemeCard || (e.target.closest && e.target.closest(
@@ -2276,8 +2305,12 @@ const App = {
     if (!this._navGuardBound) {
       this._navGuardBound = true;
       document.addEventListener('click', (e) => {
+        try { if (App._takeMatchChip(e)) return; } catch (_) {}
+      }, true);
+      document.addEventListener('click', (e) => {
         const node = e.target;
         if (!node || !node.closest) return;
+        if (node.closest('.match-plan, .match-chip')) return;
         if (node.closest('.tg-sheet, #modal .md, .md, .mo')) return;
         const inNav = node.closest('#mobileNav, .mn');
         if (!inNav && typeof ClickGuard !== 'undefined' && !ClickGuard.stealNav(node, e.clientX, e.clientY)) return;
@@ -2291,7 +2324,7 @@ const App = {
       document.addEventListener('click', (e) => {
         const node = e.target;
         if (!node || !node.closest) return;
-        if (node.closest('#mobileNav, .mn, .tg-sheet, #teamChat, #teamChatForm, .team-chat, .team-chat-form')) return;
+        if (node.closest('#mobileNav, .mn, .tg-sheet, #teamChat, #teamChatForm, .team-chat, .team-chat-form, .match-plan, .match-chip')) return;
         if (typeof ClickGuard !== 'undefined' && !ClickGuard.trainingOpensSheet(node)) return;
         const openBtn = node.closest('[data-action="open-training"], [data-action="preview-next-training"], [data-next-training]');
         if (!openBtn) return;
@@ -2454,6 +2487,14 @@ const App = {
 
       const action = t.dataset.action;
       const view = t.dataset.view;
+      const squadChip = e.target.closest && e.target.closest('.match-chip, [data-action="match-toggle"]');
+      if (squadChip && (action === 'match-toggle' || squadChip.getAttribute('data-action') === 'match-toggle')) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        return Actions.toggleMatchPlayer(squadChip.getAttribute('data-player-id'));
+      }
+      const inMatchPlan = !!(e.target.closest && e.target.closest('.match-plan, .match-chip'));
 
       // ── PRIORITY: картка тренера (ніколи не trainings) ──
       if (action === 'coach-easter' || action === 'open-coach-card') {
@@ -2468,6 +2509,7 @@ const App = {
         return;
       }
       if (action === 'open-training') {
+        if (inMatchPlan) return;
         e.preventDefault(); e.stopPropagation();
         if (e.stopImmediatePropagation) e.stopImmediatePropagation();
         if (this._lpSuppressClick) return;
@@ -2565,7 +2607,7 @@ const App = {
           t.dataset.attendanceTraining || t.dataset.editPlayer || t.dataset.delPlayer ||
           t.dataset.editDiary || t.dataset.delDiary || t.dataset.delMyex || t.dataset.delMatch ||
           t.dataset.delBoard || t.dataset.modalAction ||
-          e.target.closest('.card-training, .tg-row, #tgActionSheet')) {
+          (!inMatchPlan && e.target.closest('.card-training, .tg-row, #tgActionSheet'))) {
         e.preventDefault();
         e.stopPropagation();
       }
@@ -3871,6 +3913,7 @@ const App = {
       if (action === 'microcycle') return Actions.applyMicrocycle();
       if (action === 'export-stats') return StorageManager.exportJSON();
 
+      if (inMatchPlan) return;
       if (t.dataset.editTraining) {
         e.preventDefault();
         e.stopPropagation();

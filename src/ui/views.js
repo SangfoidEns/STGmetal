@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z82',
+  APP_BUILD: 'z83',
   APP_UPDATED: '13.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -2252,29 +2252,35 @@ trainings() {
     const players = (s.players || []).slice().sort((a, b) => (Number(a.number) || 99) - (Number(b.number) || 99));
     const byId = {};
     players.forEach(p => { if (p && p.id != null) byId[String(p.id)] = p; });
-    const nameOf = (p) => p
-      ? ('#' + (p.number || '—') + ' ' + (p.lastName || p.firstName || 'Гравець') + (p.load != null && p.load !== '' ? (' · L' + p.load) : ''))
-      : 'вільно';
+    const surnameOf = (p) => (p && (p.lastName || p.firstName)) || 'Гравець';
+    const metaOf = (p) => p
+      ? ('#' + (p.number || '—') + (p.load != null && p.load !== '' ? (' · L' + p.load) : ''))
+      : '';
     const xi = (m.xi || []).slice(0, 11);
     while (xi.length < 11) xi.push(null);
     const bench = (m.bench || []).slice();
     const used = {};
     xi.forEach(id => { if (id != null && id !== '') used[String(id)] = true; });
     bench.forEach(id => { if (id != null && id !== '') used[String(id)] = true; });
-    const chip = (id, cls, label) => canEdit
-      ? ('<button type="button" class="match-chip ' + cls + '" data-action="match-toggle" data-player-id="' + sanitize(String(id)) + '">' + sanitize(label) + '</button>')
-      : ('<span class="match-chip ' + cls + '">' + sanitize(label) + '</span>');
+    const chip = (id, cls, role, name, meta) => {
+      const body = '<span class="match-chip-role">' + sanitize(role || '•') + '</span>' +
+        '<span class="match-chip-name">' + sanitize(name) + '</span>' +
+        '<span class="match-chip-meta">' + sanitize(meta || '') + '</span>';
+      return canEdit
+        ? ('<button type="button" class="match-chip ' + cls + '" data-action="match-toggle" data-player-id="' + sanitize(String(id)) + '">' + body + '</button>')
+        : ('<span class="match-chip ' + cls + '">' + body + '</span>');
+    };
     const xiHtml = xi.map((id, i) => {
       const p = id != null ? byId[String(id)] : null;
       const role = roleUa[roles[i]] || roles[i] || (i + 1);
-      if (!p) return '<span class="match-chip is-empty">' + role + ' · вільно</span>';
-      return chip(p.id, 'is-xi', role + ' · ' + nameOf(p));
+      if (!p) return '<span class="match-chip is-empty"><span class="match-chip-role">' + sanitize(String(role)) + '</span><span class="match-chip-name">вільно</span></span>';
+      return chip(p.id, 'is-xi', role, surnameOf(p), metaOf(p));
     }).join('');
     const benchHtml = bench.map(id => {
       const p = byId[String(id)];
-      return p ? chip(p.id, 'is-bench', nameOf(p)) : '';
+      return p ? chip(p.id, 'is-bench', p.position || 'Л', surnameOf(p), metaOf(p)) : '';
     }).join('') || '<span class="note-sm">Лавка порожня</span>';
-    const outHtml = players.filter(p => !used[String(p.id)]).map(p => chip(p.id, 'is-out', nameOf(p))).join('') ||
+    const outHtml = players.filter(p => !used[String(p.id)]).map(p => chip(p.id, 'is-out', p.position || '•', surnameOf(p), metaOf(p))).join('') ||
       '<span class="note-sm">Усі в заявці</span>';
     let call = '';
     try {

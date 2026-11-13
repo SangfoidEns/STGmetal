@@ -5,6 +5,13 @@ const ClickGuard = {
     return node.closest('button, a, input, select, textarea, [data-action], [data-export-act], [data-sheet-act], [data-modal-action], [data-view], [data-psheet], [data-sq]');
   },
 
+  /** Ім'я в заявці матчу або в списку складу. Нижня панель його не забирає. */
+  matchSquadClick(node) {
+    if (!node || !node.closest) return null;
+    if (node.closest('.match-savebar')) return null;
+    return node.closest('.match-chip, [data-action="match-toggle"], [data-pick-player], .roster-pick');
+  },
+
   /**
    * true — клік належить нижній панелі.
    * Кнопка, меню і модалка лишаються своїми, навіть якщо стоять низько на екрані.
@@ -16,9 +23,10 @@ const ClickGuard = {
     const band = nav.getBoundingClientRect();
     if (band.height < 2) return false;
     const inBand = y >= band.top - 4 && y <= band.bottom + 4 && x >= band.left - 8 && x <= band.right + 8;
+    if (this.matchSquadClick(node)) return false;
     if (node.closest('#mobileNav, .mn')) return true;
     if (!inBand) return false;
-    if (node.closest('#sidebar, .sidebar, #modal, .md, .mo, .tg-sheet, .tg-sheet-backdrop, .sw-sheet, .match-savebar, [data-action="match-save"], [data-action="match-warmup"], [data-action="match-logo"]')) return false;
+    if (node.closest('#sidebar, .sidebar, #modal, .md, .mo, .tg-sheet, .tg-sheet-backdrop, .sw-sheet, .match-plan, .match-savebar, [data-action="match-save"], [data-action="match-warmup"], [data-action="match-logo"]')) return false;
     const own = this.ownControl(node);
     if (!own || !own.getBoundingClientRect) return true;
     const r = own.getBoundingClientRect();
@@ -30,6 +38,7 @@ const ClickGuard = {
 
   trainingOpensSheet(node) {
     if (!node || !node.closest) return false;
+    if (this.matchSquadClick(node) || node.closest('.match-plan, #modal, .mo, .roster-pick')) return false;
     const opener = node.closest('[data-action="open-training"], [data-action="preview-next-training"], [data-next-training]');
     if (!opener) return false;
     const own = node.closest('[data-action], [data-edit-training], [data-attendance-training], [data-del-training], [data-dup-training]');

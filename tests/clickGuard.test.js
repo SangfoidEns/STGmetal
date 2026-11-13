@@ -88,6 +88,44 @@ describe('click guard', () => {
     assert.equal(guard.stealNav(empty, 200, 720), true);
   });
 
+  it('keeps a match name even when the row is tall and sits on the tab bar', () => {
+    const nav = node({
+      id: 'mobileNav',
+      className: 'mn',
+      rect: { top: 700, left: 0, right: 390, bottom: 760, width: 390, height: 60 }
+    });
+    const guard = boot(nav);
+    const plan = node({ className: 'match-plan', rect: { top: 200, left: 0, right: 390, bottom: 760, width: 390, height: 560 } });
+    const chip = node({
+      tag: 'button',
+      className: 'match-chip is-xi',
+      attrs: { 'data-action': 'match-toggle', 'data-player-id': 'johnson' },
+      rect: { top: 680, left: 12, right: 370, bottom: 740, width: 358, height: 60 }
+    }, plan);
+    const name = node({ tag: 'span', className: 'match-chip-name', rect: { top: 690, left: 70, right: 220, bottom: 720, width: 150, height: 30 } }, chip);
+    assert.equal(guard.stealNav(name, 120, 710), false);
+    assert.equal(guard.stealNav(chip, 120, 710), false);
+    assert.equal(guard.matchSquadClick(name), chip);
+    assert.equal(guard.trainingOpensSheet(name), false);
+  });
+
+  it('does not open a training from a name inside the match plan', () => {
+    const guard = boot(null);
+    const card = node({
+      tag: 'div',
+      className: 'card-training',
+      attrs: { 'data-action': 'open-training', 'data-training-id': 'tr-3' }
+    });
+    const plan = node({ className: 'match-plan' }, card);
+    const chip = node({
+      tag: 'button',
+      className: 'match-chip',
+      attrs: { 'data-action': 'match-toggle', 'data-player-id': 'johnson' }
+    }, plan);
+    assert.equal(guard.trainingOpensSheet(chip), false);
+    assert.equal(guard.trainingOpensSheet(card), true);
+  });
+
   it('does not open a training from the save button inside a training card', () => {
     const guard = boot(null);
     const card = node({
