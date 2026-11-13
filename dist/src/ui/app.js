@@ -1219,6 +1219,42 @@ const App = {
     return null;
   },
 
+  _matchActionFrom(node) {
+    if (!node || !node.closest) return null;
+    return node.closest('[data-action="match-save"], [data-action="match-warmup"], [data-action="match-logo"], [data-action="match-logo-clear"]');
+  },
+
+  _takeMatchAction(e) {
+    const node = e && e.target;
+    if (!node || !node.closest) return false;
+    let btn = this._matchActionFrom(node);
+    if (!btn && node.closest('#mobileNav, .mn')) {
+      try {
+        const stack = document.elementsFromPoint ? document.elementsFromPoint(e.clientX, e.clientY) : [];
+        for (let i = 0; i < stack.length; i++) {
+          const el = stack[i];
+          if (!el || !el.closest) continue;
+          if (el.closest('#mobileNav, .mn')) continue;
+          const hit = this._matchActionFrom(el);
+          if (hit) { btn = hit; break; }
+          if (!el.closest('.match-plan, .match-toolbar')) break;
+        }
+      } catch (_) {}
+    }
+    if (!btn) return false;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+    const action = btn.getAttribute('data-action');
+    try {
+      if (action === 'match-save') Actions.saveMatch();
+      else if (action === 'match-warmup') Actions.placeMatchWarmup();
+      else if (action === 'match-logo') Actions.pickMatchLogo();
+      else if (action === 'match-logo-clear') Actions.clearMatchLogo();
+    } catch (err) { console.error('[match-action]', err); }
+    return true;
+  },
+
   _takeMatchChip(e) {
     const node = e && e.target;
     if (node && node.closest && node.closest('.match-savebar')) return false;
@@ -2305,6 +2341,7 @@ const App = {
     if (!this._navGuardBound) {
       this._navGuardBound = true;
       document.addEventListener('click', (e) => {
+        try { if (App._takeMatchAction(e)) return; } catch (_) {}
         try { if (App._takeMatchChip(e)) return; } catch (_) {}
       }, true);
       document.addEventListener('click', (e) => {

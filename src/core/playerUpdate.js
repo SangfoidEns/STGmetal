@@ -160,13 +160,17 @@ const PlayerUpdate = {
     player.stamps = player.stamps || {};
     const nextPhoto = src.profilePhoto || src.photoUrl || '';
     const prevPhoto = player.profilePhoto || player.photoUrl || '';
+    const photoSig = function (value) {
+      if (typeof ClubFeed !== 'undefined' && ClubFeed._photoSig) return ClubFeed._photoSig(value);
+      return String(value || '');
+    };
     if (src.profilePhoto) {
       player.profilePhoto = src.profilePhoto;
       player.photoUrl = src.photoUrl || src.profilePhoto;
     } else if (src.photoUrl) {
       player.photoUrl = src.photoUrl;
     }
-    if (nextPhoto && nextPhoto !== prevPhoto) player.stamps.photo = when;
+    if (nextPhoto && photoSig(nextPhoto) !== photoSig(prevPhoto)) player.stamps.photo = when;
     if (String(player.birthDate || '') !== prevBirth) player.stamps.birthDate = when;
     this._takePlayerGifts(state, player, packet);
     const worn = packet.wornGift || (packet.featuredGiftKey ? {

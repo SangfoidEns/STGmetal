@@ -1795,6 +1795,35 @@ const ClubFeed = {
     const pad = function (n) { return String(n).padStart(2, '0'); };
     return b.y + '-' + pad(b.m) + '-' + pad(b.d);
   },
+  /** Стабільний відбиток знімка: без довжини файлу і без токена в посиланні. */
+  _photoSig(photo) {
+    const raw = String(photo || '').trim();
+    if (!raw) return '';
+    let body = raw;
+    const marker = raw.indexOf('base64,');
+    if (marker >= 0) body = raw.slice(marker + 7);
+    else if (/^https?:/i.test(raw)) body = raw.split('?')[0];
+    if (body.length > 80) {
+      const mid = Math.floor(body.length / 2);
+      return body.slice(0, 48) + ':' + body.slice(mid, mid + 24) + ':' + body.slice(-32);
+    }
+    return body;
+  },
+  _photoBody(p) {
+    if (!p) return '';
+    const fields = [p.profilePhoto, p.photoUrl, p.profile && p.profile.photo];
+    let i;
+    for (i = 0; i < fields.length; i++) {
+      if (typeof fields[i] === 'string' && fields[i].indexOf('data:image/') === 0) return fields[i];
+    }
+    for (i = 0; i < fields.length; i++) {
+      if (typeof fields[i] === 'string' && /^https?:/i.test(fields[i])) return fields[i];
+    }
+    for (i = 0; i < fields.length; i++) {
+      if (typeof fields[i] === 'string' && fields[i].trim()) return fields[i];
+    }
+    return '';
+  },
   /** Прибирає видалений подарунок і згортає повтор тієї самої події за день. */
   prune(s) {
     if (!s || !Array.isArray(s.feed)) return false;
@@ -1805,6 +1834,19 @@ const ClubFeed = {
       if (g.id) live['gift:' + g.id] = true;
     });
     const before = s.feed.length;
+    const minutes = {};
+    s.feed.forEach(function (item) {
+      if (!item || item.kind !== 'photo') return;
+      const minute = String(item.createdAt || '').slice(0, 16);
+      const who = String(item.playerId || '');
+      if (!minute || !who) return;
+      if (!minutes[minute]) minutes[minute] = {};
+      minutes[minute][who] = true;
+    });
+    const burst = {};
+    Object.keys(minutes).forEach(function (minute) {
+      if (Object.keys(minutes[minute]).length >= 3) burst[minute] = true;
+    });
     const sorted = s.feed.filter(Boolean).slice().sort(function (a, b) {
       return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
     });
@@ -1812,6 +1854,7 @@ const ClubFeed = {
     const next = [];
     sorted.forEach(function (item) {
       if (item.kind === 'gift' && !live[item.id]) return;
+      if (item.kind === 'photo' && burst[String(item.createdAt || '').slice(0, 16)]) return;
       const stampedPhoto = (item.kind === 'photo' || item.kind === 'load') && /:\d{4}-/.test(String(item.id || ''));
       const bucket = stampedPhoto
         ? item.id
@@ -1874,6 +1917,7 @@ const ClubFeed = {
           createdAt: g.createdAt || new Date().toISOString()
         })) dirty = true;
       });
+      const photoNews = [];
       (s.players || []).forEach(function (p) {
         if (!p || p.id == null) return;
         const pid = String(p.id);
@@ -1894,42 +1938,25 @@ const ClubFeed = {
             meta.status[pid] = status;
           }
         }
-        const photo = String(p.photoUrl || p.profilePhoto || (p.profile && p.profile.photo) || '');
-        const sig = photo ? (String(photo.length) + ':' + photo.slice(24, 64) + ':' + photo.slice(-24)) : '';
+        const photo = ClubFeed._photoBody(p);
+        const sig = ClubFeed._photoSig(photo);
         if (sig) {
-          const photoAt = (p.stamps && (p.stamps.photo || p.stamps.photoUrl || p.stamps.profilePhoto)) || '';
+          const photoAt = (p.stamps && p.stamps.photo) || '';
           const knownAt = Date.parse(meta.photoAt[pid] || '') || 0;
           const nextAt = Date.parse(photoAt) || 0;
+          const changed = meta.photo[pid] != null && meta.photo[pid] !== sig;
           if (meta.photo[pid] == null) {
             meta.photo[pid] = sig;
             if (photoAt) meta.photoAt[pid] = photoAt;
             dirty = true;
-          } else if (meta.photo[pid] !== sig && nextAt > knownAt) {
-            if (ClubFeed._push(s, {
-              id: 'photo:' + pid + ':' + photoAt,
-              kind: 'photo',
-              playerId: p.id,
-              title: 'Нове фото',
-              text: who + ' додав нове фото',
-              createdAt: photoAt
-            })) dirty = true;
+          } else if (changed && photoAt && nextAt > knownAt) {
             meta.photo[pid] = sig;
             meta.photoAt[pid] = photoAt;
-          } else if (meta.photo[pid] !== sig && !photoAt) {
-            const day = ClubFeed._day(new Date().toISOString());
-            const already = (s.feed || []).some(function (x) {
-              return x && x.kind === 'photo' && String(x.playerId) === pid && ClubFeed._day(x.createdAt) === day;
-            });
-            if (!already && ClubFeed._push(s, {
-              id: 'photo:' + pid + ':' + day,
-              kind: 'photo',
-              playerId: p.id,
-              title: 'Нове фото',
-              text: who + ' додав нове фото'
-            })) dirty = true;
+            photoNews.push({ pid: pid, playerId: p.id, who: who, photoAt: photoAt });
+            dirty = true;
+          } else if (changed || (photoAt && nextAt > knownAt)) {
             meta.photo[pid] = sig;
-          } else if (meta.photo[pid] !== sig) {
-            meta.photo[pid] = sig;
+            if (photoAt) meta.photoAt[pid] = photoAt;
             dirty = true;
           }
         }
@@ -2002,6 +2029,17 @@ const ClubFeed = {
           })) dirty = true;
         }
       });
+      if (photoNews.length === 1) {
+        const row = photoNews[0];
+        if (ClubFeed._push(s, {
+          id: 'photo:' + row.pid + ':' + row.photoAt,
+          kind: 'photo',
+          playerId: row.playerId,
+          title: 'Нове фото',
+          text: row.who + ' додав нове фото',
+          createdAt: row.photoAt
+        })) dirty = true;
+      }
       if (this.prune(s)) dirty = true;
       if (dirty) {
         try { if (typeof StorageManager !== 'undefined' && StorageManager.save) StorageManager.save(); } catch (_) {}

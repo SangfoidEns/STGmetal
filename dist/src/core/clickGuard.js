@@ -26,7 +26,7 @@ const ClickGuard = {
     if (this.matchSquadClick(node)) return false;
     if (node.closest('#mobileNav, .mn')) return true;
     if (!inBand) return false;
-    if (node.closest('#sidebar, .sidebar, #modal, .md, .mo, .tg-sheet, .tg-sheet-backdrop, .sw-sheet, .match-plan, .match-savebar, [data-action="match-save"], [data-action="match-warmup"], [data-action="match-logo"]')) return false;
+    if (node.closest('#sidebar, .sidebar, #modal, .md, .mo, .tg-sheet, .tg-sheet-backdrop, .sw-sheet, .match-plan, .match-toolbar, .match-savebar, [data-action="match-save"], [data-action="match-warmup"], [data-action="match-logo"]')) return false;
     const own = this.ownControl(node);
     if (!own || !own.getBoundingClientRect) return true;
     const r = own.getBoundingClientRect();

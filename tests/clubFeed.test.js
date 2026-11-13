@@ -137,9 +137,61 @@ describe('club feed and gift delete', () => {
     assert.equal(context.Store.state.feed.some(x => x.kind === 'gift'), false);
     context.Store.state.players[0].profilePhoto = 'b'.repeat(40);
     context.ClubFeed.sync();
-    const today = context.ClubFeed._day(new Date().toISOString());
-    const photos = context.Store.state.feed.filter(x => x.kind === 'photo' && context.ClubFeed._day(x.createdAt) === today);
+    assert.equal(context.Store.state.feed.filter(x => x.kind === 'photo').length, 1);
+    context.Store.state.players[0].profilePhoto = 'c'.repeat(40);
+    context.Store.state.players[0].stamps = { photo: '2026-11-13T18:00:00.000Z' };
+    context.ClubFeed.sync();
+    const photos = context.Store.state.feed.filter(x => x.kind === 'photo' && x.createdAt === '2026-11-13T18:00:00.000Z');
     assert.equal(photos.length, 1);
+  });
+
+  it('does not announce a photo wall or a refreshed link of the same picture', () => {
+    const at = '2026-11-13T22:40:00.000Z';
+    context.Store.state = {
+      players: [1, 2, 3, 4].map(n => ({
+        id: 'p' + n,
+        firstName: 'Гравець',
+        lastName: String(n),
+        photoUrl: 'data:image/jpeg;base64,' + ('A'.repeat(20) + n),
+        stamps: { photo: at }
+      })),
+      gifts: [],
+      trainings: [],
+      settings: {},
+      feed: [1, 2, 3, 4].map(n => ({
+        id: 'photo:p' + n + ':' + at,
+        kind: 'photo',
+        playerId: 'p' + n,
+        title: 'Нове фото',
+        text: 'додав',
+        createdAt: at
+      })),
+      feedMeta: {
+        photo: { p1: 'old', p2: 'old', p3: 'old', p4: 'old' },
+        photoAt: { p1: '2026-11-01T00:00:00.000Z', p2: '2026-11-01T00:00:00.000Z', p3: '2026-11-01T00:00:00.000Z', p4: '2026-11-01T00:00:00.000Z' }
+      }
+    };
+    context.ClubFeed.sync();
+    assert.equal(context.Store.state.feed.filter(x => x.kind === 'photo').length, 0);
+    context.Store.state.players = [{
+      id: 'solo',
+      firstName: 'Ілля',
+      lastName: 'Гордійчук',
+      photoUrl: 'https://cdn.example/ilya.jpg?token=1',
+      stamps: { photo: '2026-11-12T10:00:00.000Z' }
+    }];
+    context.Store.state.feed = [];
+    context.Store.state.feedMeta = { photo: {}, photoAt: {} };
+    context.ClubFeed.sync();
+    assert.equal(context.Store.state.feed.filter(x => x.kind === 'photo').length, 0);
+    context.Store.state.players[0].photoUrl = 'https://cdn.example/ilya.jpg?token=2';
+    context.Store.state.players[0].stamps.photo = '2026-11-13T21:00:00.000Z';
+    context.ClubFeed.sync();
+    assert.equal(context.Store.state.feed.filter(x => x.kind === 'photo').length, 0);
+    context.Store.state.players[0].photoUrl = 'https://cdn.example/ilya-new.jpg';
+    context.Store.state.players[0].stamps.photo = '2026-11-13T22:10:00.000Z';
+    context.ClubFeed.sync();
+    assert.equal(context.Store.state.feed.filter(x => x.kind === 'photo').length, 1);
   });
 
   it('puts the eleven highest loads on the pitch and everyone else on the bench', () => {

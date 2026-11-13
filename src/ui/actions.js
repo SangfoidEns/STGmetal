@@ -861,7 +861,13 @@ const Actions = {
       Object.keys(before).forEach(function (key) {
         if (String(before[key] == null ? '' : before[key]) !== String(p[key] == null ? '' : p[key])) p.stamps[key] = now;
       });
-      if (before.photoUrl !== p.photoUrl || before.profilePhoto !== p.profilePhoto) p.stamps.photo = now;
+      const photoSig = function (value) {
+        if (typeof ClubFeed !== 'undefined' && ClubFeed._photoSig) return ClubFeed._photoSig(value);
+        return String(value || '');
+      };
+      const beforePhoto = photoSig(before.profilePhoto || before.photoUrl);
+      const afterPhoto = photoSig(p.profilePhoto || p.photoUrl);
+      if (afterPhoto && afterPhoto !== beforePhoto) p.stamps.photo = now;
       if (String(before.load == null ? '' : before.load) !== String(p.load == null ? '' : p.load)) {
         p.stamps.load = now;
         const row = { at: now, value: p.load, prev: before.load == null ? '' : before.load };

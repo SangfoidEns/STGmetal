@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z83',
+  APP_BUILD: 'z84',
   APP_UPDATED: '13.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -53,13 +53,14 @@ const Views = {
     const comp = m.competition || where;
     const score = (m.scoreUs != null && m.scoreUs !== '' && m.scoreThem != null && m.scoreThem !== '')
       ? (m.scoreUs + ' : ' + m.scoreThem) : '';
+    const kicker = o.kicker || (score ? 'Рахунок' : 'Наступний матч');
     return '<button type="button" class="match-plaque" data-action="open-match" data-match-id="' + sanitize(m.id || '') + '">' +
       '<span class="match-plaque-side">' +
         '<span class="match-plaque-crest">' + this._crestHtml(clubLogo, short) + '</span>' +
         '<span class="match-plaque-name">' + sanitize(short) + '</span>' +
       '</span>' +
       '<span class="match-plaque-mid">' +
-        '<span class="match-plaque-kicker">' + (score ? 'Рахунок' : 'Наступний матч') + '</span>' +
+        '<span class="match-plaque-kicker">' + sanitize(kicker) + '</span>' +
         '<span class="match-plaque-vs">' + (score ? sanitize(score) : 'VS') + '</span>' +
         '<span class="match-plaque-when">' + sanitize(when || 'дата уточнюється') + '</span>' +
         '<span class="match-plaque-comp">' + sanitize(comp) + '</span>' +
@@ -418,7 +419,10 @@ const Views = {
       ? LoadModel.pastTrainings(s.trainings) : s.trainings.filter(t => t.date && t.date <= today() && t.status !== 'cancelled');
     const totalHours = Math.round(pastForStats.reduce((a, t) => a + (t.duration || 0), 0) / 60 * 10) / 10;
     const totalMin = pastForStats.reduce((a, t) => a + (t.duration || 0), 0);
-    const nextMatch = s.matches.filter(m => m.date >= today()).sort((a, b) => a.date.localeCompare(b.date))[0];
+    const todayStr = today();
+    const nextMatch = (s.matches || []).filter(m => m && m.date >= todayStr).sort((a, b) => a.date.localeCompare(b.date))[0];
+    const pastMatch = (s.matches || []).filter(m => m && m.date && m.date < todayStr && (!nextMatch || String(m.id) !== String(nextMatch.id)))
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.time || '').localeCompare(String(a.time || '')))[0];
     const recent = s.trainings.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 6);
     const drafts = s.trainings.filter(t => t.status === 'draft' || t.status === 'pinned');
     const boardCount = (s.boards || []).length;
@@ -568,6 +572,9 @@ const Views = {
             <span class="cp-stat-lb">${t('schemes')}</span>
             <span class="cp-stat-sub">${recentBoards.map(b => sanitize((b.name||'Схема').slice(0,18))).join(' · ') || t('saved_boards')}</span>
           </button>
+          ${pastMatch
+            ? ('<div class="cp-stat cp-stat-past">' + this._matchPlaque(pastMatch, { clubShort: short, clubLogo: logo || this.clubMark(), kicker: 'Минулий матч' }) + '</div>')
+            : '<button type="button" class="cp-stat sc-tap cp-stat-action" data-view="matches"><span class="cp-stat-ic">🏟</span><span class="cp-stat-val">—</span><span class="cp-stat-lb">Минулий матч</span><span class="cp-stat-sub">Ще не зіграний</span></button>'}
         </div>
 
         <!-- Coach tools (collapse) -->
@@ -2326,14 +2333,16 @@ trainings() {
         '<p class="note-sm">' + sanitize(m.date || '') + (m.time ? (' · ' + sanitize(m.time)) : '') + ' · ' + where +
         (m.stadium ? (' · ' + sanitize(m.stadium)) : '') +
         (m.competition ? (' · ' + sanitize(m.competition)) : '') + '</p>' +
-        (canEdit ? (
-          '<div class="match-actions">' +
-            '<button type="button" class="btn btn-s btn-sm" data-action="match-logo">Логотип суперника</button>' +
-            (m.opponentLogo ? '<button type="button" class="btn btn-s btn-sm" data-action="match-logo-clear">Прибрати логотип</button>' : '') +
-          '</div>'
-        ) : '') +
         (call ? ('<p class="match-call">' + call + '</p>') : '') +
       '</section>' +
+      (canEdit ? (
+        '<div class="match-toolbar">' +
+          '<button type="button" class="btn btn-p" data-action="match-save">Зберегти план</button>' +
+          '<button type="button" class="btn btn-s" data-action="match-warmup">Розминка в день матчу</button>' +
+          '<button type="button" class="btn btn-s" data-action="match-logo">Логотип суперника</button>' +
+          (m.opponentLogo ? '<button type="button" class="btn btn-s" data-action="match-logo-clear">Прибрати логотип</button>' : '') +
+        '</div>'
+      ) : '') +
       '<section class="card glass"><div class="ct">Збір</div><div class="match-grid">' +
         field('mpMeet', 'Збір', m.meetTime, 'time') +
         field('mpGather', 'Місце збору', m.gatherPlace || '') +
@@ -2395,12 +2404,6 @@ trainings() {
         area('mpPost', 'Після матчу', m.postNotes) +
         (canEdit ? '<button type="button" class="btn btn-d btn-sm" data-action="match-delete">Видалити матч</button>' : '') +
       '</section>' +
-      (canEdit ? (
-        '<div class="match-savebar">' +
-          '<button type="button" class="btn btn-p" data-action="match-save">Зберегти план</button>' +
-          '<button type="button" class="btn btn-s" data-action="match-warmup">Розминка в день матчу</button>' +
-        '</div>'
-      ) : '') +
       '</div>';
   },
 
