@@ -1303,6 +1303,85 @@ const BoardEngine = {
     try { this.renderToolbar(); } catch (_) {}
   },
 
+  /** Свіжа дошка 3-1-2-2-1-1: 11 за явкою на полі, решта на лавці. Не чіпає збережену схему. */
+  placeAttendanceLineup(name) {
+    const schemeName = name || '3-1-2-2-1-1';
+    const scheme = (typeof SCHEMES !== 'undefined' && SCHEMES[schemeName]) || null;
+    if (!scheme || typeof CoachTools === 'undefined' || !CoachTools.pickLineup) return false;
+    const s = Store.get();
+    if (!s) return false;
+    if (!s.activeBoard) s.activeBoard = { objects: [], selectedId: null, tool: 'select', fieldView: 'full' };
+    s.activeBoard.sourceBoardId = null;
+    s.activeBoard.scheme = schemeName;
+    s.activeBoard.selectedId = null;
+    const roles = ['GK', 'DEF', 'DEF', 'DEF', 'MID', 'MID', 'MID', 'ATT', 'ATT', 'MID', 'ATT'];
+    const attOf = function (p) {
+      try {
+        if (typeof PlayerProgress !== 'undefined' && PlayerProgress.compute) {
+          const pr = PlayerProgress.compute(p.id) || {};
+          if (pr.attPct != null) return pr.attPct;
+        }
+      } catch (_) {}
+      return 0;
+    };
+    const picked = CoachTools.pickLineup(s.players || [], attOf);
+    const assigned = CoachTools.assignFormation(picked.xi, roles);
+    const chipColor = s.activeBoard.drawColor || '#c8a84b';
+    const nextId = function () {
+      return (typeof uid === 'function') ? uid() : ('lp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6));
+    };
+    const objects = [];
+    scheme.slice(0, 11).forEach(function (slot, i) {
+      const point = this.clampWorld(slot[1], slot[2]);
+      const player = assigned[i] || null;
+      const isGk = roles[i] === 'GK' || (player && CoachTools.lineupRole(player) === 'GK');
+      const col = isGk ? this.GK_CHIP_COLOR : chipColor;
+      objects.push({
+        id: nextId(), type: 'player', x: point.x, y: point.y,
+        number: player ? player.number : (i + 1),
+        label: player ? (player.lastName || player.firstName || '') : roles[i],
+        team: 'own',
+        playerId: player ? player.id : null,
+        readiness: player ? (player.readiness != null ? player.readiness : player.condition) : 80,
+        load: player && player.load != null ? player.load : 0,
+        position: player ? player.position : roles[i],
+        status: player ? player.status : null,
+        isCaptain: player ? !!player.isCaptain : false,
+        chipColor: col,
+        color: col,
+        onBench: false,
+        rotation: 0, locked: false, visible: true
+      });
+    }, this);
+    (picked.bench || []).forEach(function (player) {
+      objects.push({
+        id: nextId(), type: 'player', x: 0, y: 0,
+        number: player.number,
+        label: player.lastName || player.firstName || '',
+        team: 'own',
+        playerId: player.id,
+        readiness: player.readiness != null ? player.readiness : (player.condition != null ? player.condition : 80),
+        load: player.load != null ? player.load : 0,
+        position: player.position || null,
+        status: player.status || null,
+        isCaptain: !!player.isCaptain,
+        chipColor: chipColor,
+        color: chipColor,
+        onBench: true,
+        rotation: 0, locked: false, visible: true
+      });
+    });
+    s.activeBoard.objects = objects;
+    try { this.pushHistory(); } catch (_) {}
+    try { this.render(); } catch (_) {}
+    try { this.renderToolbar(); } catch (_) {}
+    const benchN = (picked.bench || []).length;
+    try {
+      Toast.show('3-1-2-2-1-1 · на полі ' + Math.min(11, (picked.xi || []).length) + ' · лавка ' + benchN, 'ok');
+    } catch (_) {}
+    return true;
+  },
+
   saveBoard() {
     const linked = Store.get().activeBoard && Store.get().activeBoard.sourceBoardId;
     if (linked && typeof Actions !== 'undefined' && Actions.saveSchemeDrawing) {

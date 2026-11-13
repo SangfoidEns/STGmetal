@@ -10809,14 +10809,19 @@ body.role-guest #mobileNav .mni[data-view="trainings"] { display: none !importan
 .an-table { overflow-x: auto !important; }
 .an-table .an-head,
 .an-table .an-row {
-  grid-template-columns: minmax(120px, 1.7fr) minmax(52px, 0.55fr) minmax(64px, 0.7fr) minmax(44px, 0.5fr) minmax(48px, 0.55fr) minmax(64px, 0.6fr) !important;
-  min-width: 520px !important;
+  grid-template-columns: minmax(0, 1.35fr) minmax(46px, 0.5fr) minmax(34px, 0.38fr) minmax(46px, 0.5fr) minmax(68px, 0.72fr) !important;
+  min-width: 0 !important;
 }
 .an-table .an-visits,
 .an-table .an-gifts,
 .an-att, .an-visits, .an-rpe, .an-load, .an-gifts {
   text-align: left !important;
   font-variant-numeric: tabular-nums !important;
+}
+.an-table .an-th {
+  white-space: nowrap !important;
+  font-size: 10px !important;
+  line-height: 1.15 !important;
 }
 .an-summary-line {
   font-size: 13px;
@@ -12387,10 +12392,51 @@ body.mode-board-focus #boardToolbarTop.btb-top {
   font-size: 13px;
   line-height: 1;
 }
-.club-feed-row {
-  background: linear-gradient(165deg, hsl(var(--feed-hue, 42) 42% 22%), hsl(var(--feed-hue, 42) 34% 11%));
-  border: 1.5px solid var(--feed-frame, #e8c547);
+.team-chat.club-feed {
+  background: rgba(14, 18, 26, 0.42);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
-.club-feed-row .club-feed-body b {
-  color: hsl(var(--feed-hue, 42) 78% 72%);
+.club-feed .team-chat-log {
+  max-height: min(70vh, 32rem);
+}
+.club-feed-row {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  min-height: 0;
+  padding: 0.75rem 0.8rem;
+  border-radius: 16px;
+  border: 1px solid var(--feed-frame, rgba(232, 197, 71, 0.7));
+  background: linear-gradient(165deg, hsla(var(--feed-hue, 42), 46%, 58%, 0.2), rgba(10, 14, 20, 0.28));
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.club-feed-ico {
+  width: auto;
+  flex: 0 0 1.6rem;
+  font-size: 1.15rem;
+  line-height: 1.3;
+}
+.club-feed-body b {
+  font-size: 0.78rem;
+  line-height: 1.25;
+  color: hsl(var(--feed-hue, 42) 78% 74%);
+}
+.club-feed-body span {
+  font-size: 0.95rem;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+.club-feed-time {
+  margin-left: auto;
+  font-size: 0.72rem;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.club-feed .note-sm {
+  font-size: 0.82rem;
+  line-height: 1.4;
 }

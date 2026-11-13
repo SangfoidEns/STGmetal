@@ -1,7 +1,7 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z75',
-  APP_UPDATED: '08.11.2026',
+  APP_BUILD: 'z76',
+  APP_UPDATED: '13.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
   versionLetter(stamp) {
@@ -2394,7 +2394,6 @@ trainings() {
       const gifts = giftCount(p.id);
       return '<div class="an-row" data-player-id="' + p.id + '" data-action="open-player-card">' +
         '<span class="an-name">' + sanitize(name) + '</span>' +
-        '<span class="an-att">' + (st.attPct != null ? st.attPct + '%' : '—') + '</span>' +
         '<span class="an-visits">' + (st.present || 0) + '/' + ((st.present || 0) + (st.absent || 0)) + '</span>' +
         '<span class="an-rpe">' + (st.avgRpe != null ? st.avgRpe : '—') + '</span>' +
         '<span class="an-load">' + (st.load28 != null ? st.load28 : '—') + '</span>' +
@@ -2409,7 +2408,6 @@ trainings() {
       '<div class="card glass an-table">' +
       '<div class="an-head">' +
         '<span class="an-name">Гравець</span>' +
-        '<button type="button" class="an-th" data-player-sort="att">Відв.%</button>' +
         '<button type="button" class="an-th" data-player-sort="visits">Візити</button>' +
         '<button type="button" class="an-th" data-player-sort="rpe">RPE</button>' +
         '<button type="button" class="an-th" data-player-sort="load">Load</button>' +

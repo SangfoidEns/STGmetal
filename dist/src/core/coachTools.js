@@ -1493,6 +1493,49 @@ CoachTools.playerXpTotal = function (playerId) {
   } catch (_) { return 0; }
 };
 
+/** Роль фішки для розстановки основи. */
+CoachTools.lineupRole = function (player) {
+  const pos = String((player && player.position) || '').toUpperCase();
+  if (pos === 'GK' || pos.indexOf('GK') === 0) return 'GK';
+  if (['CB', 'LB', 'RB', 'LCB', 'RCB', 'LWB', 'RWB', 'WB', 'SW', 'DEF'].indexOf(pos) >= 0) return 'DEF';
+  if (['ST', 'CF', 'LW', 'RW', 'SS', 'LF', 'RF', 'ATT', 'FW'].indexOf(pos) >= 0) return 'ATT';
+  return 'MID';
+};
+/** Одинадцять здорових за явкою. Решта, включно з лазаретом, іде на лавку. */
+CoachTools.pickLineup = function (players, attOf) {
+  const list = (players || []).filter(function (p) { return p && p.id != null; });
+  const hurt = function (p) {
+    const st = String(p.status || '').toLowerCase();
+    return st === 'injured' || st === 'rehab' || st === 'recovery';
+  };
+  const score = function (p) {
+    try { return Number(attOf ? attOf(p) : 0) || 0; } catch (_) { return 0; }
+  };
+  const available = list.filter(function (p) { return !hurt(p); }).slice().sort(function (a, b) {
+    const diff = score(b) - score(a);
+    if (diff) return diff;
+    return (Number(a.number) || 99) - (Number(b.number) || 99);
+  });
+  const xi = available.slice(0, 11);
+  const on = {};
+  xi.forEach(function (p) { on[String(p.id)] = true; });
+  return {
+    xi: xi,
+    bench: list.filter(function (p) { return !on[String(p.id)]; })
+  };
+};
+/** Серед обраних одинадцяти спочатку сідає своя роль, потім будь-хто з тих, хто лишився. */
+CoachTools.assignFormation = function (xi, roles) {
+  const pool = (xi || []).slice();
+  const used = {};
+  return (roles || []).map(function (role) {
+    let pick = pool.find(function (p) { return !used[String(p.id)] && CoachTools.lineupRole(p) === role; });
+    if (!pick) pick = pool.find(function (p) { return !used[String(p.id)]; });
+    if (pick) used[String(pick.id)] = true;
+    return pick || null;
+  });
+};
+
 /** Стрічка клубу: подарунки, серії, дні народження, статус, фото, рейтинг. */
 const ClubFeed = {
   MILESTONES: [3, 5, 8, 12, 16, 20, 24, 30],
