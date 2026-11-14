@@ -480,6 +480,29 @@ const BoardEngine = {
     });
     return best;
   },
+  _textBox(o) {
+    const size = Math.max(10, Math.min(96, +(o && o.fontSize) || 16));
+    const letters = Math.max(1, String((o && o.label) || '').length);
+    const halfWpx = Math.max(22, letters * size * 0.34);
+    const halfHpx = Math.max(14, size * 0.7);
+    return { size: size, halfW: halfWpx / 680, halfH: halfHpx / 1050, halfWpx: halfWpx, halfHpx: halfHpx };
+  },
+  hitTestText(wx, wy) {
+    const list = (Store.get() && Store.get().activeBoard && Store.get().activeBoard.objects) || [];
+    for (let i = list.length - 1; i >= 0; i--) {
+      const o = list[i];
+      if (!o || o.type !== 'text' || o.visible === false || o.x == null) continue;
+      const box = this._textBox(o);
+      if (Math.abs(wx - o.x) <= box.halfW && Math.abs(wy - o.y) <= box.halfH) return o;
+    }
+    return null;
+  },
+  hitTestTextHandle(wx, wy, o) {
+    if (!o) return null;
+    const box = this._textBox(o);
+    if (Math.hypot(wx - (o.x + box.halfW), wy - (o.y + box.halfH)) < 0.04) return 'scale';
+    return null;
+  },
   hitTestArrowHandle(wx, wy, o, tol) {
     tol = tol == null ? 0.035 : tol;
     if (!o || o.x2 == null) return null;
@@ -524,7 +547,15 @@ const BoardEngine = {
       this.dragObj = null;
       this.drawing = false;
       const pts = [...this.pointers.values()];
-      this.lastPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      const pinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      this.lastPinchDist = pinchDist;
+      const abPinch = Store.get() && Store.get().activeBoard;
+      const textSel = abPinch && (abPinch.objects || []).find(o => o && o.id === abPinch.selectedId && o.type === 'text');
+      if (textSel) {
+        this._textPinch = { id: textSel.id, fontSize: textSel.fontSize || 16, dist: Math.max(pinchDist, 8) };
+        return;
+      }
+      this._textPinch = null;
       this.panStart = {
         mx: (pts[0].x + pts[1].x) / 2,
         my: (pts[0].y + pts[1].y) / 2,
@@ -657,13 +688,38 @@ const BoardEngine = {
       return;
     }
 
+    if (tool === 'select' || tool === 'text' || !tool) {
+      const textHit = this.hitTestText(world.x, world.y);
+      if (textHit) {
+        s.activeBoard.selectedId = textHit.id;
+        s.activeBoard.tool = 'select';
+        this.dragObj = textHit;
+        this._textEdit = this.hitTestTextHandle(world.x, world.y, textHit) || 'move';
+        this.dragOffset = { x: world.x - textHit.x, y: world.y - textHit.y };
+        this._textGrab = {
+          fontSize: textHit.fontSize || 16,
+          dist: Math.max(0.02, Math.hypot(world.x - textHit.x, world.y - textHit.y))
+        };
+        this.activePointerId = e.pointerId;
+        this._dragOrigin = { x: e.clientX, y: e.clientY };
+        this._dragMovedPx = 0;
+        this.renderDrawings();
+        try { this.renderToolbar && this.renderToolbar(); } catch (_) {}
+        return;
+      }
+    }
+
     if (tool === 'text') {
       Modal.prompt('Текст', '', text => {
         if (text) {
           const tp = this.clampWorld(world.x, world.y);
-          s.activeBoard.objects.push({ id: uid(), type: 'text', x: tp.x, y: tp.y, label: text, locked: false, visible: true });
+          const item = { id: uid(), type: 'text', x: tp.x, y: tp.y, label: text, fontSize: 18, locked: false, visible: true };
+          s.activeBoard.objects.push(item);
+          s.activeBoard.selectedId = item.id;
+          s.activeBoard.tool = 'select';
           this.pushHistory();
           this.render();
+          try { this.renderToolbar && this.renderToolbar(); } catch (_) {}
         }
       });
       return;
@@ -705,7 +761,18 @@ const BoardEngine = {
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     }
 
-    // Pinch zoom + two-finger pan
+    // Pinch zoom + two-finger pan. На вибраному тексті той самий жест змінює розмір напису.
+    if (this.pointers.size >= 2 && this._textPinch) {
+      const pts = [...this.pointers.values()];
+      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      const ab = Store.get() && Store.get().activeBoard;
+      const sel = ab && (ab.objects || []).find(o => o && o.id === this._textPinch.id);
+      if (sel && this._textPinch.dist > 8) {
+        sel.fontSize = Math.max(10, Math.min(96, this._textPinch.fontSize * (dist / this._textPinch.dist)));
+        this.renderDrawings();
+      }
+      return;
+    }
     if (this.pointers.size >= 2) {
       const pts = [...this.pointers.values()];
       const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
@@ -752,6 +819,20 @@ const BoardEngine = {
     /* ── DRAG: player follows finger continuously ── */
     if (this.dragObj && (this.activePointerId === null || this.activePointerId === e.pointerId)) {
       const world = this.screenToWorld(e.clientX, e.clientY);
+      if (this.dragObj.type === 'text') {
+        if (this._textEdit === 'scale') {
+          const dist = Math.max(0.012, Math.hypot(world.x - this.dragObj.x, world.y - this.dragObj.y));
+          const base = (this._textGrab && this._textGrab.dist) || 0.02;
+          const start = (this._textGrab && this._textGrab.fontSize) || 16;
+          this.dragObj.fontSize = Math.max(10, Math.min(96, start * (dist / base)));
+        } else {
+          const pos = this.clampWorld(world.x - (this.dragOffset ? this.dragOffset.x : 0), world.y - (this.dragOffset ? this.dragOffset.y : 0));
+          this.dragObj.x = pos.x;
+          this.dragObj.y = pos.y;
+        }
+        this.renderDrawings();
+        return;
+      }
       // Редагування стрілки: переміщення / кінці (довжина + кут)
       if (this._arrowEdit && this.PATH_TYPES.includes(this.dragObj.type) && this.dragObj.x2 != null) {
         const g = this._arrowGrab || {};
@@ -824,8 +905,23 @@ const BoardEngine = {
     }
 
     // Commit drag
+    if (this._textPinch && this.pointers.size < 2) {
+      this._textPinch = null;
+      this.pushHistory();
+      try { StorageManager.save(); } catch (_) {}
+    }
     if (this.dragObj) {
       const dragged = this.dragObj;
+      if (dragged.type === 'text') {
+        this._textEdit = null;
+        this._textGrab = null;
+        this.dragObj = null;
+        this.activePointerId = null;
+        this.pushHistory();
+        this.renderDrawings();
+        try { StorageManager.save(); } catch (_) {}
+        return;
+      }
       const wasArrow = this._arrowEdit && this.PATH_TYPES.includes(dragged.type);
       if (wasArrow) {
         this._arrowEdit = null;
@@ -2533,7 +2629,15 @@ const BoardEngine = {
           }
         }
       } else if (o.type === 'text') {
-        html += `<text x="${tx(o.x)}" y="${ty(o.y)}" fill="#fff" font-size="16" font-weight="600" text-anchor="middle">${sanitize(o.label)}</text>`;
+        const box = this._textBox(o);
+        const selected = s.activeBoard.selectedId === o.id;
+        html += `<text x="${tx(o.x)}" y="${ty(o.y)}" fill="#fff" font-size="${box.size}" font-weight="700" text-anchor="middle" dominant-baseline="middle">${sanitize(o.label || '')}</text>`;
+        if (selected) {
+          const x = tx(o.x) - box.halfWpx;
+          const y = ty(o.y) - box.halfHpx;
+          html += `<rect x="${x}" y="${y}" width="${box.halfWpx * 2}" height="${box.halfHpx * 2}" fill="none" stroke="#d5ff3f" stroke-width="1.6" rx="6"/>`;
+          html += `<circle cx="${x + box.halfWpx * 2}" cy="${y + box.halfHpx * 2}" r="9" fill="#d5ff3f" stroke="#111" stroke-width="1.5"/>`;
+        }
       }
     });
 

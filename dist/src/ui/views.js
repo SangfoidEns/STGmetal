@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z93',
+  APP_BUILD: 'z94',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -1513,7 +1513,14 @@ const Views = {
       let chips = 0;
       draw.forEach(o => {
         const typ = String(o.type || o.kind || 'player');
-        if (paths[typ] || typ === 'zone' || typ === 'text') return;
+        if (typ === 'text') {
+          const px = norm(o.nx != null ? o.nx : o.x) * W;
+          const py = norm(o.ny != null ? o.ny : o.y) * H;
+          const label = String(o.label || o.text || '').replace(/[<>&"]/g, '').slice(0, 16);
+          if (label) svg += '<text x="' + px.toFixed(1) + '" y="' + py.toFixed(1) + '" text-anchor="middle" fill="#fff" font-size="5" font-weight="700">' + label + '</text>';
+          return;
+        }
+        if (paths[typ] || typ === 'zone') return;
         if (o.x == null && o.nx == null) return;
         const px = norm(o.nx != null ? o.nx : o.x) * W;
         const py = norm(o.ny != null ? o.ny : o.y) * H;

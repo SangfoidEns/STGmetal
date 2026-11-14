@@ -107,4 +107,12 @@ describe('scheme albums in the club file', () => {
     assert.equal(next.schemeAlbums[0].boardIds[0], 'sch-1');
     assert.equal(next.trainings[0].schemeAlbumId, 'zones');
   });
+
+  it('keeps the size of a board label', () => {
+    const ctx = boot({ settings: {}, players: [], trainings: [], schemeAlbums: [] });
+    const label = ctx.StorageManager.normalizeBoardObj({ type: 'text', x: 0.4, y: 0.3, label: 'пас в зону', fontSize: 28 });
+    assert.equal(label.type, 'text');
+    assert.equal(label.label, 'пас в зону');
+    assert.equal(label.fontSize, 28);
+  });
 });

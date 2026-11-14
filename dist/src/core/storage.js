@@ -686,7 +686,8 @@ const StorageManager = {
       step: o.step,
       locked: !!o.locked,
       visible: o.visible !== false,
-      rotation: o.rotation || 0
+      rotation: o.rotation || 0,
+      fontSize: o.fontSize != null ? o.fontSize : undefined
     };
   },
 

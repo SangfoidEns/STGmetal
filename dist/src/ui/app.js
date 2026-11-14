@@ -4159,7 +4159,7 @@ const App = {
       if (action === 'microcycle') return Actions.applyMicrocycle();
       if (action === 'export-stats') return StorageManager.exportJSON();
 
-      if (e.target.closest && e.target.closest('.ym, .ym-track, .ym-expand, .ym-pick, .ym-picks, .ym-tile, .ym-menu, .tg-sheet, .tg-sheet-backdrop, #modal')) return;
+      if (e.target.closest && e.target.closest('.ym, .ym-track, .ym-expand, .ym-pick, .ym-picks, .ym-tile, .ym-menu, .tg-sheet, .tg-sheet-backdrop')) return;
       if (action && action !== 'open-training' && action !== 'preview-next-training') return;
       if (inMatchPlan) return;
       if (t.dataset.editTraining) {
