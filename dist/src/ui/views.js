@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z87',
+  APP_BUILD: 'z88',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -1581,29 +1581,6 @@ trainings() {
     });
 
     const _isPlayerRole = typeof AuthManager !== 'undefined' && AuthManager.isPlayer && AuthManager.isPlayer();
-    let _schemesBlock = '';
-    if (_isPlayerRole) {
-      const meNow = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer) ? AuthManager.getLinkedPlayer() : null;
-      const mineAlbum = meNow && (s.schemeAlbums || []).find(a => a && String(a.id) === String(meNow.schemeAlbumId));
-      if (mineAlbum) {
-        const byId = {};
-        (s.boards || []).forEach(b => { if (b && b.id != null) byId[String(b.id)] = b; });
-        const tracks = (mineAlbum.boardIds || []).map(id => byId[String(id)]).filter(Boolean)
-          .map(b => this._schemeTrack(b, { editable: false })).join('');
-        _schemesBlock = '<div class="ym"><div class="ym-kicker">Твій альбом</div><h2>' + sanitize(mineAlbum.name || 'Альбом') + '</h2><div class="ym-list">' +
-          (tracks || '<div class="es">В альбомі ще немає схем</div>') + '</div></div>';
-      } else {
-      const boards = (typeof this._playerVisibleBoards === 'function')
-        ? this._playerVisibleBoards()
-        : (s.boards || []).filter(b => b && this._isTacticalBoard && this._isTacticalBoard(b));
-      const schemesHtml = boards.length
-        ? boards.slice(0, 60).map(b => {
-            return this._schemeCard(b, { editable: false });
-          }).join('')
-        : '<div class="es note-sm">Немає тактичних схем. Тренер збереже схему на дошці.</div>';
-      _schemesBlock = '<div class="player-schemes-block"><div class="scheme-cards">' + schemesHtml + '</div></div>';
-      }
-    }
     const _tab = (s.ui && s.ui.playerTrainTab) || 'trainings';
     const _tabsHtml = _isPlayerRole ? (
       '<div class="pt-tabs glass">' +
@@ -1612,9 +1589,7 @@ trainings() {
       '</div>'
     ) : '';
     if (_isPlayerRole && _tab === 'schemes') {
-      return '<div class="st">Тренування · Схеми</div>' + _tabsHtml +
-        '<p class="note-sm">Утримуйте мініатюру, щоб прочитати повний опис.</p>' +
-        (_schemesBlock || '<div class="es">Немає схем</div>');
+      return _tabsHtml + this.tactics();
     }
 
     const statusLabel = (tr) => {
@@ -2108,17 +2083,25 @@ trainings() {
     const typ = sanitize((b && (b.type || b.kind || b.schemeType)) || 'тактика');
     const desc = String((b && (b.description || b.notes || b.text)) || '').trim();
     const thumb = (typeof this._schemeThumbSvg === 'function') ? this._schemeThumbSvg(b) : '📐';
-    const extra = (o.editable && o.albumId)
-      ? '<button type="button" class="ym-more" data-action="album-remove-board" data-album-id="' + sanitize(o.albumId) + '" data-board-id="' + id + '" title="Прибрати з альбому">–</button>'
-      : (o.editable
-        ? '<button type="button" class="ym-more" data-action="edit-scheme" data-board-id="' + id + '" title="Редагувати">✎</button>' +
-          '<button type="button" class="ym-more" data-action="delete-scheme" data-board-id="' + id + '" title="Видалити">✕</button>'
-        : '');
-    return '<div class="ym-track" data-name="' + title + '">' +
+    const coachTools = o.editable
+      ? '<div class="ym-expand-actions">' +
+          '<button type="button" class="btn btn-s btn-sm" data-action="edit-scheme" data-board-id="' + id + '">Редагувати</button>' +
+          '<button type="button" class="btn btn-s btn-sm" data-action="delete-scheme" data-board-id="' + id + '">Видалити</button>' +
+          (o.albumId
+            ? '<button type="button" class="btn btn-s btn-sm" data-action="album-remove-board" data-album-id="' + sanitize(o.albumId) + '" data-board-id="' + id + '">З альбому</button>'
+            : '') +
+        '</div>'
+      : '';
+    return '<div class="ym-track" data-name="' + title + '" data-board-id="' + id + '">' +
       '<button type="button" class="ym-play" data-action="load-scheme-board" data-board-id="' + id + '">' +
         '<span class="ym-thumb">' + thumb + '</span>' +
-        '<span class="ym-track-copy"><b>' + title + '</b><small>' + typ + (desc ? (' · ' + sanitize(desc)) : '') + '</small></span>' +
-      '</button>' + extra + '</div>';
+        '<span class="ym-track-copy"><b>' + title + '</b><small>' + typ + '</small></span>' +
+      '</button>' +
+      '<div class="ym-expand">' +
+        '<p class="ym-desc">' + (desc ? sanitize(desc) : 'Опису ще немає.') + '</p>' +
+        coachTools +
+        '<button type="button" class="btn btn-p btn-sm" data-action="load-scheme-board" data-board-id="' + id + '">На дошку</button>' +
+      '</div></div>';
   },
 
   _albumTile(album) {
@@ -2183,7 +2166,7 @@ trainings() {
           ? '<span><button type="button" class="btn btn-s btn-sm" data-action="new-scheme-album">+ Альбом</button> <button type="button" class="btn btn-p btn-sm" data-action="new-board">+ Схема</button></span>'
           : '') +
       '</div>' +
-      '<p class="note-sm">Альбом збираєш сам, як у музиці. Потім чіпляєш його до тренування, матчу або гравця.</p>' +
+      '<p class="note-sm">Альбоми одні для всіх. Довгий тап розгортає схему з описом' + (canEdit ? ' і редагуванням' : '') + '.</p>' +
       '<input id="schemeSearch" class="ym-search" type="search" placeholder="Пошук схеми" autocomplete="off">' +
       '<div class="ym-shelf-h">Альбоми</div>' +
       '<div class="ym-row">' + tiles +

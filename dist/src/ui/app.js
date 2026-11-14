@@ -2121,6 +2121,16 @@ const App = {
     try { TelegramManager.haptic && TelegramManager.haptic('medium'); } catch (_) {}
   },
 
+  expandSchemeTrack(boardId) {
+    const id = String(boardId || '');
+    document.querySelectorAll('.ym-track[data-board-id]').forEach(row => {
+      const same = String(row.dataset.boardId || '') === id;
+      if (!same) row.classList.remove('ym-open');
+      else row.classList.toggle('ym-open');
+    });
+    try { TelegramManager.haptic && TelegramManager.haptic('medium'); } catch (_) {}
+  },
+
   expandSchemeCard(boardId) {
     const id = String(boardId || '');
     const cards = document.querySelectorAll('.scheme-card[data-board-id]');
@@ -2309,30 +2319,32 @@ const App = {
     };
 
     root.addEventListener('pointerdown', e => {
-      if (e.target.closest && e.target.closest('#teamChat, #teamChatForm, .team-chat, .team-chat-form, .scheme-card-detail, #modal, .match-plan, .match-chip')) return;
+      if (e.target.closest && e.target.closest('#teamChat, #teamChatForm, .team-chat, .team-chat-form, .scheme-card-detail, .ym-expand, #modal, .match-plan, .match-chip')) return;
       const schemeCard = e.target.closest && e.target.closest('.scheme-card[data-board-id]');
-      if (!schemeCard && e.target.closest && e.target.closest('button:not(.coach-tools-handle), a, input, select, textarea')) return;
-      const row = schemeCard || (e.target.closest && e.target.closest(
+      const track = e.target.closest && e.target.closest('.ym-track[data-board-id]');
+      if (!schemeCard && !track && e.target.closest && e.target.closest('button:not(.coach-tools-handle), a, input, select, textarea')) return;
+      const row = track || schemeCard || (e.target.closest && e.target.closest(
         '.card-training[data-training-id], .tg-row[data-training-id], .pl-row[data-player-id], .scheme-row[data-board-id], .sc-next-training[data-next-training], .coach-tools-handle, .sc-tap[data-view="players"]'
       ));
       if (!row) return;
       this._lpMoved = false;
       this._lpTarget = row;
       row.classList.add('tg-row-holding');
-      const kind = schemeCard ? 'scheme-card'
+      const kind = track ? 'ym-track' : schemeCard ? 'scheme-card'
         : row.classList.contains('pl-row') ? 'player'
         : (row.matches && row.matches('.sc-tap[data-view="players"]')) ? 'squad'
         : row.classList.contains('scheme-row') ? 'scheme'
         : row.classList.contains('sc-next-training') ? 'next-training'
         : row.classList.contains('coach-tools-handle') ? 'coach-tools'
         : 'training';
-      const id = (schemeCard && schemeCard.dataset.boardId) || row.dataset.trainingId || row.dataset.editTraining || row.dataset.playerId || row.dataset.boardId || row.dataset.nextTraining || '';
+      const id = (track && track.dataset.boardId) || (schemeCard && schemeCard.dataset.boardId) || row.dataset.trainingId || row.dataset.editTraining || row.dataset.playerId || row.dataset.boardId || row.dataset.nextTraining || '';
       this._lpTimer = setTimeout(() => {
         this._lpTimer = null;
         if (this._lpTarget && !this._lpMoved) {
           this._lpTarget.classList.remove('tg-row-holding');
           if (kind === 'squad') this.openSquadDialog();
           else if (kind === 'player') this.openPlayerActionSheet(id);
+          else if (kind === 'ym-track') this.expandSchemeTrack(id);
           else if (kind === 'scheme-card') this.expandSchemeCard(id);
           else if (kind === 'scheme') this.openSchemeActionSheet(id);
           else if (kind === 'next-training') this.openNextTrainingPreview(id);

@@ -49,6 +49,7 @@ describe('scheme cards', () => {
     assert.match(html, /data-action="edit-scheme"/);
     assert.match(html, /data-action="delete-scheme"/);
     assert.match(html, /ym-track/);
+    assert.match(html, /ym-expand/);
     assert.match(html, /Альбоми/);
   });
 
