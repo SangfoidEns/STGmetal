@@ -455,21 +455,15 @@ const App = {
     const s = (typeof Store !== 'undefined' && Store.get()) || {};
     const set = s.settings || {};
     const name = (set.coachName && String(set.coachName).trim()) || 'Artem Serdiuk';
-    let photo = set.coachPhoto || set.coachPhotoUrl || '';
+    let sources = [];
     try {
-      // Фото з Telegram лише якщо сесія — тренер (інакше підтягнеться аватар гравця)
-      const isCoachSession = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
-      if (!photo && isCoachSession && AuthManager.user) {
-        photo = AuthManager.user.photo_url || AuthManager.user.photoUrl || '';
-      }
-      if (!photo && isCoachSession && typeof TelegramManager !== 'undefined' && TelegramManager.tg) {
-        const u = TelegramManager.tg.initDataUnsafe && TelegramManager.tg.initDataUnsafe.user;
-        if (u && u.photo_url) photo = u.photo_url;
-      }
+      if (typeof Views !== 'undefined' && Views._coachPhotoSources) sources = Views._coachPhotoSources();
     } catch (_) {}
+    const photo = sources[0] || '';
+    const fallback = sources.slice(1).map(encodeURIComponent).join('|');
     const initials = (name || 'AS').split(/\s+/).map(p => p[0] || '').join('').slice(0, 2).toUpperCase() || 'AS';
     const photoHtml = photo
-      ? '<img src="'+String(photo).replace(/"/g,'&quot;')+'" alt="" referrerpolicy="no-referrer" onerror="this.style.display=\'none\';this.nextElementSibling&&(this.nextElementSibling.style.display=\'grid\')"/><div class="cc-photo-ph" style="display:none">'+initials+'</div>'
+      ? '<img src="'+String(photo).replace(/"/g,'&quot;')+'" alt="" referrerpolicy="no-referrer" data-fallback="'+String(fallback).replace(/"/g,'&quot;')+'" onerror="App.photoFallback(this)"/><div class="cc-photo-ph" style="display:none">'+initials+'</div>'
       : '<div class="cc-photo-ph">'+initials+'</div>';
 
     // Real coach stats
@@ -2450,7 +2444,99 @@ const App = {
     });
   },
 
+  photoFallback(img) {
+    if (!img) return;
+    const parts = String(img.getAttribute('data-fallback') || '').split('|').filter(Boolean);
+    const next = parts.shift();
+    if (next) {
+      img.setAttribute('data-fallback', parts.join('|'));
+      try { img.src = decodeURIComponent(next); } catch (_) { img.src = next; }
+      return;
+    }
+    img.style.display = 'none';
+    if (img.nextElementSibling) img.nextElementSibling.style.display = 'flex';
+  },
+
+  /* Кнопки вікна обробляються тут, до будь-якого іншого кліку. */
+  runModalAction(button, e) {
+    if (!button) return false;
+    if (e && e._modalHandled) return true;
+    if (e) e._modalHandled = true;
+    const act = button.dataset.modalAction || button.getAttribute('data-modal-action') || '';
+    if (!act) return false;
+    if (act === 'cancel') {
+      const dirty = this._albumPickDirty;
+      this._albumPickDirty = false;
+      Modal.close({ action: 'cancel' });
+      if (dirty) this.renderCurrent();
+      return true;
+    }
+    if (act === 'ok') {
+      const values = {};
+      try {
+        document.querySelectorAll('#modalBody input, #modalBody textarea, #modalBody select').forEach(function (el) {
+          if (el && el.id) values[el.id] = el.value;
+        });
+      } catch (_) {}
+      Modal.close({ action: 'ok', values: values });
+      return true;
+    }
+    if (act === 'open-training-board') {
+      const tid = button.dataset.tid;
+      if (tid && Actions.openTrainingBoard) Actions.openTrainingBoard(tid);
+      else {
+        Modal.close();
+        this.allowBoardOnce('training-board');
+        this.navigate('board');
+      }
+      return true;
+    }
+    if (act === 'confirm') {
+      const fn = Modal._onConfirm;
+      Modal.close({ action: 'confirm' });
+      if (fn) fn();
+      return true;
+    }
+    const map = {
+      'create-myex': () => Actions.createMyEx(),
+      'create-diary': () => Actions.createDiary(),
+      'save-diary': () => Actions.saveDiary(button.dataset.did),
+      'open-diary-board': () => Actions.openDiaryBoard(button.dataset.did),
+      'create-training': () => Actions.createTraining(),
+      'save-training': () => Actions.saveTraining(button.dataset.tid),
+      'open-attendance': () => Actions.openAttendance(button.dataset.tid),
+      'save-attendance': () => Actions.saveAttendance(button.dataset.tid),
+      'save-match-attendance': () => Actions.saveMatchAttendance(button.dataset.matchId),
+      'save-beats': () => Actions.saveBeats(button.dataset.tid),
+      'save-slides': () => Actions.saveSlides(button.dataset.tid),
+      'create-player': () => Actions.createPlayer(),
+      'save-player': () => Actions.savePlayer(button.dataset.pid),
+      'create-exercise': () => Actions.createExercise(),
+      'create-match': () => Actions.createMatch(),
+      'create-event': () => Actions.createEvent(),
+      'save-scheme': () => Actions.saveScheme(button.dataset.boardId),
+      'edit-scheme-board': () => Actions.saveScheme(button.dataset.boardId, { openBoard: true }),
+      'create-scheme': () => Actions.commitNewScheme()
+    };
+    if (map[act]) {
+      map[act]();
+      return true;
+    }
+    return false;
+  },
+
   bindEvents() {
+    if (!this._modalActionBound) {
+      this._modalActionBound = true;
+      document.addEventListener('click', (e) => {
+        const node = e.target && e.target.closest && e.target.closest('#modal [data-modal-action], .mo [data-modal-action]');
+        if (!node) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        try { App.runModalAction(node, e); } catch (err) { console.error('[modal]', err); }
+      }, true);
+    }
     if (!this._trainingArmBound) {
       this._trainingArmBound = true;
       document.addEventListener('pointerdown', (e) => {
@@ -2610,6 +2696,12 @@ const App = {
 
     // Event delegation — single listener
     document.addEventListener('click', e => {
+      const modalBtn = e.target && e.target.closest && e.target.closest('#modal [data-modal-action], .mo [data-modal-action]');
+      if (modalBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        return this.runModalAction(modalBtn, e);
+      }
       // Чат команди не є карткою тренування і не відкриває редактор
       if (e.target.closest && e.target.closest('#teamChat, #teamChatForm, .team-chat, .team-chat-form')) {
         const send = e.target.closest('[data-action="team-chat-send"]');
@@ -4394,57 +4486,7 @@ const App = {
       if (t.dataset.delMatch) return Modal.confirm('Видалити матч?', () => { Store.get().matches = Store.get().matches.filter(x => x.id !== t.dataset.delMatch); StorageManager.save(); App.renderCurrent(); });
       if (t.dataset.tpl) return Actions.applyTemplate(t.dataset.tpl);
 
-      if (t.dataset.modalAction === 'cancel') {
-        const dirty = this._albumPickDirty;
-        this._albumPickDirty = false;
-        Modal.close({ action: 'cancel' });
-        if (dirty) this.renderCurrent();
-        return;
-      }
-      if (t.dataset.modalAction === 'ok') {
-        const values = {};
-        try {
-          document.querySelectorAll('#modalBody input, #modalBody textarea, #modalBody select').forEach(function (el) {
-            if (el && el.id) values[el.id] = el.value;
-          });
-        } catch (_) {}
-        return Modal.close({ action: 'ok', values: values });
-      }
-      if (t.dataset.modalAction === 'open-training-board') {
-        e.preventDefault(); e.stopPropagation();
-        const tid = t.dataset.tid;
-        if (tid && Actions.openTrainingBoard) return Actions.openTrainingBoard(tid);
-        Modal.close();
-        App.allowBoardOnce('training-board');
-        App.navigate('board');
-        return;
-      }
-      if (t.dataset.modalAction === 'confirm') {
-        const fn = Modal._onConfirm;
-        Modal.close({ action: 'confirm' });
-        if (fn) fn();
-        return;
-      }
-      // form submits via modal actions with specific handlers
-      if (t.dataset.modalAction === 'create-myex') return Actions.createMyEx();
-      if (t.dataset.modalAction === 'create-diary') return Actions.createDiary();
-      if (t.dataset.modalAction === 'save-diary') return Actions.saveDiary(t.dataset.did);
-      if (t.dataset.modalAction === 'open-diary-board') return Actions.openDiaryBoard(t.dataset.did);
-      if (t.dataset.modalAction === 'create-training') return Actions.createTraining();
-      if (t.dataset.modalAction === 'save-training') return Actions.saveTraining(t.dataset.tid);
-      if (t.dataset.modalAction === 'open-attendance') return Actions.openAttendance(t.dataset.tid);
-      if (t.dataset.modalAction === 'save-attendance') return Actions.saveAttendance(t.dataset.tid);
-      if (t.dataset.modalAction === 'save-match-attendance') return Actions.saveMatchAttendance(t.dataset.matchId);
-      if (t.dataset.modalAction === 'save-beats') return Actions.saveBeats(t.dataset.tid);
-      if (t.dataset.modalAction === 'save-slides') return Actions.saveSlides(t.dataset.tid);
-      if (t.dataset.modalAction === 'create-player') return Actions.createPlayer();
-      if (t.dataset.modalAction === 'save-player') return Actions.savePlayer(t.dataset.pid);
-      if (t.dataset.modalAction === 'create-exercise') return Actions.createExercise();
-      if (t.dataset.modalAction === 'create-match') return Actions.createMatch();
-      if (t.dataset.modalAction === 'create-event') return Actions.createEvent();
-      if (t.dataset.modalAction === 'save-scheme') return Actions.saveScheme(t.dataset.boardId);
-      if (t.dataset.modalAction === 'edit-scheme-board') return Actions.saveScheme(t.dataset.boardId, { openBoard: true });
-      if (t.dataset.modalAction === 'create-scheme') return Actions.commitNewScheme();
+      if (t.dataset.modalAction) return this.runModalAction(t, e);
     });
 
     // Filters

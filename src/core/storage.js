@@ -192,6 +192,7 @@ const StorageManager = {
       };
     }
     if (migrated.settings) delete migrated.settings.lang;
+    this.restoreCoachPhoto(migrated);
     this._suppressClubPush = true;
     try {
       Store.set(migrated, { keepStamp: true });
@@ -297,6 +298,44 @@ const StorageManager = {
     } catch (_) {}
   },
 
+  COACH_PHOTO_KEY: 'metalist_coach_photo',
+
+  _photoFromPayload(data) {
+    if (!data || typeof data !== 'object') return '';
+    const set = data.settings && typeof data.settings === 'object' ? data.settings : data;
+    return String((set && (set.coachPhoto || set.coachPhotoUrl)) || '').trim();
+  },
+
+  rememberCoachPhoto(url) {
+    const value = String(url || '').trim();
+    if (!value) return;
+    try { localStorage.setItem(this.COACH_PHOTO_KEY, value); } catch (_) {}
+  },
+
+  /** Фото живе окремим ключем. Велике збереження складу його більше не стирає. */
+  restoreCoachPhoto(state) {
+    const s = state || (typeof Store !== 'undefined' && Store.get && Store.get());
+    if (!s) return '';
+    if (!s.settings) s.settings = {};
+    const current = String(s.settings.coachPhoto || s.settings.coachPhotoUrl || '').trim();
+    if (current) {
+      if (!s.settings.coachPhoto) s.settings.coachPhoto = current;
+      this.rememberCoachPhoto(current);
+      return current;
+    }
+    let found = '';
+    try { found = String(localStorage.getItem(this.COACH_PHOTO_KEY) || '').trim(); } catch (_) {}
+    if (!found) found = this._photoFromPayload(this._readBackupPayload());
+    if (!found) {
+      try { found = this._photoFromPayload(JSON.parse(localStorage.getItem('metalist_full_migration') || 'null')); } catch (_) {}
+    }
+    if (found) {
+      s.settings.coachPhoto = found;
+      this.rememberCoachPhoto(found);
+    }
+    return found;
+  },
+
   save(opts) {
     /* DATA INTEGRITY: never wipe keys on error */
     /* Кеш Telegram тримає останню сесію. На сайт клубний файл не викладається. */
@@ -304,6 +343,7 @@ const StorageManager = {
     try {
       const s = Store.get();
       if (!s) return;
+      this.restoreCoachPhoto(s);
       s.updatedAt = new Date().toISOString();
       const payload = this._buildLocalPayload();
       this._writeLocalPayload(payload);
@@ -470,7 +510,15 @@ const StorageManager = {
       const cloudAt = Date.parse(cloud.updatedAt || 0) || 0;
       if (cloudAt > localAt) {
         this.createBackup();
-        const migrated = this.migrate(cloud, cloud.schemaVersion || 1);
+        let migrated = this.migrate(cloud, cloud.schemaVersion || 1);
+        if (localRaw && typeof ClubMerge !== 'undefined' && ClubMerge.mergePayload) {
+          try {
+            const localData = JSON.parse(localRaw);
+            const localMigrated = this.migrate(localData, localData.schemaVersion || 1);
+            migrated = ClubMerge.mergePayload(localMigrated, migrated);
+          } catch (_) {}
+        }
+        this.restoreCoachPhoto(migrated);
         Store.set(migrated);
         // write local without re-push loop storm
         const payload = this._buildLocalPayload();
@@ -520,8 +568,10 @@ const StorageManager = {
       try {
         if (typeof ClubMerge !== 'undefined' && ClubMerge.collapseTrainings) folded = ClubMerge.collapseTrainings(migrated) || folded;
       } catch (_) {}
+      const photoBefore = (migrated.settings && migrated.settings.coachPhoto) || '';
       Store.set(migrated, { keepStamp: true });
-      if (folded.removed) {
+      const photoAfter = this.restoreCoachPhoto();
+      if (folded.removed || (photoAfter && photoAfter !== photoBefore)) {
         try { this.save({ localOnly: true }); } catch (_) {}
       }
       return true;

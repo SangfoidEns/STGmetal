@@ -404,4 +404,22 @@ describe('club snapshot merge', () => {
     assert.equal(merged.trainings[0].schemeAlbumId, 'zones');
     assert.equal(merged.matches[0].schemeAlbumId, 'zones');
   });
+
+  it('keeps the coach photo when a newer copy left it blank', () => {
+    const merged = mergePayload({
+      settings: {
+        coachName: 'Artem Serdiuk',
+        coachPhoto: 'data:image/jpeg;base64,abc',
+        coachStats: { updatedAt: '2026-11-14T10:00:00.000Z' }
+      }
+    }, {
+      settings: {
+        coachName: 'Artem Serdiuk',
+        coachPhoto: '',
+        coachStats: { appMs: 20, updatedAt: '2026-11-14T16:00:00.000Z' }
+      }
+    });
+    assert.equal(merged.settings.coachPhoto, 'data:image/jpeg;base64,abc');
+    assert.equal(merged.settings.coachName, 'Artem Serdiuk');
+  });
 });

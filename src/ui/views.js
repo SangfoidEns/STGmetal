@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z94',
+  APP_BUILD: 'z95',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -290,19 +290,46 @@ const Views = {
   },
 
 
+  _coachPhotoSources() {
+    const set = (Store.get() && Store.get().settings) || {};
+    const list = [];
+    const push = (url) => {
+      const value = String(url || '').trim();
+      if (!value || list.indexOf(value) >= 0) return;
+      list.push(value);
+    };
+    push(set.coachPhoto);
+    push(set.coachPhotoUrl);
+    try {
+      const coach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+      if (!coach) return list;
+      if (typeof TelegramManager !== 'undefined' && TelegramManager.getUser) {
+        const u = TelegramManager.getUser();
+        if (u) push(u.photo_url || u.photoUrl);
+      }
+      if (typeof AuthManager !== 'undefined' && AuthManager.user) {
+        const u = AuthManager.user;
+        push(u.photo_url || u.photoUrl);
+      }
+    } catch (_) {}
+    return list;
+  },
+
+  _photoTag(sources, initials) {
+    const list = sources || [];
+    const letters = sanitize(initials || 'AS');
+    if (!list.length) return '<span class="cp-avatar-ph">' + letters + '</span>';
+    const rest = list.slice(1).map(encodeURIComponent).join('|');
+    return '<img src="' + sanitize(list[0]) + '" alt="" referrerpolicy="no-referrer" data-fallback="' + sanitize(rest) + '" onerror="App.photoFallback(this)"/><span class="cp-avatar-ph" style="display:none">' + letters + '</span>';
+  },
+
   _coachSquadCard() {
     const s = Store.get();
     const set = s.settings || {};
     // Картка тренера ЗАВЖДИ з налаштувань клубу — НЕ з сесії поточного гравця
     let name = (set.coachName && String(set.coachName).trim()) || 'Artem Serdiuk';
-    let photo = set.coachPhoto || set.coachPhotoUrl || '';
-    try {
-      const isCoachSession = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
-      if (!photo && isCoachSession && typeof TelegramManager !== 'undefined' && TelegramManager.getUser) {
-        const u = TelegramManager.getUser();
-        if (u && u.photo_url) photo = u.photo_url;
-      }
-    } catch (_) {}
+    const sources = this._coachPhotoSources();
+    const photo = sources[0] || '';
     const ach = (typeof CoachTools !== 'undefined' && CoachTools.getCoachAchievements)
       ? CoachTools.getCoachAchievements()
       : { attendancePct: 100, appMs: 0, boardMs: 0, trainingsDone: 0, boards: 0 };
@@ -313,9 +340,7 @@ const Views = {
       return (Math.round(m / 6) / 10) + 'г';
     };
     const initials = (name || 'AS').split(/\s+/).map(p => p[0] || '').join('').slice(0, 2).toUpperCase();
-    const ph = photo
-      ? '<img src="' + sanitize(photo) + '" alt="" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'"/>'
-      : '<span class="cp-avatar-ph">' + sanitize(initials) + '</span>';
+    const ph = this._photoTag(sources, initials);
     return '<div class="pl-card glass coach-squad-card is-coach" data-action="open-coach-card" role="button" tabindex="0">' +
       '<div class="pl-card-av-wrap"><div class="pl-card-av coach-av" style="border-color:#f0c14b;background:linear-gradient(145deg,#3d2e0a,#1a1408)">' + ph + '</div></div>' +
       '<div class="pl-card-body">' +
@@ -344,7 +369,6 @@ const Views = {
     } catch (_) {}
     if (!person && kind === 'coach') {
       // тренер: з TG user або settings
-      let photo = '';
       let name = (s.settings && s.settings.coachName && String(s.settings.coachName).trim()) || '';
       try {
         const inTelegram = typeof AuthManager !== 'undefined' && AuthManager.user;
@@ -352,14 +376,10 @@ const Views = {
         if (!name) name = 'Artem Serdiuk';
         if (typeof TelegramManager !== 'undefined') {
           const u = TelegramManager.getUser && TelegramManager.getUser();
-          if (u && u.photo_url) photo = u.photo_url;
           if (u && (u.first_name || u.last_name)) name = [u.first_name, u.last_name].filter(Boolean).join(' ');
         }
       } catch (_) {}
-      // coach photo from settings if uploaded
-      try {
-        if (s.settings && s.settings.coachPhoto) photo = s.settings.coachPhoto;
-      } catch (_) {}
+      const photo = (this._coachPhotoSources()[0]) || '';
       const gifts = [];
       const acc = this._posAccent('COACH');
       return { kind: 'coach', name: this._cleanDisplayName(name), photo, pos: 'ГОЛОВНИЙ ТРЕНЕР', accent: acc, gifts, attPct: 85, initials: this._initials(name) };
@@ -493,9 +513,11 @@ const Views = {
             : (pc.kind === 'coach'
               ? 'data-action="open-default-board"'
               : (pc.player && pc.player.id ? ('data-action="open-fifa-card" data-player-id="' + pc.player.id + '"') : ''));
-          const ph = pc.photo
-            ? `<img src="${sanitize(pc.photo)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling&&(this.nextElementSibling.style.display='flex')"/><span class="cp-avatar-ph" style="display:none">${sanitize(pc.initials || '??')}</span>`
-            : `<span class="cp-avatar-ph">${sanitize(pc.initials || '??')}</span>`;
+          const ph = pc.kind === 'coach'
+            ? this._photoTag(this._coachPhotoSources(), pc.initials)
+            : (pc.photo
+              ? this._photoTag([pc.photo], pc.initials)
+              : `<span class="cp-avatar-ph">${sanitize(pc.initials || '??')}</span>`);
           return `
         <div class="cp-hero cp-person cp-clean" style="--pos-bg:${pc.accent.bg};--pos-ring:${pc.accent.ring};">
           <div class="cp-avatar-wrap">
@@ -1254,7 +1276,8 @@ const Views = {
     const s = Store.get();
     const set = s.settings || {};
     const name = set.coachName || 'Artem Serdiuk';
-    const photo = set.coachPhoto || '';
+    const sources = this._coachPhotoSources();
+    const photo = sources[0] || '';
     const cs = set.coachStats || { appMs: 0, boardMs: 0 };
     const todayStr = (typeof today === 'function' ? today() : new Date().toISOString().slice(0, 10));
     const past = (s.trainings || []).filter(t => t.status === 'done' || ((t.date || '') < todayStr && t.status !== 'draft' && t.status !== 'cancelled'));
@@ -1269,7 +1292,7 @@ const Views = {
     const appT = (typeof App !== 'undefined' && App.formatDurationMs) ? App.formatDurationMs(cs.appMs || 0) : '—';
     const boardT = (typeof App !== 'undefined' && App.formatDurationMs) ? App.formatDurationMs(cs.boardMs || 0) : '—';
     const ph = photo
-      ? '<button type="button" class="coach-pub-av" data-action="open-photo" data-photo="' + sanitize(photo) + '" title="Фото на весь екран"><img src="' + sanitize(photo) + '" alt="" referrerpolicy="no-referrer"/></button>'
+      ? '<button type="button" class="coach-pub-av" data-action="open-photo" data-photo="' + sanitize(photo) + '" title="Фото на весь екран">' + this._photoTag(sources, 'AS') + '</button>'
       : '<span class="coach-pub-av"><span class="cp-avatar-ph">AS</span></span>';
     return `
       <div class="card glass coach-public-card" data-action="open-coach-card" data-coach-card="1" data-stop-nav="1" role="button" tabindex="0">

@@ -6,7 +6,7 @@ const Modal = {
     document.getElementById('modalTitle').textContent = title;
     document.getElementById('modalBody').innerHTML = body;
     document.getElementById('modalFooter').innerHTML = (buttons || []).map(b =>
-      `<button class="btn ${b.cls || 'btn-s'}" data-modal-action="${b.action || ''}">${b.label}</button>`
+      `<button type="button" class="btn ${b.cls || 'btn-s'}" data-modal-action="${b.action || ''}">${b.label}</button>`
     ).join('');
     document.getElementById('modal').classList.add('show');
     setTimeout(() => {

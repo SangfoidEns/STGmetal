@@ -10854,8 +10854,18 @@ button.cal-cell {
   background: rgba(245,197,66,0.15) !important;
   color: #f5c542 !important;
 }
-#modal.show { z-index: 99999 !important; }
-#modal .md, #modal .modal-content { z-index: 100000 !important; pointer-events: auto !important; }
+#modal.mo.show,
+#modal.show {
+  z-index: 1000020 !important;
+  pointer-events: auto !important;
+}
+#modal .md,
+#modal .modal-content,
+#modal .mf,
+#modalFooter {
+  z-index: 1000021 !important;
+  pointer-events: auto !important;
+}
 
 /* ROLE NAV: player = 3 tabs only */
 #mobileNav.nav-player-3 { justify-content: space-around !important; }

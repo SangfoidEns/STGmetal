@@ -115,4 +115,17 @@ describe('scheme albums in the club file', () => {
     assert.equal(label.label, 'пас в зону');
     assert.equal(label.fontSize, 28);
   });
+
+  it('puts the coach photo back from the side copy when the session lost it', () => {
+    const ctx = boot({
+      settings: { coachName: 'Artem Serdiuk', coachPhoto: '' },
+      players: [],
+      trainings: [],
+      schemeAlbums: []
+    });
+    ctx.localStorage.setItem('metalist_coach_photo', 'data:image/jpeg;base64,coach');
+    const found = ctx.StorageManager.restoreCoachPhoto();
+    assert.equal(found, 'data:image/jpeg;base64,coach');
+    assert.equal(ctx._state().settings.coachPhoto, 'data:image/jpeg;base64,coach');
+  });
 });
