@@ -29,7 +29,7 @@ describe('calendar weekday letters', () => {
     assert.match(html, /title="Субота">Сб</);
     assert.match(html, /title="Неділя">Нд</);
     assert.equal(html.includes('>А<'), false);
-    assert.equal(context.Views.APP_BUILD, 'z92');
+    assert.equal(context.Views.APP_BUILD, 'z93');
     const library = context.Views.tactics();
     assert.match(library, /Альбоми/);
     assert.match(library, /ym-search/);

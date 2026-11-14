@@ -62,4 +62,24 @@ describe('scheme cards', () => {
     assert.equal(html.includes('data-action="edit-scheme"'), false);
     assert.equal(html.includes('data-action="delete-scheme"'), false);
   });
+
+  it('opens a player album inside trainings and returns to the album list', () => {
+    const ctx = boot(false);
+    const store = ctx.Store.get();
+    store.schemeAlbums = [{ id: 'a1', name: 'Зони', boardIds: ['sch-1'], createdAt: '2026-11-14T10:00:00.000Z' }];
+    store.ui.playerTrainTab = 'schemes';
+    store.ui.view = 'trainings';
+    const shelf = ctx.Views.trainings();
+    assert.match(shelf, /data-action="player-train-tab"/);
+    assert.match(shelf, /data-action="open-scheme-album"/);
+    assert.match(shelf, /data-album-id="a1"/);
+    assert.equal(shelf.includes('schemes-home'), false);
+    store.ui.schemeAlbumId = 'a1';
+    const album = ctx.Views.trainings();
+    assert.match(album, /Зони/);
+    assert.match(album, /Перший пас/);
+    assert.match(album, /data-action="schemes-home"/);
+    assert.match(album, /data-tab="trainings"/);
+    assert.equal(album.includes('data-action="edit-scheme"'), false);
+  });
 });

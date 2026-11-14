@@ -9047,6 +9047,8 @@ body.board-on .main {
 
 body.role-player .mni[data-view="calendar"],
 body.role-player .mni[data-view="analytics"],
+body.role-player .mni[data-view="tactics"],
+body.role-player .nav[data-view="tactics"],
 body.role-player .mni-more,
 body.role-player .mni[data-view="board"] {
   display: none !important;
@@ -9136,6 +9138,7 @@ body.role-player .mni.mni-player[data-view="analytics"] { display: none !importa
 body.role-player #mobileNav .mni-extra,
 body.role-player #mobileNav .mni[data-view="analytics"],
 body.role-player #mobileNav .mni[data-view="calendar"],
+body.role-player #mobileNav .mni[data-view="tactics"],
 body.role-player #mobileNav .mni-more {
   display: none !important;
 }
@@ -9148,8 +9151,7 @@ body.role-player #mobileNav {
 }
 body.role-player #mobileNav .mni[data-view="dashboard"],
 body.role-player #mobileNav .mni[data-view="trainings"],
-body.role-player #mobileNav .mni[data-view="players"],
-body.role-player #mobileNav .mni[data-view="tactics"] {
+body.role-player #mobileNav .mni[data-view="players"] {
   display: flex !important;
   flex: 1 1 0;
   min-width: 0;

@@ -1326,12 +1326,30 @@ const App = {
     if (form) form.id = 'teamChatForm';
   },
 
-    navigate(view) {
+    _playerSchemesHome(s) {
+    const player = typeof AuthManager !== 'undefined' && AuthManager.isPlayer && AuthManager.isPlayer()
+      && !(AuthManager.isCoach && AuthManager.isCoach());
+    if (!player || !s) return false;
+    s.ui = s.ui || {};
+    s.ui.playerTrainTab = 'schemes';
+    s.ui.view = 'trainings';
+    return true;
+  },
+
+  navigate(view) {
     try { if (typeof Actions !== 'undefined' && Actions.flushMatchPlan) Actions.flushMatchPlan(); } catch (_) {}
     if (view === 'trainings' && this._chatBlocksTraining() && !this._navTap) return;
     if (view === 'trainings' && typeof AuthManager !== 'undefined' && AuthManager.isGuest && AuthManager.isGuest()) view = 'analytics';
     // Aliases for dashboard pills / legacy links
     if (view === 'schemes' || view === 'scheme') view = 'tactics';
+    const playerOnly = typeof AuthManager !== 'undefined' && AuthManager.isPlayer && AuthManager.isPlayer()
+      && !(AuthManager.isCoach && AuthManager.isCoach());
+    if (playerOnly && view === 'tactics') {
+      view = 'trainings';
+      const ui = Store.get().ui || {};
+      ui.playerTrainTab = 'schemes';
+      Store.get().ui = ui;
+    }
     if (view === 'stats' || view === 'statistics') view = 'analytics';
     if (view === 'squad' || view === 'roster') view = 'players';
     // iOS: після file picker focus може «клікнути» логотип — блокуємо
@@ -2667,8 +2685,10 @@ const App = {
         e.preventDefault(); e.stopPropagation();
         const s = Store.get(); s.ui = s.ui || {};
         s.ui.playerTrainTab = t.dataset.tab || 'trainings';
+        s.ui.schemeAlbumId = null;
+        s.ui.view = 'trainings';
         try { StorageManager.save(); } catch (_) {}
-        try { App.renderCurrent(); } catch (_) {}
+        try { this.navigate('trainings'); } catch (_) { this.renderCurrent(); }
         return;
       }
       if (action === 'open-self-profile') {
@@ -2717,6 +2737,10 @@ const App = {
         const s = Store.get();
         s.ui = s.ui || {};
         s.ui.schemeAlbumId = t.dataset.albumId || null;
+        if (this._playerSchemesHome(s)) {
+          try { this.navigate('trainings'); } catch (_) { this.renderCurrent(); }
+          return;
+        }
         s.ui.view = 'tactics';
         try { App.renderCurrent(); } catch (_) {}
         return;
@@ -2726,6 +2750,10 @@ const App = {
         const s = Store.get();
         s.ui = s.ui || {};
         s.ui.schemeAlbumId = null;
+        if (this._playerSchemesHome(s)) {
+          try { this.navigate('trainings'); } catch (_) { this.renderCurrent(); }
+          return;
+        }
         s.ui.view = 'tactics';
         try { App.renderCurrent(); } catch (_) {}
         return;
