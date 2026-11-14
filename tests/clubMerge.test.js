@@ -387,4 +387,21 @@ describe('club snapshot merge', () => {
     assert.equal(next.date, '2026-11-10');
     assert.equal(next.status, 'planned');
   });
+
+  it('keeps scheme albums and their links when the newer copy left them blank', () => {
+    const merged = mergePayload({
+      schemeAlbums: [{ id: 'zones', name: 'Зони', boardIds: ['sch-1'], updatedAt: '2026-11-14T10:00:00.000Z' }],
+      trainings: [{ id: 't1', name: 'Тактика', schemeAlbumId: 'zones', updatedAt: '2026-11-14T10:00:00.000Z' }],
+      matches: [{ id: 'm1', opponent: 'Кастель', schemeAlbumId: 'zones', updatedAt: '2026-11-14T10:00:00.000Z' }]
+    }, {
+      schemeAlbums: [{ id: 'zones', name: 'Зони', boardIds: [], updatedAt: '2026-11-14T15:00:00.000Z' }, { id: 'standards', name: 'Стандарти', boardIds: ['sch-2'], updatedAt: '2026-11-14T15:00:00.000Z' }],
+      trainings: [{ id: 't1', name: 'Тактика', updatedAt: '2026-11-14T15:00:00.000Z', attendance: { p1: { present: true, updatedAt: '2026-11-14T15:00:00.000Z' } } }],
+      matches: [{ id: 'm1', opponent: 'Кастель', updatedAt: '2026-11-14T15:00:00.000Z' }]
+    });
+    assert.equal(merged.schemeAlbums.length, 2);
+    const zones = merged.schemeAlbums.find(a => a.id === 'zones');
+    assert.deepEqual(zones.boardIds, ['sch-1']);
+    assert.equal(merged.trainings[0].schemeAlbumId, 'zones');
+    assert.equal(merged.matches[0].schemeAlbumId, 'zones');
+  });
 });

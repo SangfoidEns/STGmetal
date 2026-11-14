@@ -17,6 +17,7 @@ const Store = (() => {
       trainings: [],
       exercises: JSON.parse(JSON.stringify(DEMO.exercises)),
       boards: [],
+      schemeAlbums: [],
       calendar: [],
       matches: [],
       diary: [],

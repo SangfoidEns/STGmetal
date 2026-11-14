@@ -220,13 +220,13 @@ function applyStampedFields(merged, a, b) {
   /** Новіший знімок із порожнім полем не стирає день народження, фото, телефон і складену схему. */
   function keepFilled(merged, loser, winner) {
     if (!merged) return;
-    ['birthDate', 'birthday', 'photoUrl', 'photo', 'avatar', 'profilePhoto', 'phone', 'bio', 'statusText', 'telegramUsername', 'telegramId', 'firstName', 'lastName', 'notes', 'position'].forEach(function (key) {
+    ['birthDate', 'birthday', 'photoUrl', 'photo', 'avatar', 'profilePhoto', 'phone', 'bio', 'statusText', 'telegramUsername', 'telegramId', 'firstName', 'lastName', 'notes', 'position', 'schemeAlbumId'].forEach(function (key) {
       if (!filled(winner && winner[key]) && filled(loser && loser[key])) merged[key] = loser[key];
     });
     if ((!winner || winner.number == null || winner.number === '' || winner.number === 0) && loser && loser.number) {
       merged.number = loser.number;
     }
-    ['structure', 'slides', 'objects', 'tags', 'secondaryPositions'].forEach(function (key) {
+    ['structure', 'slides', 'objects', 'tags', 'secondaryPositions', 'boardIds'].forEach(function (key) {
       const older = loser && loser[key];
       const newer = winner && winner[key];
       if (Array.isArray(older) && older.length && (!Array.isArray(newer) || !newer.length)) merged[key] = older;
