@@ -29,7 +29,7 @@ describe('calendar weekday letters', () => {
     assert.match(html, /title="Субота">Сб</);
     assert.match(html, /title="Неділя">Нд</);
     assert.equal(html.includes('>А<'), false);
-    assert.equal(context.Views.APP_BUILD, 'z90');
+    assert.equal(context.Views.APP_BUILD, 'z91');
     const library = context.Views.tactics();
     assert.match(library, /Альбоми/);
     assert.match(library, /ym-search/);
@@ -116,12 +116,22 @@ describe('calendar weekday letters', () => {
     assert.match(day, /13:00/);
     assert.match(day, /основа 1/);
     assert.match(day, /data-action="new-event"/);
-    store.schemeAlbums = [{ id: 'a1', name: 'Стандарти', boardIds: ['b1'] }];
-    store.boards = [{ id: 'b1', name: 'Кутовий', type: 'стандарт' }];
+    store.schemeAlbums = [
+      { id: 'a1', name: 'Стандарти', boardIds: ['b1'], createdAt: '2026-11-14T10:00:00.000Z' },
+      { id: 'a2', name: 'Порожній', boardIds: [], createdAt: '2026-11-14T11:00:00.000Z' }
+    ];
+    store.boards = [{ id: 'b1', name: 'Кутовий', type: 'стандарт', objects: [{ type: 'player', x: 0.5, y: 0.5, number: 9 }] }];
+    store.ui.schemeAlbumId = null;
+    const shelf = context.Views.tactics();
+    assert.match(shelf, /ym-tile-cover/);
+    assert.match(shelf, /scheme-thumb-svg/);
+    assert.match(shelf, /--ym:#e8c547/);
+    assert.match(shelf, /--ym:#7dd3fc/);
     store.ui.schemeAlbumId = 'a1';
     const album = context.Views.tactics();
     assert.match(album, /Стандарти/);
     assert.match(album, /Кутовий/);
     assert.match(album, /ym-track/);
+    assert.match(album, /ym-hero-art ym-tile-cover/);
   });
 });

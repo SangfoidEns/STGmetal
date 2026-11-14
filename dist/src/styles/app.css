@@ -12838,17 +12838,32 @@ body.board-only-mode #mobileNav.glass-nav {
   text-align: left; padding: 0; cursor: pointer;
 }
 .ym-tile-art, .ym-hero-art {
+  position: relative;
   display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end;
-  width: 132px; height: 132px; border-radius: 12px; padding: 12px;
-  background: linear-gradient(160deg, rgba(255,255,255,.35), transparent 46%), var(--ym, #e8c547);
+  width: 132px; height: 132px; border-radius: 12px; padding: 12px; box-sizing: border-box;
+  background: #12161c;
+  border: 3px solid var(--ym, #e8c547);
   box-shadow: 0 10px 24px rgba(0,0,0,.35);
+  overflow: hidden;
 }
-.ym-tile-art b, .ym-hero-art { font-size: 42px; font-weight: 900; line-height: 1; }
+.ym-tile-art b { font-size: 42px; font-weight: 900; line-height: 1; color: var(--ym, #e8c547); }
+.ym-hero-art { font-size: 64px; font-weight: 900; }
 .ym-tile-art small { font-size: 12px; font-weight: 700; opacity: .8; }
+.ym-tile-cover { padding: 0; align-items: stretch; justify-content: stretch; background: #166534; }
+.ym-tile-cover svg { width: 100%; height: 100%; display: block; }
+.ym-tile-count {
+  position: absolute; left: 8px; bottom: 8px; opacity: 1;
+  min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.62); color: #fff; font-size: 12px; font-weight: 800;
+}
 .ym-tile-name { display: block; margin-top: 8px; font-size: 13px; font-weight: 700; line-height: 1.25; }
-.ym-tile-new .ym-tile-art { align-items: center; justify-content: center; font-size: 40px; background: rgba(255,255,255,0.06); box-shadow: none; }
+.ym-tile-new .ym-tile-art {
+  align-items: center; justify-content: center; font-size: 40px;
+  background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.2); box-shadow: none;
+}
 .ym-hero { display: flex; gap: 14px; align-items: flex-end; }
-.ym-hero-art { width: 148px; height: 148px; font-size: 64px; align-items: center; justify-content: center; }
+.ym-hero-art { width: 148px; height: 148px; align-items: center; justify-content: center; color: var(--ym, #e8c547); }
 .ym-hero h1 { font-size: 26px; }
 .ym-hero p, .ym-list { margin: 0; }
 .ym-list { display: flex; flex-direction: column; }

@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z90',
+  APP_BUILD: 'z91',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -2060,12 +2060,28 @@ trainings() {
       '</div></article>';
   },
 
-  _albumHue(id) {
-    const hues = ['#e8c547', '#7dd3fc', '#86efac', '#c4b5fd', '#fb7185', '#fdba74'];
-    const text = String(id || '');
-    let n = 0;
-    for (let i = 0; i < text.length; i++) n = (n + text.charCodeAt(i)) % hues.length;
-    return hues[n];
+  _albumHue(album) {
+    const hues = ['#e8c547', '#7dd3fc', '#86efac', '#c4b5fd', '#fb7185', '#fdba74', '#f9a8d4', '#5eead4'];
+    const albums = ((Store.get() && Store.get().schemeAlbums) || []).slice().sort((a, b) =>
+      String((a && (a.createdAt || a.id)) || '').localeCompare(String((b && (b.createdAt || b.id)) || ''))
+    );
+    let index = albums.findIndex(a => a && album && String(a.id) === String(album.id));
+    if (index < 0) {
+      const text = String((album && album.id) || album || '');
+      index = 0;
+      for (let i = 0; i < text.length; i++) index = (index + text.charCodeAt(i)) % hues.length;
+    }
+    return hues[index % hues.length];
+  },
+
+  _albumCover(album) {
+    const s = Store.get() || {};
+    const byId = {};
+    (s.boards || []).forEach(b => { if (b && b.id != null) byId[String(b.id)] = b; });
+    const firstId = ((album && album.boardIds) || []).find(id => byId[String(id)]);
+    const board = firstId != null ? byId[String(firstId)] : null;
+    if (!board || typeof this._schemeThumbSvg !== 'function') return '';
+    return this._schemeThumbSvg(board);
   },
 
   _albumOptions(current) {
@@ -2115,8 +2131,12 @@ trainings() {
     const count = ids.filter(id => (s.boards || []).some(b => b && String(b.id) === String(id))).length;
     const name = sanitize((album && album.name) || 'Альбом');
     const letter = name.replace(/[^A-Za-zА-Яа-яІіЇїЄєҐґ0-9]/g, '').slice(0, 1).toUpperCase() || 'А';
-    return '<button type="button" class="ym-tile" data-action="open-scheme-album" data-album-id="' + sanitize(album.id || '') + '" style="--ym:' + this._albumHue(album.id) + '">' +
-      '<span class="ym-tile-art"><b>' + letter + '</b><small>' + count + '</small></span>' +
+    const cover = this._albumCover(album);
+    const art = cover
+      ? '<span class="ym-tile-art ym-tile-cover">' + cover + '<small class="ym-tile-count">' + count + '</small></span>'
+      : '<span class="ym-tile-art"><b>' + letter + '</b><small>' + count + '</small></span>';
+    return '<button type="button" class="ym-tile" data-action="open-scheme-album" data-album-id="' + sanitize(album.id || '') + '" style="--ym:' + this._albumHue(album) + '">' +
+      art +
       '<span class="ym-tile-name">' + name + '</span></button>';
   },
 
@@ -2140,10 +2160,14 @@ trainings() {
           '<button type="button" class="btn btn-s btn-sm" data-action="delete-scheme-album" data-album-id="' + sanitize(album.id) + '">Видалити альбом</button>' +
         '</div>'
       : '';
+    const cover = this._albumCover(album);
+    const heroArt = cover
+      ? '<div class="ym-hero-art ym-tile-cover">' + cover + '</div>'
+      : '<div class="ym-hero-art">' + sanitize(String(album.name || 'А').replace(/[^A-Za-zА-Яа-яІіЇїЄєҐґ0-9]/g, '').slice(0, 1).toUpperCase() || 'А') + '</div>';
     return '<div class="ym">' +
       '<button type="button" class="btn btn-s btn-sm" data-action="schemes-home">‹ Усі альбоми</button>' +
-      '<div class="ym-hero" style="--ym:' + this._albumHue(album.id) + '">' +
-        '<div class="ym-hero-art">' + sanitize(String(album.name || 'А').replace(/[^A-Za-zА-Яа-яІіЇїЄєҐґ0-9]/g, '').slice(0, 1).toUpperCase() || 'А') + '</div>' +
+      '<div class="ym-hero" style="--ym:' + this._albumHue(album) + '">' +
+        heroArt +
         '<div><div class="ym-kicker">Альбом схем</div><h1>' + sanitize(album.name || 'Альбом') + '</h1>' +
         '<p>' + (album.boardIds || []).length + ' схем</p></div></div>' +
       tools +
