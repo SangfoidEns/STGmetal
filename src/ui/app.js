@@ -2611,6 +2611,15 @@ const App = {
         try { App.navigate('home'); } catch (_) {}
         return;
       }
+      if (action === 'scheme-menu') {
+        e.preventDefault(); e.stopPropagation();
+        const row = t.closest('.ym-track');
+        if (!row) return;
+        const open = row.classList.contains('ym-menu-open');
+        document.querySelectorAll('.ym-track.ym-menu-open').forEach(el => el.classList.remove('ym-menu-open'));
+        if (!open) row.classList.add('ym-menu-open');
+        return;
+      }
       if (action === 'edit-scheme') {
         e.preventDefault(); e.stopPropagation();
         const bid = t.dataset.boardId || (t.closest('.scheme-card') && t.closest('.scheme-card').dataset.boardId);

@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z88',
+  APP_BUILD: 'z89',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -2083,13 +2083,15 @@ trainings() {
     const typ = sanitize((b && (b.type || b.kind || b.schemeType)) || 'тактика');
     const desc = String((b && (b.description || b.notes || b.text)) || '').trim();
     const thumb = (typeof this._schemeThumbSvg === 'function') ? this._schemeThumbSvg(b) : '📐';
-    const coachTools = o.editable
-      ? '<div class="ym-expand-actions">' +
-          '<button type="button" class="btn btn-s btn-sm" data-action="edit-scheme" data-board-id="' + id + '">Редагувати</button>' +
-          '<button type="button" class="btn btn-s btn-sm" data-action="delete-scheme" data-board-id="' + id + '">Видалити</button>' +
+    const menu = o.editable
+      ? '<button type="button" class="ym-dots" data-action="scheme-menu" data-board-id="' + id + '" aria-label="Меню схеми">⋯</button>' +
+        '<div class="ym-menu">' +
+          '<button type="button" data-action="edit-scheme" data-board-id="' + id + '">Редагувати</button>' +
+          '<button type="button" data-action="delete-scheme" data-board-id="' + id + '">Видалити</button>' +
           (o.albumId
-            ? '<button type="button" class="btn btn-s btn-sm" data-action="album-remove-board" data-album-id="' + sanitize(o.albumId) + '" data-board-id="' + id + '">З альбому</button>'
+            ? '<button type="button" data-action="album-remove-board" data-album-id="' + sanitize(o.albumId) + '" data-board-id="' + id + '">З альбому</button>'
             : '') +
+          '<button type="button" data-action="load-scheme-board" data-board-id="' + id + '">На дошку</button>' +
         '</div>'
       : '';
     return '<div class="ym-track" data-name="' + title + '" data-board-id="' + id + '">' +
@@ -2098,9 +2100,12 @@ trainings() {
         '<span class="ym-track-copy"><b>' + title + '</b><small>' + typ + '</small></span>' +
       '</button>' +
       '<div class="ym-expand">' +
-        '<p class="ym-desc">' + (desc ? sanitize(desc) : 'Опису ще немає.') + '</p>' +
-        coachTools +
-        '<button type="button" class="btn btn-p btn-sm" data-action="load-scheme-board" data-board-id="' + id + '">На дошку</button>' +
+        '<div class="ym-expand-copy">' +
+          '<b class="ym-expand-title">' + title + '</b>' +
+          '<p class="ym-desc">' + (desc ? sanitize(desc) : 'Опису ще немає.') + '</p>' +
+          menu +
+        '</div>' +
+        '<div class="ym-art" aria-hidden="true">' + thumb + '</div>' +
       '</div></div>';
   },
 

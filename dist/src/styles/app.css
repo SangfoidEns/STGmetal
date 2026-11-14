@@ -12852,7 +12852,7 @@ body.board-only-mode #mobileNav.glass-nav {
 .ym-hero h1 { font-size: 26px; }
 .ym-hero p, .ym-list { margin: 0; }
 .ym-list { display: flex; flex-direction: column; }
-.ym-track { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.ym-track { display: flex; align-items: stretch; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
 .ym-play {
   flex: 1; display: flex; align-items: center; gap: 12px; min-height: 64px;
   border: 0; background: transparent; color: inherit; text-align: left; padding: 8px 0; cursor: pointer;
@@ -12862,11 +12862,32 @@ body.board-only-mode #mobileNav.glass-nav {
 .ym-track-copy { display: flex; flex-direction: column; min-width: 0; }
 .ym-track-copy b { font-size: 15px; }
 .ym-track-copy small { color: #9aa4b2; white-space: normal; line-height: 1.3; }
-.ym-expand { display: none; padding: 0 8px 14px 60px; }
-.ym-track.ym-open { background: rgba(255,255,255,0.05); border-radius: 14px; }
-.ym-track.ym-open .ym-expand { display: block; }
-.ym-desc { margin: 0 0 10px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
-.ym-expand-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.ym-expand { display: none; }
+.ym-track.ym-open { display: block; background: rgba(255,255,255,0.05); border-radius: 16px; padding: 4px; }
+.ym-track.ym-open .ym-play { display: none; }
+.ym-track.ym-open .ym-expand {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 148px;
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+}
+.ym-expand-title { display: block; font-size: 18px; line-height: 1.25; margin-bottom: 8px; }
+.ym-desc { margin: 0; font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
+.ym-art {
+  width: 148px; height: 210px; border-radius: 12px; overflow: hidden; background: #14321f;
+}
+.ym-art svg { width: 100%; height: 100%; display: block; }
+.ym-dots {
+  margin-top: 10px; width: 40px; height: 32px; border: 0; border-radius: 16px;
+  background: transparent; color: inherit; font-size: 22px; letter-spacing: 1px; cursor: pointer;
+}
+.ym-menu { display: none; margin-top: 8px; min-width: 160px; }
+.ym-track.ym-menu-open .ym-menu { display: flex; flex-direction: column; gap: 4px; }
+.ym-menu button {
+  text-align: left; border: 0; background: rgba(255,255,255,0.06); color: inherit;
+  border-radius: 10px; min-height: 40px; padding: 8px 12px; font: inherit; cursor: pointer;
+}
 .ym-more {
   width: 36px; height: 36px; border-radius: 18px; border: 0; background: rgba(255,255,255,0.08);
   color: inherit; font-weight: 800; cursor: pointer;
