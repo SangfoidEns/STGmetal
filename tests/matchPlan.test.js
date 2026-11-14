@@ -68,6 +68,23 @@ describe('match planning', () => {
     assert.equal(state.trainings[0].time, '14:20');
     assert.equal(state.trainings[0].duration, 25);
     assert.equal(state.trainings[0].structure.length, 3);
+    assert.equal(state.trainings[0].name, 'Розминка • Металіст vs Кастель');
+    assert.equal(state.calendar.find(item => item.md === 'WU').title, 'Розминка • Металіст vs Кастель');
     assert.equal(state.calendar.filter(item => item.md === 'WU').length, 1);
+  });
+
+  it('remembers the prepared next match before the previous one', () => {
+    const state = {
+      matches: [
+        { id: 'old', date: '2026-10-25', opponent: 'Реал', xi: ['p1'] },
+        { id: 'next', date: '2026-11-15', opponent: 'Кастель', xi: ['p2'] },
+        { id: 'empty', date: '2026-11-10', opponent: 'Порожній', xi: [] }
+      ]
+    };
+    const next = context.CoachTools.rememberedLineup(state, '2026-11-14');
+    assert.equal(next.id, 'next');
+    state.matches[1].xi = [];
+    const previous = context.CoachTools.rememberedLineup(state, '2026-11-14');
+    assert.equal(previous.id, 'old');
   });
 });

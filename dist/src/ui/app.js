@@ -1251,7 +1251,7 @@ const App = {
       else if (action === 'match-warmup') Actions.placeMatchWarmup();
       else if (action === 'match-logo') Actions.pickMatchLogo();
       else if (action === 'match-logo-clear') Actions.clearMatchLogo();
-      else if (action === 'match-attendance') Actions.openMatchAttendance();
+      else if (action === 'match-attendance') Actions.openMatchAttendance(btn.getAttribute('data-match-id'));
     } catch (err) { console.error('[match-action]', err); }
     return true;
   },
@@ -1267,7 +1267,7 @@ const App = {
     e.preventDefault();
     e.stopPropagation();
     if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-    try { Actions.toggleMatchPlayer(chip.getAttribute('data-player-id')); } catch (err) { console.error('[match-toggle]', err); }
+    try { Actions.toggleMatchPlayer(chip.getAttribute('data-player-id'), chip.getAttribute('data-match-id')); } catch (err) { console.error('[match-toggle]', err); }
     return true;
   },
 
@@ -1678,7 +1678,7 @@ const App = {
 
   bindSquadViewButtons() {
     try {
-      document.querySelectorAll('[data-action="squad-view"],[data-action="squad-cards"],[data-action="squad-list"],[data-action="toggle-squad-view"]').forEach(btn => {
+      document.querySelectorAll('[data-action="squad-view"],[data-action="squad-cards"],[data-action="squad-list"],[data-action="squad-match"],[data-action="toggle-squad-view"]').forEach(btn => {
         if (btn._msSquadBound) return;
         btn._msSquadBound = true;
         btn.addEventListener('click', (ev) => {
@@ -1691,16 +1691,17 @@ const App = {
           const act = btn.getAttribute('data-action') || '';
           if (act === 'squad-cards') mode = 'cards';
           if (act === 'squad-list') mode = 'list';
+          if (act === 'squad-match') mode = 'match';
           if (!mode || act === 'toggle-squad-view') {
             const cur = s.ui.squadViewMode || window.__squadViewMode || sessionStorage.getItem('ms_squad_view') || 'list';
             mode = cur === 'cards' ? 'list' : 'cards';
           }
-          mode = mode === 'cards' ? 'cards' : 'list';
+          if (mode !== 'cards' && mode !== 'match') mode = 'list';
           s.ui.squadViewMode = mode;
           try { window.__squadViewMode = mode; } catch (_) {}
           try { sessionStorage.setItem('ms_squad_view', mode); } catch (_) {}
           if (s.ui.view !== 'players') s.ui.view = 'players';
-          try { Toast.show(mode === 'cards' ? 'Режим: картки' : 'Режим: список', 'ok'); } catch (_) {}
+          try { Toast.show(mode === 'cards' ? 'Режим: картки' : (mode === 'match' ? 'Режим: матч' : 'Режим: список'), 'ok'); } catch (_) {}
           try { App.renderCurrent(); } catch (err) { console.error(err); }
         }, true);
       });
@@ -2559,7 +2560,7 @@ const App = {
         e.preventDefault();
         e.stopPropagation();
         if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-        return Actions.toggleMatchPlayer(squadChip.getAttribute('data-player-id'));
+        return Actions.toggleMatchPlayer(squadChip.getAttribute('data-player-id'), squadChip.getAttribute('data-match-id'));
       }
       const inMatchPlan = !!(e.target.closest && e.target.closest('.match-plan, .match-chip'));
 
@@ -2620,6 +2621,55 @@ const App = {
       if (action === 'new-board') {
         e.preventDefault(); e.stopPropagation();
         return Actions.startNewScheme();
+      }
+      if (action === 'new-scheme-album') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.newSchemeAlbum();
+      }
+      if (action === 'open-scheme-album') {
+        e.preventDefault(); e.stopPropagation();
+        const s = Store.get();
+        s.ui = s.ui || {};
+        s.ui.schemeAlbumId = t.dataset.albumId || null;
+        s.ui.view = 'tactics';
+        try { App.renderCurrent(); } catch (_) {}
+        return;
+      }
+      if (action === 'schemes-home') {
+        e.preventDefault(); e.stopPropagation();
+        const s = Store.get();
+        s.ui = s.ui || {};
+        s.ui.schemeAlbumId = null;
+        s.ui.view = 'tactics';
+        try { App.renderCurrent(); } catch (_) {}
+        return;
+      }
+      if (action === 'rename-scheme-album') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.renameSchemeAlbum(t.dataset.albumId);
+      }
+      if (action === 'delete-scheme-album') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.deleteSchemeAlbum(t.dataset.albumId);
+      }
+      if (action === 'album-pick-board') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.pickBoardForAlbum(t.dataset.albumId);
+      }
+      if (action === 'album-add-board') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.addBoardToAlbum(t.dataset.albumId, t.dataset.boardId);
+      }
+      if (action === 'album-remove-board') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.removeBoardFromAlbum(t.dataset.albumId, t.dataset.boardId);
+      }
+      if (action === 'squad-board') {
+        e.preventDefault(); e.stopPropagation();
+        const s = Store.get();
+        s.ui = s.ui || {};
+        if (t.dataset.matchId) s.ui.matchId = t.dataset.matchId;
+        return Actions.openMatchBoard();
       }
       if (action === 'load-scheme-board') {
         e.preventDefault(); e.stopPropagation();
@@ -2813,7 +2863,7 @@ const App = {
       if (action === 'match-xi') return Actions.fillMatchSquad();
       if (action === 'match-board') return Actions.openMatchBoard();
       if (action === 'match-week') return Actions.buildMatchWeek();
-      if (action === 'match-toggle') return Actions.toggleMatchPlayer(t.dataset.playerId);
+      if (action === 'match-toggle') return Actions.toggleMatchPlayer(t.dataset.playerId, t.dataset.matchId);
       if (action === 'match-delete') return Actions.deleteMatch();
       if (action === 'new-event') return Actions.newEvent();
       if (action === 'toggle-rp') return document.getElementById('rightPanel').classList.toggle('force');
@@ -3572,7 +3622,7 @@ const App = {
         }
         return;
       }
-      if (action === 'squad-view' || action === 'toggle-squad-view' || action === 'squad-cards' || action === 'squad-list') {
+      if (action === 'squad-view' || action === 'toggle-squad-view' || action === 'squad-cards' || action === 'squad-list' || action === 'squad-match') {
         e.preventDefault();
         e.stopPropagation();
         if (e.stopImmediatePropagation) e.stopImmediatePropagation();
@@ -3582,17 +3632,18 @@ const App = {
           let mode = (t.dataset && (t.dataset.mode || t.dataset.squadMode)) || '';
           if (action === 'squad-cards') mode = 'cards';
           if (action === 'squad-list') mode = 'list';
+          if (action === 'squad-match') mode = 'match';
           if (!mode || action === 'toggle-squad-view') {
             const cur = s.ui.squadViewMode || window.__squadViewMode || sessionStorage.getItem('ms_squad_view') || 'list';
             mode = cur === 'cards' ? 'list' : 'cards';
           }
-          mode = mode === 'cards' ? 'cards' : 'list';
+          if (mode !== 'cards' && mode !== 'match') mode = 'list';
           s.ui.squadViewMode = mode;
           try { window.__squadViewMode = mode; } catch (_) {}
           try { sessionStorage.setItem('ms_squad_view', mode); } catch (_) {}
           // лишаємось на players
           if (s.ui.view !== 'players') s.ui.view = 'players';
-          try { Toast.show(mode === 'cards' ? 'Режим: картки' : 'Режим: список', 'ok'); } catch (_) {}
+          try { Toast.show(mode === 'cards' ? 'Режим: картки' : (mode === 'match' ? 'Режим: матч' : 'Режим: список'), 'ok'); } catch (_) {}
           try { App.renderCurrent(); } catch (err) { console.error('[squad-view]', err); }
         } catch (err) { console.error('[squad-view]', err); }
         return;
@@ -4282,6 +4333,13 @@ const App = {
         this._matchPlanTimer = setTimeout(() => {
           try { Actions.flushMatchPlan(); } catch (_) {}
         }, 400);
+      }
+      if (e.target && e.target.id === 'schemeSearch') {
+        const q = String(e.target.value || '').trim().toLowerCase();
+        document.querySelectorAll('.ym-track').forEach(row => {
+          const name = String(row.getAttribute('data-name') || '').toLowerCase();
+          row.hidden = !!(q && name.indexOf(q) < 0);
+        });
       }
       if (e.target.dataset.filter === 'trainings') {
         const q = (document.getElementById('trSearch')?.value || '').toLowerCase();

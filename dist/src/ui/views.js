@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z86',
+  APP_BUILD: 'z87',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -1583,6 +1583,16 @@ trainings() {
     const _isPlayerRole = typeof AuthManager !== 'undefined' && AuthManager.isPlayer && AuthManager.isPlayer();
     let _schemesBlock = '';
     if (_isPlayerRole) {
+      const meNow = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer) ? AuthManager.getLinkedPlayer() : null;
+      const mineAlbum = meNow && (s.schemeAlbums || []).find(a => a && String(a.id) === String(meNow.schemeAlbumId));
+      if (mineAlbum) {
+        const byId = {};
+        (s.boards || []).forEach(b => { if (b && b.id != null) byId[String(b.id)] = b; });
+        const tracks = (mineAlbum.boardIds || []).map(id => byId[String(id)]).filter(Boolean)
+          .map(b => this._schemeTrack(b, { editable: false })).join('');
+        _schemesBlock = '<div class="ym"><div class="ym-kicker">Твій альбом</div><h2>' + sanitize(mineAlbum.name || 'Альбом') + '</h2><div class="ym-list">' +
+          (tracks || '<div class="es">В альбомі ще немає схем</div>') + '</div></div>';
+      } else {
       const boards = (typeof this._playerVisibleBoards === 'function')
         ? this._playerVisibleBoards()
         : (s.boards || []).filter(b => b && this._isTacticalBoard && this._isTacticalBoard(b));
@@ -1592,6 +1602,7 @@ trainings() {
           }).join('')
         : '<div class="es note-sm">Немає тактичних схем. Тренер збереже схему на дошці.</div>';
       _schemesBlock = '<div class="player-schemes-block"><div class="scheme-cards">' + schemesHtml + '</div></div>';
+      }
     }
     const _tab = (s.ui && s.ui.playerTrainTab) || 'trainings';
     const _tabsHtml = _isPlayerRole ? (
@@ -1844,6 +1855,49 @@ trainings() {
       '<div class="gift-award-grid">' + catalog + '</div></div>';
   },
 
+  _focusMatch(s) {
+    const todayStr = (typeof today === 'function') ? today() : '';
+    const list = ((s && s.matches) || []).filter(m => m && m.status !== 'cancelled' && m.status !== 'canceled');
+    const byStart = (a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.time || '').localeCompare(String(b.time || ''));
+    const upcoming = list.filter(m => String(m.date || '') >= todayStr).sort(byStart);
+    if (upcoming.length) return upcoming[0];
+    const past = list.filter(m => String(m.date || '') < todayStr).sort((a, b) => byStart(b, a));
+    return past[0] || null;
+  },
+
+  _squadMatch(s) {
+    const m = this._focusMatch(s);
+    if (!m) {
+      return '<div class="card glass"><div class="ct">Матч</div><p class="note-sm">Немає матчу. Додай його в розділі матчів, і склад з’явиться тут.</p></div>';
+    }
+    const todayStr = (typeof today === 'function') ? today() : '';
+    const phase = m.date === todayStr ? 'Матч сьогодні' : (String(m.date || '') > todayStr ? 'Перед матчем' : 'Останній матч');
+    const players = (s.players || []).slice().sort((a, b) => (Number(a.number) || 99) - (Number(b.number) || 99));
+    const byId = {};
+    players.forEach(p => { if (p && p.id != null) byId[String(p.id)] = p; });
+    const xi = (m.xi || []).filter(id => id != null && byId[String(id)]);
+    const bench = (m.bench || []).filter(id => id != null && byId[String(id)] && !xi.some(x => String(x) === String(id)));
+    const used = {};
+    xi.concat(bench).forEach(id => { used[String(id)] = true; });
+    const out = players.filter(p => !used[String(p.id)]);
+    const row = (p, role) => '<button type="button" class="match-chip squad-match-row" data-action="match-toggle" data-match-id="' + sanitize(m.id || '') + '" data-player-id="' + sanitize(p.id) + '">' +
+      '<span class="match-chip-role">' + role + '</span>' +
+      '<span class="match-chip-name">' + sanitize((p.lastName || p.firstName || 'Гравець')) + '</span>' +
+      '<span class="match-chip-meta">#' + sanitize(p.number || '—') + (p.position ? (' · ' + sanitize(p.position)) : '') + '</span></button>';
+    const block = (title, arr, role) => '<div class="match-block-label">' + title + ' · ' + arr.length + '</div><div class="match-chips">' +
+      (arr.length ? arr.map(p => row(p, role)).join('') : '<span class="note-sm">Порожньо</span>') + '</div>';
+    return '<p class="note-sm">' + sanitize(phase) + '. Тап переводить гравця: основа → лавка → поза заявкою.</p>' +
+      '<div class="cp-stat cp-stat-wide cp-stat-match">' + this._matchPlaque(m, { kicker: phase }) + '</div>' +
+      '<div class="match-actions">' +
+        '<button type="button" class="btn btn-s btn-sm" data-action="squad-board" data-match-id="' + sanitize(m.id || '') + '">На дошку</button>' +
+        '<button type="button" class="btn btn-s btn-sm" data-action="match-attendance" data-match-id="' + sanitize(m.id || '') + '">Явка, голи, картки</button>' +
+        '<button type="button" class="btn btn-p btn-sm" data-action="open-match" data-match-id="' + sanitize(m.id || '') + '">План матчу</button>' +
+      '</div>' +
+      block('Основа', xi.map(id => byId[String(id)]), 'ОС') +
+      block('Лавка', bench.map(id => byId[String(id)]), 'Л') +
+      block('Поза заявкою', out, '•');
+  },
+
   players() {
     const s = Store.get();
     const sortKey = (s.ui && s.ui.playerSort) || 'role';
@@ -1940,7 +1994,7 @@ trainings() {
       viewMode = u.squadViewMode || (typeof window !== 'undefined' && window.__squadViewMode) ||
         (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('ms_squad_view')) || 'list';
     } catch (_) {}
-    viewMode = viewMode === 'cards' ? 'cards' : 'list';
+    viewMode = (viewMode === 'cards' || viewMode === 'match') ? viewMode : 'list';
 
     const th = (key, label) => {
       const active = sortKey === key ? (sortDir < 0 ? ' ↓' : ' ↑') : '';
@@ -1974,6 +2028,7 @@ trainings() {
       '<span class="squad-view-toggle" role="group" aria-label="Вигляд складу">' +
         '<button type="button" class="btn-s squad-mode-btn' + (viewMode === 'list' ? ' on' : '') + '" data-action="squad-list" data-mode="list" data-squad-mode="list">Список</button>' +
         '<button type="button" class="btn-s squad-mode-btn' + (viewMode === 'cards' ? ' on' : '') + '" data-action="squad-cards" data-mode="cards" data-squad-mode="cards">Картки</button>' +
+        '<button type="button" class="btn-s squad-mode-btn' + (viewMode === 'match' ? ' on' : '') + '" data-action="squad-match" data-mode="match" data-squad-mode="match">Матч</button>' +
       '</span>' +
       '<button class="btn btn-p btn-sm" data-action="new-player">+ Гравець</button></div>';
 
@@ -1981,6 +2036,10 @@ trainings() {
       '<div class="css-item"><b>' + trN + '</b><span>Тренувань</span></div>' +
       '<div class="css-item"><b>' + doneN + '</b><span>Проведено</span></div>' +
       '</div>';
+
+    if (viewMode === 'match') {
+      return header + this._squadMatch(s);
+    }
 
     if (viewMode === 'cards') {
       return header + strip +
@@ -2026,19 +2085,113 @@ trainings() {
       '</div></article>';
   },
 
+  _albumHue(id) {
+    const hues = ['#e8c547', '#7dd3fc', '#86efac', '#c4b5fd', '#fb7185', '#fdba74'];
+    const text = String(id || '');
+    let n = 0;
+    for (let i = 0; i < text.length; i++) n = (n + text.charCodeAt(i)) % hues.length;
+    return hues[n];
+  },
+
+  _albumOptions(current) {
+    const albums = ((Store.get() && Store.get().schemeAlbums) || []);
+    return '<option value="">Без альбому</option>' + albums.map(a =>
+      '<option value="' + sanitize(a.id || '') + '"' + (String(current || '') === String(a.id) ? ' selected' : '') + '>' +
+      sanitize(a.name || 'Альбом') + '</option>'
+    ).join('');
+  },
+
+  _schemeTrack(b, opts) {
+    const o = opts || {};
+    const id = sanitize(String((b && b.id) || ''));
+    const title = sanitize((b && (b.name || b.title)) || 'Схема');
+    const typ = sanitize((b && (b.type || b.kind || b.schemeType)) || 'тактика');
+    const desc = String((b && (b.description || b.notes || b.text)) || '').trim();
+    const thumb = (typeof this._schemeThumbSvg === 'function') ? this._schemeThumbSvg(b) : '📐';
+    const extra = (o.editable && o.albumId)
+      ? '<button type="button" class="ym-more" data-action="album-remove-board" data-album-id="' + sanitize(o.albumId) + '" data-board-id="' + id + '" title="Прибрати з альбому">–</button>'
+      : (o.editable
+        ? '<button type="button" class="ym-more" data-action="edit-scheme" data-board-id="' + id + '" title="Редагувати">✎</button>' +
+          '<button type="button" class="ym-more" data-action="delete-scheme" data-board-id="' + id + '" title="Видалити">✕</button>'
+        : '');
+    return '<div class="ym-track" data-name="' + title + '">' +
+      '<button type="button" class="ym-play" data-action="load-scheme-board" data-board-id="' + id + '">' +
+        '<span class="ym-thumb">' + thumb + '</span>' +
+        '<span class="ym-track-copy"><b>' + title + '</b><small>' + typ + (desc ? (' · ' + sanitize(desc)) : '') + '</small></span>' +
+      '</button>' + extra + '</div>';
+  },
+
+  _albumTile(album) {
+    const s = Store.get();
+    const ids = (album && album.boardIds) || [];
+    const count = ids.filter(id => (s.boards || []).some(b => b && String(b.id) === String(id))).length;
+    const name = sanitize((album && album.name) || 'Альбом');
+    const letter = name.replace(/[^A-Za-zА-Яа-яІіЇїЄєҐґ0-9]/g, '').slice(0, 1).toUpperCase() || 'А';
+    return '<button type="button" class="ym-tile" data-action="open-scheme-album" data-album-id="' + sanitize(album.id || '') + '" style="--ym:' + this._albumHue(album.id) + '">' +
+      '<span class="ym-tile-art"><b>' + letter + '</b><small>' + count + '</small></span>' +
+      '<span class="ym-tile-name">' + name + '</span></button>';
+  },
+
+  _schemeAlbumPage(album, canEdit) {
+    const s = Store.get();
+    const byId = {};
+    (s.boards || []).forEach(b => { if (b && b.id != null) byId[String(b.id)] = b; });
+    const tracks = (album.boardIds || []).map(id => byId[String(id)]).filter(Boolean)
+      .map(b => this._schemeTrack(b, { editable: canEdit, albumId: album.id })).join('');
+    const trains = (s.trainings || []).filter(t => t && String(t.schemeAlbumId || '') === String(album.id));
+    const games = (s.matches || []).filter(m => m && String(m.schemeAlbumId || '') === String(album.id));
+    const people = (s.players || []).filter(p => p && String(p.schemeAlbumId || '') === String(album.id));
+    const attached = []
+      .concat(trains.map(t => 'тренування · ' + (t.name || t.date || '')))
+      .concat(games.map(m => 'матч · vs ' + (m.opponent || '')))
+      .concat(people.map(p => 'гравець · ' + ((p.lastName || p.firstName || '') )));
+    const tools = canEdit
+      ? '<div class="ym-actions">' +
+          '<button type="button" class="btn btn-s btn-sm" data-action="rename-scheme-album" data-album-id="' + sanitize(album.id) + '">Назва</button>' +
+          '<button type="button" class="btn btn-p btn-sm" data-action="album-pick-board" data-album-id="' + sanitize(album.id) + '">+ Схема</button>' +
+          '<button type="button" class="btn btn-s btn-sm" data-action="delete-scheme-album" data-album-id="' + sanitize(album.id) + '">Видалити альбом</button>' +
+        '</div>'
+      : '';
+    return '<div class="ym">' +
+      '<button type="button" class="btn btn-s btn-sm" data-action="schemes-home">‹ Усі альбоми</button>' +
+      '<div class="ym-hero" style="--ym:' + this._albumHue(album.id) + '">' +
+        '<div class="ym-hero-art">' + sanitize(String(album.name || 'А').replace(/[^A-Za-zА-Яа-яІіЇїЄєҐґ0-9]/g, '').slice(0, 1).toUpperCase() || 'А') + '</div>' +
+        '<div><div class="ym-kicker">Альбом схем</div><h1>' + sanitize(album.name || 'Альбом') + '</h1>' +
+        '<p>' + (album.boardIds || []).length + ' схем</p></div></div>' +
+      tools +
+      '<p class="note-sm">' + (attached.length ? ('Прикріплено: ' + sanitize(attached.join(' · '))) : 'Ще не прикріплено. Альбом можна додати до тренування, матчу або гравця.') + '</p>' +
+      '<div class="ym-list">' + (tracks || '<div class="es">В альбомі ще немає схем</div>') + '</div></div>';
+  },
+
   tactics() {
     const s = Store.get();
+    const canEdit = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+    const albums = (s.schemeAlbums || []).slice().sort((a, b) =>
+      String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))
+    );
+    const openId = s.ui && s.ui.schemeAlbumId;
+    const open = albums.find(a => a && String(a.id) === String(openId));
+    if (open) return this._schemeAlbumPage(open, canEdit);
     const boards = (s.boards || []).slice().sort((a, b) =>
       String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))
     );
-    const canEdit = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
-    const cards = boards.map(b => this._schemeCard(b, { editable: canEdit })).join('');
-    const hint = canEdit
-      ? '<p class="note-sm">Утримуйте мініатюру — повний опис, редагування і видалення. Короткий тап відкриває схему на дошці.</p>'
-      : '<p class="note-sm">Утримуйте мініатюру, щоб прочитати повний опис. Короткий тап відкриває схему на дошці.</p>';
-    return '<div class="st">Схеми' + (canEdit ? ' <button class="btn btn-p btn-sm" data-action="new-board">+ Схема</button>' : '') + '</div>' +
-      hint +
-      '<div class="scheme-cards">' + (cards || '<div class="es">Немає збережених схем</div>') + '</div>';
+    const tiles = albums.map(a => this._albumTile(a)).join('');
+    const tracks = boards.map(b => this._schemeTrack(b, { editable: canEdit })).join('');
+    return '<div class="ym">' +
+      '<div class="ym-head"><h1>Схеми</h1>' +
+        (canEdit
+          ? '<span><button type="button" class="btn btn-s btn-sm" data-action="new-scheme-album">+ Альбом</button> <button type="button" class="btn btn-p btn-sm" data-action="new-board">+ Схема</button></span>'
+          : '') +
+      '</div>' +
+      '<p class="note-sm">Альбом збираєш сам, як у музиці. Потім чіпляєш його до тренування, матчу або гравця.</p>' +
+      '<input id="schemeSearch" class="ym-search" type="search" placeholder="Пошук схеми" autocomplete="off">' +
+      '<div class="ym-shelf-h">Альбоми</div>' +
+      '<div class="ym-row">' + tiles +
+        (canEdit ? '<button type="button" class="ym-tile ym-tile-new" data-action="new-scheme-album"><span class="ym-tile-art">+</span><span class="ym-tile-name">Новий альбом</span></button>' : '') +
+        (!tiles && !canEdit ? '<div class="es">Альбомів ще немає</div>' : '') +
+      '</div>' +
+      '<div class="ym-shelf-h">Усі схеми · ' + boards.length + '</div>' +
+      '<div class="ym-list">' + (tracks || '<div class="es">Немає збережених схем</div>') + '</div></div>';
   },
 
   _trainingCancelled(tr) {
@@ -2164,7 +2317,8 @@ trainings() {
         else cls += ' cal-dot-ev';
         dots += '<span class="' + cls + '"></span>';
       });
-      cells += '<button type="button" class="cal-cell cd' + (isToday ? ' cal-today today' : '') + (isSel ? ' cal-selected' : '') + (dayEv.length ? ' has-ev has' : '') + '" data-day="' + ds + '">' +
+      const hasMatch = dayEv.some(e => e.type === 'match');
+      cells += '<button type="button" class="cal-cell cd' + (isToday ? ' cal-today today' : '') + (isSel ? ' cal-selected' : '') + (hasMatch ? ' has-match' : '') + (dayEv.length ? ' has-ev has' : '') + '" data-day="' + ds + '">' +
         '<span class="cal-d">' + d + '</span><span class="cal-dots">' + dots + '</span></button>';
     }
 
@@ -2197,8 +2351,18 @@ trainings() {
               }
             }
             if (e.type === 'match' && e.id) {
-              return '<button type="button" class="cal-ev-row" data-action="open-match" data-match-id="' + sanitize(e.id) + '">⚽ ' +
-                sanitize(e.title) + ' <span class="note-sm">(' + kind + ')</span></button>';
+              const mt = (s.matches || []).find(item => item && String(item.id) === String(e.id));
+              const bits = [];
+              if (mt && mt.time) bits.push(mt.time);
+              if (mt) bits.push(mt.home === false ? 'виїзд' : 'дім');
+              if (mt && mt.competition) bits.push(mt.competition);
+              if (mt) bits.push('основа ' + (mt.xi || []).filter(Boolean).length + ' · лавка ' + (mt.bench || []).length);
+              const score = mt && mt.scoreUs != null && mt.scoreUs !== '' && mt.scoreThem != null && mt.scoreThem !== ''
+                ? (mt.scoreUs + ':' + mt.scoreThem) : '';
+              return '<button type="button" class="cal-ev-row is-match" data-action="open-match" data-match-id="' + sanitize(e.id) + '">' +
+                '<span class="cal-ev-kicker">Матч' + (score ? (' · ' + sanitize(score)) : '') + '</span>' +
+                '<b>' + sanitize(mt && mt.opponent ? mt.opponent : e.title) + '</b>' +
+                '<span class="note-sm">' + sanitize(bits.join(' · ')) + '</span></button>';
             }
             return '<div class="cal-ev-row">' + sanitize(e.title) +
               ' <span class="note-sm">(' + kind + (state ? ', ' + state : '') + extra + ')</span></div>';
@@ -2208,7 +2372,10 @@ trainings() {
       }
     }
 
-    return '<div class="st">Календар</div>' +
+    const canEditCal = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+    return '<div class="st">Календар' +
+      (canEditCal ? ' <button type="button" class="btn btn-p btn-sm" data-action="new-event">+ Подія</button>' : '') +
+      '</div>' +
       '<div class="card glass cal-card"><div class="cal-nav">' +
       '<button type="button" class="btn btn-s btn-sm cal-nav-btn" data-action="cal-prev" aria-label="Попередній місяць">‹</button>' +
       '<div class="cal-month">' + sanitize(monthName) + '</div>' +
@@ -2224,7 +2391,7 @@ trainings() {
       '<span class="cdn" title="Неділя">Нд</span></div>' +
       '<div class="cal-grid cg">' + cells + '</div></div>' +
       dayDetail +
-      '<p class="note-sm">● заплановане · ✓ проведено · ✕ скасовано · 🎂 день народження</p>';
+      '<p class="note-sm">Золота клітинка — матч. ● заплановане · ✓ проведено · ✕ скасовано · 🎂 день народження</p>';
   },
 
   matches() {
@@ -2373,7 +2540,9 @@ trainings() {
           field('mpWarmPlace', 'Місце', m.warmupPlace || '') +
         '</div>' +
         area('mpWarm', 'Що робимо', m.warmup) +
-        '<p class="note-sm">Кожен рядок стає окремим блоком розминки в день гри.</p>' +
+        '<p class="note-sm">Кожен рядок стає окремим блоком. Назва: ' +
+          sanitize((typeof CoachTools !== 'undefined' && CoachTools.warmupTitle) ? CoachTools.warmupTitle(m, s) : ('Розминка • Металіст vs ' + (m.opponent || 'суперник'))) +
+          '</p>' +
       '</section>' +
       '<section class="card glass"><div class="ct">Тиждень матчу</div>' +
         '<div class="match-week">' + weekHtml +
@@ -2386,6 +2555,9 @@ trainings() {
         (canEdit ? (
           '<label class="fl"><span class="fl-label">Схема</span><select class="fl-input" id="mpScheme">' +
             schemes.map(name => '<option' + (name === scheme ? ' selected' : '') + '>' + sanitize(name) + '</option>').join('') +
+          '</select></label>' +
+          '<label class="fl"><span class="fl-label">Альбом схем</span><select class="fl-input" id="mpAlbum">' +
+            this._albumOptions(m.schemeAlbumId) +
           '</select></label>' +
           '<div class="match-actions">' +
             '<button type="button" class="btn btn-s btn-sm" data-action="match-xi">За лоадом</button>' +

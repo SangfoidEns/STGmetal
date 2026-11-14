@@ -10662,7 +10662,31 @@ button.cal-cell {
 .cal-dot-done { background: #2ecc71 !important; }
 .cal-dot-cancel { background: #e74c3c !important; }
 .cal-dot-plan { background: #f5c542 !important; }
-.cal-dot-match { background: #3b82f6 !important; }
+.cal-dot-match { background: #e8c547 !important; }
+.cal-cell.has-match {
+  background: linear-gradient(180deg, rgba(232, 197, 71, 0.34), rgba(61, 126, 255, 0.2)) !important;
+  border-color: rgba(232, 197, 71, 0.9) !important;
+  box-shadow: inset 0 0 0 1px rgba(232, 197, 71, 0.35) !important;
+}
+.cal-ev-row.is-match {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 2px !important;
+  width: 100% !important;
+  text-align: left !important;
+  background: transparent !important;
+  border: 0 !important;
+  color: inherit !important;
+  cursor: pointer !important;
+}
+.cal-ev-kicker {
+  color: #e8c547;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
 .cal-dot-ev { background: #a855f7 !important; }
 .cal-day-detail { margin-top: 12px !important; }
 .cal-ev-row {
@@ -12799,3 +12823,48 @@ body.board-only-mode #mobileNav.glass-nav {
 #playersLayer .pt .tn-pos {
   pointer-events: auto !important;
 }
+
+.ym { display: flex; flex-direction: column; gap: 12px; }
+.ym-head, .ym-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.ym h1, .ym h2 { margin: 0; font-size: 28px; letter-spacing: -0.04em; }
+.ym-kicker { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #9aa4b2; font-weight: 800; }
+.ym-search {
+  width: 100%; box-sizing: border-box; min-height: 44px; border-radius: 22px;
+  border: 0; padding: 0 16px; background: rgba(255,255,255,0.08); color: inherit; font: inherit;
+}
+.ym-shelf-h { font-size: 18px; font-weight: 800; margin-top: 6px; }
+.ym-row { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }
+.ym-tile {
+  flex: 0 0 132px; scroll-snap-align: start; border: 0; background: transparent; color: inherit;
+  text-align: left; padding: 0; cursor: pointer;
+}
+.ym-tile-art, .ym-hero-art {
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end;
+  width: 132px; height: 132px; border-radius: 12px; padding: 12px;
+  background: linear-gradient(160deg, rgba(255,255,255,.35), transparent 46%), var(--ym, #e8c547);
+  box-shadow: 0 10px 24px rgba(0,0,0,.35);
+}
+.ym-tile-art b, .ym-hero-art { font-size: 42px; font-weight: 900; line-height: 1; }
+.ym-tile-art small { font-size: 12px; font-weight: 700; opacity: .8; }
+.ym-tile-name { display: block; margin-top: 8px; font-size: 13px; font-weight: 700; line-height: 1.25; }
+.ym-tile-new .ym-tile-art { align-items: center; justify-content: center; font-size: 40px; background: rgba(255,255,255,0.06); box-shadow: none; }
+.ym-hero { display: flex; gap: 14px; align-items: flex-end; }
+.ym-hero-art { width: 148px; height: 148px; font-size: 64px; align-items: center; justify-content: center; }
+.ym-hero h1 { font-size: 26px; }
+.ym-hero p, .ym-list { margin: 0; }
+.ym-list { display: flex; flex-direction: column; }
+.ym-track { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.ym-play {
+  flex: 1; display: flex; align-items: center; gap: 12px; min-height: 64px;
+  border: 0; background: transparent; color: inherit; text-align: left; padding: 8px 0; cursor: pointer;
+}
+.ym-thumb { width: 48px; height: 48px; border-radius: 8px; overflow: hidden; flex: 0 0 auto; background: #1b212b; }
+.ym-thumb svg { width: 48px; height: 48px; display: block; }
+.ym-track-copy { display: flex; flex-direction: column; min-width: 0; }
+.ym-track-copy b { font-size: 15px; }
+.ym-track-copy small { color: #9aa4b2; white-space: normal; line-height: 1.3; }
+.ym-more {
+  width: 36px; height: 36px; border-radius: 18px; border: 0; background: rgba(255,255,255,0.08);
+  color: inherit; font-weight: 800; cursor: pointer;
+}
+.squad-match-row { width: 100%; }

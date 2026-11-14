@@ -1211,6 +1211,10 @@ const BoardEngine = {
       Toast.show('Суперник: схема ' + name + ' (дзеркало)', 'ok');
       return;
     }
+    const remembered = (typeof CoachTools !== 'undefined' && CoachTools.rememberedLineup)
+      ? CoachTools.rememberedLineup(s)
+      : null;
+    if (remembered && this.placeMatchLineup(Object.assign({}, remembered, { scheme: name }))) return;
     // Своя команда: 11 основи на поле; резерв / травма / відновлення — на лавку
     s.activeBoard.objects = s.activeBoard.objects.filter(o => !(o.type === 'player' && o.team !== 'opp'));
     const chipColor = s.activeBoard.drawColor || null;
@@ -1428,8 +1432,7 @@ const BoardEngine = {
         rotation: 0, locked: false, visible: true
       });
     }, this);
-    (match.bench || []).forEach(function (id) {
-      const player = byId[String(id)];
+    const pushBench = function (player) {
       if (!player || used[String(player.id)]) return;
       used[String(player.id)] = true;
       objects.push({
@@ -1448,7 +1451,9 @@ const BoardEngine = {
         onBench: true,
         rotation: 0, locked: false, visible: true
       });
-    });
+    };
+    (match.bench || []).forEach(function (id) { pushBench(byId[String(id)]); });
+    (s.players || []).forEach(function (player) { pushBench(player); });
     s.activeBoard.objects = objects;
     try { this.pushHistory(); } catch (_) {}
     try { this.render(); } catch (_) {}

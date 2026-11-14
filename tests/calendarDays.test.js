@@ -29,7 +29,10 @@ describe('calendar weekday letters', () => {
     assert.match(html, /title="Субота">Сб</);
     assert.match(html, /title="Неділя">Нд</);
     assert.equal(html.includes('>А<'), false);
-    assert.equal(context.Views.APP_BUILD, 'z86');
+    assert.equal(context.Views.APP_BUILD, 'z87');
+    const library = context.Views.tactics();
+    assert.match(library, /Альбоми/);
+    assert.match(library, /ym-search/);
     const plaque = context.Views._matchPlaque({
       id: 'm9', opponent: 'Turbine Leuschner', date: '2026-10-25', time: '20:00',
       competition: 'Товариський матч', home: true, scoreUs: 2, scoreThem: 1
@@ -100,5 +103,25 @@ describe('calendar weekday letters', () => {
     assert.equal(store.calendar.length, 1);
     assert.equal(store.calendar[0].type, 'birthday');
     assert.equal(store.calendar[0].date, '1989-07-25');
+    store.matches = [{
+      id: 'm1', date: '2026-11-15', time: '13:00', opponent: 'Turbine Leuschner',
+      competition: 'Товариський', home: true, xi: ['p1'], bench: ['p2']
+    }];
+    store.ui.calDate = '2026-11-01';
+    store.ui.selectedDay = '2026-11-15';
+    context.AuthManager.isCoach = () => true;
+    const day = context.Views.calendar();
+    assert.match(day, /has-match/);
+    assert.match(day, /Turbine Leuschner/);
+    assert.match(day, /13:00/);
+    assert.match(day, /основа 1/);
+    assert.match(day, /data-action="new-event"/);
+    store.schemeAlbums = [{ id: 'a1', name: 'Стандарти', boardIds: ['b1'] }];
+    store.boards = [{ id: 'b1', name: 'Кутовий', type: 'стандарт' }];
+    store.ui.schemeAlbumId = 'a1';
+    const album = context.Views.tactics();
+    assert.match(album, /Стандарти/);
+    assert.match(album, /Кутовий/);
+    assert.match(album, /ym-track/);
   });
 });

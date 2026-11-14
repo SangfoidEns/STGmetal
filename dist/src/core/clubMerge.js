@@ -4,7 +4,7 @@
  * Відвідуваність зливається по гравцю. Час тренера береться більший.
  */
 (function (root) {
-  const LISTS = ['players', 'trainings', 'exercises', 'boards', 'calendar', 'matches', 'diary', 'myExercises', 'animations', 'gifts', 'moments', 'chat', 'feed'];
+  const LISTS = ['players', 'trainings', 'exercises', 'boards', 'schemeAlbums', 'calendar', 'matches', 'diary', 'myExercises', 'animations', 'gifts', 'moments', 'chat', 'feed'];
 
   function stamp(value) {
     const n = Date.parse(value || '');

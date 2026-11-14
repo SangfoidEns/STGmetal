@@ -1725,6 +1725,30 @@ CoachTools.applyMatchWeek = function (state, match) {
   return { added: added };
 };
 
+/** «Розминка • Металіст vs суперник». */
+CoachTools.warmupTitle = function (match, state) {
+  const settings = (state && state.settings) || {};
+  let club = String(settings.clubShort || '').trim();
+  if (!club || club === 'МШ' || club === 'MS') club = 'Металіст';
+  const opp = String((match && match.opponent) || '').trim() || 'суперник';
+  return 'Розминка • ' + club + ' vs ' + opp;
+};
+
+/** Наступний зібраний матч, інакше останній зіграний зі складом. */
+CoachTools.rememberedLineup = function (state, todayStr) {
+  const today = todayStr || ((typeof today === 'function') ? today() : '');
+  const list = ((state && state.matches) || []).filter(function (m) {
+    return m && m.status !== 'cancelled' && m.status !== 'canceled' && (m.xi || []).some(Boolean);
+  });
+  const byStart = function (a, b) {
+    return String(a.date || '').localeCompare(String(b.date || '')) || String(a.time || '').localeCompare(String(b.time || ''));
+  };
+  const upcoming = list.filter(function (m) { return String(m.date || '') >= today; }).sort(byStart);
+  if (upcoming.length) return upcoming[0];
+  const past = list.filter(function (m) { return String(m.date || '') < today; }).sort(function (a, b) { return byStart(b, a); });
+  return past[0] || null;
+};
+
 /** Одна розминка в день матчу. Повторний виклик оновлює той самий запис. */
 CoachTools.applyMatchWarmup = function (state, match) {
   if (!state || !match || !match.id || !match.date) return { added: 0 };
@@ -1746,7 +1770,7 @@ CoachTools.applyMatchWarmup = function (state, match) {
       intensity: 3
     };
   });
-  const name = 'Розминка · vs ' + (match.opponent || 'суперник');
+  const name = CoachTools.warmupTitle(match, state);
   let training = state.trainings.find(function (item) {
     return item && (item.id === id || (item.matchId === match.id && item.md === 'WU'));
   });

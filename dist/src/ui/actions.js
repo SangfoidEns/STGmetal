@@ -543,6 +543,7 @@ const Actions = {
         <div class="fgr"><label>RPE</label><input type="number" id="teInt" value="${t.intensity || 6}" min="1" max="10"></div>
         <div class="fgr full"><label>${(typeof I18n!=='undefined'?I18n.t('label_goal','Мета'):'Мета')}</label><input id="teGoal" value="${sanitize(t.mainGoal || '')}"></div>
         <div class="fgr full"><label>Коментар</label><textarea id="teCom">${sanitize(t.comment || '')}</textarea></div>
+        <div class="fgr full"><label>Альбом схем</label><select id="teAlbum">${(typeof Views !== 'undefined' && Views._albumOptions) ? Views._albumOptions(t.schemeAlbumId) : ''}</select></div>
         <div class="fgr full"><label><input type="checkbox" id="teAttachBoard"> ${t.board ? 'Оновити прикріплену дошку з поточної' : 'Прикріпити поточну дошку до тренування'}</label></div>
         ${t.board ? '<p class="note-sm">До тренування вже прикріплена дошка (' + (t.board.objects||[]).length + ' об\'єктів).</p>' : ''}
       </div>
@@ -637,6 +638,8 @@ const Actions = {
     t.intensity = +document.getElementById('teInt')?.value || t.intensity;
     t.mainGoal = document.getElementById('teGoal')?.value;
     t.comment = document.getElementById('teCom')?.value;
+    const albumEl = document.getElementById('teAlbum');
+    if (albumEl) t.schemeAlbumId = albumEl.value || '';
     t.duration = (t.structure || []).reduce((a, b) => a + (b.duration || 0), 0);
     const savedAt = new Date().toISOString();
     t.updatedAt = savedAt;
@@ -792,6 +795,7 @@ const Actions = {
         </div>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_telegram','Telegram'):'Telegram')}</label><input id="peTg" value="${sanitize(p.telegramUsername||'')}" placeholder="@username" autocomplete="off"></div>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_phone','Телефон'):'Телефон')}</label><input id="pePhone" type="tel" value="${sanitize(p.phone||'')}" placeholder="+49..." autocomplete="off"></div>
+        <div class="fgr full"><label>Альбом схем</label><select id="peAlbum">${(typeof Views !== 'undefined' && Views._albumOptions) ? Views._albumOptions(p.schemeAlbumId) : ''}</select></div>
         <div class="fgr full"><label>Примітки / Індивідуальна програма</label><textarea id="peNo">${sanitize(p.notes||'')}</textarea></div>
         <p class="note-sm" style="grid-column:1/-1;margin:0">Telegram-нік потрібен для майбутнього входу гравця / персоналу в Mini App.</p>
       </div>`, [
@@ -824,6 +828,8 @@ const Actions = {
     p.load = +document.getElementById('peLoad')?.value ?? p.load;
     p.group = document.getElementById('peG')?.value || p.group;
     p.notes = document.getElementById('peNo')?.value || '';
+    const albumPick = document.getElementById('peAlbum');
+    if (albumPick) p.schemeAlbumId = albumPick.value || '';
     p.telegramUsername = (document.getElementById('peTg')?.value || '').replace(/^@/, '').trim();
     p.phone = (document.getElementById('pePhone')?.value || '').trim();
     const bd = document.getElementById('peBirth')?.value;
@@ -1416,6 +1422,8 @@ const Actions = {
     set('warmup', 'mpWarm');
     set('warmupAt', 'mpWarmAt');
     set('warmupPlace', 'mpWarmPlace');
+    const album = val('mpAlbum');
+    if (album != null) put('schemeAlbumId', album);
     const mins = val('mpWarmMin');
     if (mins != null) put('warmupMin', mins === '' ? '' : Number(mins));
     if (!changed) return true;
@@ -1595,9 +1603,11 @@ const Actions = {
     App.renderCurrent();
   },
 
-  toggleMatchPlayer(playerId) {
+  toggleMatchPlayer(playerId, matchId) {
     if (!this._coachOnly()) return;
-    const m = this._matchByUi();
+    const m = matchId
+      ? ((Store.get().matches || []).find(item => item && String(item.id) === String(matchId)) || null)
+      : this._matchByUi();
     if (!m || playerId == null || playerId === '') return;
     const id = String(playerId);
     const xi = (m.xi || []).slice(0, 11);
@@ -1689,6 +1699,95 @@ const Actions = {
     App.navigate('matches');
   },
 
+  _albumById(id) {
+    return ((Store.get().schemeAlbums) || []).find(a => a && String(a.id) === String(id)) || null;
+  },
+
+  newSchemeAlbum() {
+    if (!this._coachOnly()) return;
+    Modal.prompt('Назва альбому', 'Стандарти', name => {
+      const title = String(name || '').trim();
+      if (!title) return;
+      const s = Store.get();
+      s.schemeAlbums = s.schemeAlbums || [];
+      const now = new Date().toISOString();
+      const album = { id: uid(), name: title, boardIds: [], createdAt: now, updatedAt: now };
+      s.schemeAlbums.push(album);
+      s.ui = s.ui || {};
+      s.ui.schemeAlbumId = album.id;
+      s.ui.view = 'tactics';
+      StorageManager.save();
+      Toast.show('Альбом створено', 'ok');
+      App.renderCurrent();
+    });
+  },
+
+  renameSchemeAlbum(id) {
+    if (!this._coachOnly()) return;
+    const album = this._albumById(id);
+    if (!album) return;
+    Modal.prompt('Назва альбому', album.name || '', name => {
+      const title = String(name || '').trim();
+      if (!title) return;
+      album.name = title;
+      album.updatedAt = new Date().toISOString();
+      StorageManager.save();
+      App.renderCurrent();
+    });
+  },
+
+  deleteSchemeAlbum(id) {
+    if (!this._coachOnly()) return;
+    const album = this._albumById(id);
+    if (!album) return;
+    Modal.confirm('Видалити альбом «' + (album.name || '') + '»? Схеми залишаться.', () => {
+      const s = Store.get();
+      s.schemeAlbums = (s.schemeAlbums || []).filter(a => String(a.id) !== String(id));
+      if (s.ui && String(s.ui.schemeAlbumId) === String(id)) s.ui.schemeAlbumId = null;
+      StorageManager.save();
+      Toast.show('Альбом видалено', 'ok');
+      App.renderCurrent();
+    });
+  },
+
+  pickBoardForAlbum(id) {
+    if (!this._coachOnly()) return;
+    const album = this._albumById(id);
+    if (!album) return;
+    const have = new Set((album.boardIds || []).map(String));
+    const boards = (Store.get().boards || []).filter(b => b && b.id != null && !have.has(String(b.id)));
+    const rows = boards.map(b =>
+      '<button type="button" class="ym-track" data-action="album-add-board" data-album-id="' + sanitize(album.id) + '" data-board-id="' + sanitize(b.id) + '">' +
+      '<span class="ym-track-copy"><b>' + sanitize(b.name || 'Схема') + '</b><small>' + sanitize(b.type || 'тактика') + '</small></span></button>'
+    ).join('');
+    Modal.open('Додати схему', '<div class="ym-list">' + (rows || '<div class="es">Усі схеми вже в альбомі</div>') + '</div>', [
+      { label: 'Закрити', cls: 'btn-s', action: 'cancel' }
+    ]);
+  },
+
+  addBoardToAlbum(albumId, boardId) {
+    if (!this._coachOnly()) return;
+    const album = this._albumById(albumId);
+    if (!album || boardId == null) return;
+    album.boardIds = album.boardIds || [];
+    if (!album.boardIds.some(id => String(id) === String(boardId))) album.boardIds.push(boardId);
+    album.updatedAt = new Date().toISOString();
+    StorageManager.save();
+    try { Modal.close(); } catch (_) {}
+    Toast.show('Схему додано в альбом', 'ok');
+    App.renderCurrent();
+  },
+
+  removeBoardFromAlbum(albumId, boardId) {
+    if (!this._coachOnly()) return;
+    const album = this._albumById(albumId);
+    if (!album) return;
+    album.boardIds = (album.boardIds || []).filter(id => String(id) !== String(boardId));
+    album.updatedAt = new Date().toISOString();
+    StorageManager.save();
+    App.renderCurrent();
+  },
+
   newEvent() {
     Modal.open('Нова подія', `
       <div class="fg">
@@ -1710,11 +1809,24 @@ const Actions = {
   createEvent() {
     const title = document.getElementById('evN')?.value?.trim();
     if (!title) { Toast.show((typeof I18n!=='undefined'?I18n.t('toast_need_name','Вкажіть назву'):'Вкажіть назву'), 'warn'); return; }
-    Store.get().calendar.push({
-      id: uid(), title, date: document.getElementById('evD')?.value || today(),
-      time: document.getElementById('evT')?.value, type: document.getElementById('evTy')?.value,
+    const date = document.getElementById('evD')?.value || today();
+    const time = document.getElementById('evT')?.value;
+    const type = document.getElementById('evTy')?.value;
+    const event = {
+      id: uid(), title, date, time, type,
       notes: document.getElementById('evNo')?.value
-    });
+    };
+    if (type === 'MATCH') {
+      const match = {
+        id: uid(), opponent: title, date, time, status: 'planned', home: true,
+        competition: '', xi: [], bench: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+      };
+      Store.get().matches = Store.get().matches || [];
+      Store.get().matches.push(match);
+      event.matchId = match.id;
+      event.type = 'MATCH';
+    }
+    Store.get().calendar.push(event);
     StorageManager.save();
     Modal.close();
     Toast.show('Подію створено', 'ok');

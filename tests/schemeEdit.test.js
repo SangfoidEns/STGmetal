@@ -48,8 +48,8 @@ describe('scheme cards', () => {
     assert.match(html, /data-board-id="sch-1"/);
     assert.match(html, /data-action="edit-scheme"/);
     assert.match(html, /data-action="delete-scheme"/);
-    assert.match(html, /scheme-card-detail/);
-    assert.match(html, /Утримуйте мініатюру/);
+    assert.match(html, /ym-track/);
+    assert.match(html, /Альбоми/);
   });
 
   it('shows the description to a player and hides edit and delete', () => {
