@@ -45,7 +45,7 @@ describe('scheme cards', () => {
     const ctx = boot(true);
     const shelf = ctx.Views.tactics();
     assert.match(shelf, /Архів/);
-    assert.match(shelf, /Альбоми/);
+    assert.match(shelf, /Всі альбоми/);
     assert.equal(shelf.includes('data-action="edit-scheme"'), false);
     ctx.Store.get().ui.schemeArchive = true;
     const html = ctx.Views.tactics();
@@ -88,5 +88,32 @@ describe('scheme cards', () => {
     assert.match(album, /data-action="schemes-home"/);
     assert.match(album, /data-tab="trainings"/);
     assert.equal(album.includes('data-action="edit-scheme"'), false);
+  });
+
+  it('keeps albums inside a section and recommends the one this player has not opened', () => {
+    const ctx = boot(false);
+    ctx.AuthManager.getLinkedPlayer = () => ({ id: 'p9' });
+    ctx.AuthManager.isPlayer = () => true;
+    const store = ctx.Store.get();
+    store.schemeAlbums = [
+      { id: 'out', name: 'Аут', boardIds: ['sch-1'], createdAt: '2026-11-14T10:00:00.000Z' },
+      { id: 'ball', name: 'Перший м’яч', boardIds: [], createdAt: '2026-11-14T11:00:00.000Z' }
+    ];
+    store.schemeSections = [{ id: 'sec', name: 'Перший товариський матч', albumIds: ['out', 'ball'] }];
+    store.schemeOpens = [{ id: 'o1', who: 'p:p9', albumId: 'out', at: '2026-11-14T12:00:00.000Z' }];
+    const html = ctx.Views.tactics();
+    const headEnd = html.indexOf('Перший товариський матч');
+    const head = html.slice(html.indexOf('Всі альбоми'), headEnd);
+    assert.match(head, /Архів/);
+    assert.match(head, /ym-tile-count">1</);
+    assert.equal(head.includes('data-album-id'), false);
+    assert.ok(headEnd > html.indexOf('open-scheme-archive'));
+    assert.match(html, /Аут/);
+    const rec = html.split('Рекомендовані альбоми')[1] || '';
+    assert.match(rec, /Перший м’яч/);
+    assert.equal(rec.includes('data-album-id="out"'), false);
+    store.schemeOpens = [{ id: 'o2', who: 'p:other', albumId: 'ball', at: '2026-11-14T12:00:00.000Z' }];
+    const other = ctx.Views.tactics().split('Рекомендовані альбоми')[1] || '';
+    assert.equal(other.includes('Перший м’яч'), false);
   });
 });

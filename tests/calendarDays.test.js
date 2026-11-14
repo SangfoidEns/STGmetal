@@ -29,9 +29,9 @@ describe('calendar weekday letters', () => {
     assert.match(html, /title="Субота">Сб</);
     assert.match(html, /title="Неділя">Нд</);
     assert.equal(html.includes('>А<'), false);
-    assert.equal(context.Views.APP_BUILD, 'z96');
+    assert.equal(context.Views.APP_BUILD, 'z97');
     const library = context.Views.tactics();
-    assert.match(library, /Альбоми/);
+    assert.match(library, /Всі альбоми/);
     assert.match(library, /open-scheme-archive/);
     const plaque = context.Views._matchPlaque({
       id: 'm9', opponent: 'Turbine Leuschner', date: '2026-10-25', time: '20:00',

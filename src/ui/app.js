@@ -2873,8 +2873,13 @@ const App = {
         e.preventDefault(); e.stopPropagation();
         return Actions.newSchemeAlbum();
       }
+      if (action === 'new-album-in-section') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.newSchemeAlbum(t.dataset.sectionId);
+      }
       if (action === 'open-scheme-album') {
         e.preventDefault(); e.stopPropagation();
+        try { Actions.noteSchemeOpen({ albumId: t.dataset.albumId }); } catch (_) {}
         const s = Store.get();
         s.ui = s.ui || {};
         s.ui.schemeAlbumId = t.dataset.albumId || null;
@@ -2912,9 +2917,25 @@ const App = {
         e.preventDefault(); e.stopPropagation();
         return Actions.pickBoardForAlbum(t.dataset.albumId, t.dataset.sectionId);
       }
-      if (action === 'new-album-section') {
+      if (action === 'new-album-section' || action === 'new-scheme-section') {
         e.preventDefault(); e.stopPropagation();
-        return Actions.newAlbumSection(t.dataset.albumId);
+        return Actions.newSchemeSection();
+      }
+      if (action === 'rename-scheme-section') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.renameSchemeSection(t.dataset.sectionId);
+      }
+      if (action === 'delete-scheme-section') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.deleteSchemeSection(t.dataset.sectionId);
+      }
+      if (action === 'move-album-section') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.moveAlbumToSection(t.dataset.albumId);
+      }
+      if (action === 'set-album-section') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.setAlbumSection(t.dataset.albumId, t.dataset.sectionId);
       }
       if (action === 'open-scheme-archive') {
         e.preventDefault(); e.stopPropagation();
@@ -2967,6 +2988,10 @@ const App = {
         if (e.stopImmediatePropagation) e.stopImmediatePropagation();
         const bid = (t.dataset && t.dataset.boardId) || t.getAttribute('data-board-id');
         if (!bid) { Toast.show('Схему не знайдено', 'warn'); return; }
+        try {
+          const openAlbum = (Store.get().ui && Store.get().ui.schemeAlbumId) || '';
+          Actions.noteSchemeOpen({ boardId: bid, albumId: openAlbum });
+        } catch (_) {}
         try {
           const id = String(bid);
           let b = (Store.get().boards || []).find(x => String(x.id) === id);

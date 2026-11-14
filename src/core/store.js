@@ -18,6 +18,8 @@ const Store = (() => {
       exercises: JSON.parse(JSON.stringify(DEMO.exercises)),
       boards: [],
       schemeAlbums: [],
+      schemeSections: [],
+      schemeOpens: [],
       calendar: [],
       matches: [],
       diary: [],

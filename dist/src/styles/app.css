@@ -12844,6 +12844,10 @@ body.board-only-mode #mobileNav.glass-nav {
   border: 0; padding: 0 16px; background: rgba(255,255,255,0.08); color: inherit; font: inherit;
 }
 .ym-shelf-h { font-size: 18px; font-weight: 800; margin-top: 6px; }
+.ym-shelf-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; }
+.ym-shelf-head .ym-shelf-h { margin: 0; }
+.ym-sec-tools { display: flex; gap: 6px; flex: none; }
+.ym-section { margin-top: 8px; }
 .ym-row { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }
 .ym-tile {
   flex: 0 0 132px; scroll-snap-align: start; border: 0; background: transparent; color: inherit;

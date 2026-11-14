@@ -369,6 +369,8 @@ const StorageManager = {
       exercises: s.exercises,
       boards: s.boards,
       schemeAlbums: s.schemeAlbums || [],
+      schemeSections: s.schemeSections || [],
+      schemeOpens: s.schemeOpens || [],
       calendar: s.calendar,
       matches: s.matches,
       diary: s.diary || [],
@@ -600,6 +602,8 @@ const StorageManager = {
     if (Array.isArray(data.exercises) && data.exercises.length) base.exercises = data.exercises;
     if (Array.isArray(data.boards)) base.boards = data.boards;
     if (Array.isArray(data.schemeAlbums)) base.schemeAlbums = data.schemeAlbums;
+    if (Array.isArray(data.schemeSections)) base.schemeSections = data.schemeSections;
+    if (Array.isArray(data.schemeOpens)) base.schemeOpens = data.schemeOpens;
     if (Array.isArray(data.calendar)) base.calendar = data.calendar;
     if (Array.isArray(data.matches)) base.matches = data.matches;
     if (data.activeBoard) {
@@ -778,6 +782,8 @@ const StorageManager = {
       exercises: clone(s.exercises) || [],
       boards: clone(s.boards) || [],
       schemeAlbums: clone(s.schemeAlbums) || [],
+      schemeSections: clone(s.schemeSections) || [],
+      schemeOpens: clone(s.schemeOpens) || [],
       calendar: clone(s.calendar) || [],
       matches: clone(s.matches) || [],
       diary: clone(s.diary) || [],
@@ -835,6 +841,8 @@ const StorageManager = {
       matches: JSON.parse(JSON.stringify(s.matches || [])),
       boards: JSON.parse(JSON.stringify(s.boards || [])),
       schemeAlbums: JSON.parse(JSON.stringify(s.schemeAlbums || [])),
+      schemeSections: JSON.parse(JSON.stringify(s.schemeSections || [])),
+      schemeOpens: JSON.parse(JSON.stringify(s.schemeOpens || [])),
       schemes: JSON.parse(JSON.stringify(s.schemes || [])),
       diary: JSON.parse(JSON.stringify(s.diary || [])),
       gifts: JSON.parse(JSON.stringify(s.gifts || [])),
@@ -1311,6 +1319,8 @@ const StorageManager = {
             if (data.matches) packed.matches = mergeById(s.matches, data.matches);
             if (data.boards) packed.boards = mergeById(s.boards, data.boards);
             if (data.schemeAlbums) packed.schemeAlbums = mergeById(s.schemeAlbums, data.schemeAlbums);
+            if (data.schemeSections) packed.schemeSections = mergeById(s.schemeSections, data.schemeSections);
+            if (data.schemeOpens) packed.schemeOpens = mergeById(s.schemeOpens, data.schemeOpens);
             if (data.schemes) packed.schemes = mergeById(s.schemes, data.schemes);
             if (data.diary) packed.diary = mergeById(s.diary, data.diary);
             if (data.gifts) packed.gifts = mergeById(s.gifts, data.gifts);

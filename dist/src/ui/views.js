@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z96',
+  APP_BUILD: 'z97',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -2265,29 +2265,69 @@ trainings() {
       '<span class="ym-tile-name">' + name + '</span></button>';
   },
 
+  _viewerKey() {
+    try {
+      if (typeof AuthManager !== 'undefined' && AuthManager.isPlayer && AuthManager.isPlayer()) {
+        const me = AuthManager.getLinkedPlayer && AuthManager.getLinkedPlayer();
+        if (me && me.id != null && me.id !== '') return 'p:' + me.id;
+      }
+    } catch (_) {}
+    try {
+      if (typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach()) return 'coach';
+    } catch (_) {}
+    try {
+      const user = (typeof AuthManager !== 'undefined' && AuthManager.user) ? AuthManager.user() : null;
+      if (user && user.id != null && user.id !== '') return 'tg:' + user.id;
+    } catch (_) {}
+    return 'guest';
+  },
+
+  _archiveTile(count) {
+    return '<button type="button" class="ym-tile" data-action="open-scheme-archive" style="--ym:#94a3b8">' +
+      '<span class="ym-tile-art"><b>А</b><small class="ym-tile-count">' + count + '</small></span>' +
+      '<span class="ym-tile-name">Архів</span></button>';
+  },
+
+  _recommendedAlbums(s) {
+    const albums = (s.schemeAlbums || []).filter(a => a && a.id != null);
+    const byId = {};
+    albums.forEach(a => { byId[String(a.id)] = a; });
+    const who = this._viewerKey();
+    const opens = (s.schemeOpens || []).filter(o => o && o.who === who);
+    const openedAlbums = {};
+    const openedBoards = {};
+    opens.forEach(o => {
+      if (o.albumId) openedAlbums[String(o.albumId)] = (openedAlbums[String(o.albumId)] || 0) + 1;
+      if (o.boardId) openedBoards[String(o.boardId)] = (openedBoards[String(o.boardId)] || 0) + 1;
+    });
+    const score = {};
+    albums.forEach(a => { score[String(a.id)] = 0; });
+    albums.forEach(a => {
+      const hits = (a.boardIds || []).reduce((n, id) => n + (openedBoards[String(id)] || 0), 0);
+      if (hits && !openedAlbums[String(a.id)]) score[String(a.id)] += hits * 5;
+    });
+    (s.schemeSections || []).forEach(sec => {
+      const ids = ((sec && sec.albumIds) || []).map(String).filter(id => byId[id]);
+      const heat = ids.reduce((n, id) => n + (openedAlbums[id] || 0), 0);
+      if (!heat) return;
+      ids.forEach(id => {
+        if (!openedAlbums[id]) score[id] += heat * 4;
+      });
+    });
+    const ranked = albums
+      .map(a => ({ album: a, score: score[String(a.id)] || 0 }))
+      .filter(row => row.score > 0)
+      .sort((a, b) => b.score - a.score || String(b.album.updatedAt || b.album.createdAt || '').localeCompare(String(a.album.updatedAt || a.album.createdAt || '')))
+      .slice(0, 8)
+      .map(row => row.album);
+    return { albums: ranked, personal: opens.length > 0 };
+  },
+
   _schemeAlbumPage(album, canEdit) {
     const s = Store.get();
     const byId = {};
     (s.boards || []).forEach(b => { if (b && b.id != null) byId[String(b.id)] = b; });
     const trackOf = (b) => this._schemeTrack(b, { editable: canEdit, albumId: album.id });
-    const sections = Array.isArray(album.sections) ? album.sections : [];
-    let grouped = '';
-    if (sections.length) {
-      const used = {};
-      grouped = sections.map(sec => {
-        const ids = (sec && sec.boardIds) || [];
-        ids.forEach(id => { used[String(id)] = true; });
-        const secTracks = ids.map(id => byId[String(id)]).filter(Boolean).map(trackOf).join('');
-        return '<section class="ym-section"><div class="ym-shelf-h">' + sanitize((sec && sec.name) || 'Розділ') + '</div>' +
-          (canEdit ? '<button type="button" class="btn btn-s btn-sm" data-action="album-pick-board" data-album-id="' + sanitize(album.id) + '" data-section-id="' + sanitize(sec.id || '') + '">+ Схема сюди</button>' : '') +
-          '<div class="ym-list">' + (secTracks || '<div class="es">У розділі ще немає схем</div>') + '</div></section>';
-      }).join('');
-      const rest = (album.boardIds || []).filter(id => byId[String(id)] && !used[String(id)]);
-      if (rest.length) {
-        grouped += '<section class="ym-section"><div class="ym-shelf-h">Загальне</div><div class="ym-list">' +
-          rest.map(id => trackOf(byId[String(id)])).join('') + '</div></section>';
-      }
-    }
     const tracks = (album.boardIds || []).map(id => byId[String(id)]).filter(Boolean).map(trackOf).join('');
     const trains = (s.trainings || []).filter(t => t && String(t.schemeAlbumId || '') === String(album.id));
     const games = (s.matches || []).filter(m => m && String(m.schemeAlbumId || '') === String(album.id));
@@ -2300,7 +2340,7 @@ trainings() {
       ? '<div class="ym-actions">' +
           '<button type="button" class="btn btn-s btn-sm" data-action="rename-scheme-album" data-album-id="' + sanitize(album.id) + '">Назва</button>' +
           '<button type="button" class="btn btn-p btn-sm" data-action="album-pick-board" data-album-id="' + sanitize(album.id) + '">+ Схема</button>' +
-          '<button type="button" class="btn btn-s btn-sm" data-action="new-album-section" data-album-id="' + sanitize(album.id) + '">+ Розділ</button>' +
+          '<button type="button" class="btn btn-s btn-sm" data-action="move-album-section" data-album-id="' + sanitize(album.id) + '">У розділ</button>' +
           '<button type="button" class="btn btn-s btn-sm" data-action="delete-scheme-album" data-album-id="' + sanitize(album.id) + '">Видалити альбом</button>' +
         '</div>'
       : '';
@@ -2317,7 +2357,7 @@ trainings() {
       tools +
       '<p class="note-sm">' + (attached.length ? ('Прикріплено: ' + sanitize(attached.join(' · '))) : 'Ще не прикріплено. Альбом можна додати до тренування, матчу або гравця.') +
         (canEdit ? ' Свайп вліво прибирає схему з альбому.' : '') + '</p>' +
-      (grouped || ('<div class="ym-list">' + (tracks || '<div class="es">В альбомі ще немає схем</div>') + '</div>')) + '</div>';
+      '<div class="ym-list">' + (tracks || '<div class="es">В альбомі ще немає схем</div>') + '</div></div>';
   },
 
   tactics() {
@@ -2343,21 +2383,52 @@ trainings() {
         '<input id="schemeSearch" class="ym-search" type="search" placeholder="Пошук схеми" autocomplete="off">' +
         '<div class="ym-list">' + (tracks || '<div class="es">Архів порожній</div>') + '</div></div>';
     }
-    const tiles = albums.map(a => this._albumTile(a)).join('');
-    const archive = '<button type="button" class="ym-tile" data-action="open-scheme-archive" style="--ym:#94a3b8">' +
-      '<span class="ym-tile-art"><b>А</b><small>' + boards.length + '</small></span><span class="ym-tile-name">Архів</span></button>';
+    const byId = {};
+    albums.forEach(a => { if (a && a.id != null) byId[String(a.id)] = a; });
+    const sections = (s.schemeSections || []).slice().sort((a, b) =>
+      String(a.createdAt || a.id || '').localeCompare(String(b.createdAt || b.id || ''))
+    );
+    const used = {};
+    sections.forEach(sec => ((sec && sec.albumIds) || []).forEach(id => { if (byId[String(id)]) used[String(id)] = true; }));
+    const loose = albums.filter(a => a && !used[String(a.id)]);
+    const newAlbum = canEdit
+      ? '<button type="button" class="ym-tile ym-tile-new" data-action="new-scheme-album"><span class="ym-tile-art">+</span><span class="ym-tile-name">Новий альбом</span></button>'
+      : '';
+    const sectionHtml = sections.map(sec => {
+      const tiles = ((sec && sec.albumIds) || []).map(id => byId[String(id)]).filter(Boolean).map(a => this._albumTile(a)).join('');
+      const tools = canEdit
+        ? '<span class="ym-sec-tools">' +
+            '<button type="button" class="btn btn-s btn-sm" data-action="rename-scheme-section" data-section-id="' + sanitize(sec.id || '') + '">Назва</button>' +
+            '<button type="button" class="btn btn-s btn-sm" data-action="delete-scheme-section" data-section-id="' + sanitize(sec.id || '') + '">Видалити</button>' +
+          '</span>'
+        : '';
+      return '<section class="ym-section">' +
+        '<div class="ym-shelf-head"><div class="ym-shelf-h">' + sanitize((sec && sec.name) || 'Розділ') + '</div>' + tools + '</div>' +
+        '<div class="ym-row">' + tiles +
+          (canEdit ? '<button type="button" class="ym-tile ym-tile-new" data-action="new-album-in-section" data-section-id="' + sanitize(sec.id || '') + '"><span class="ym-tile-art">+</span><span class="ym-tile-name">Альбом сюди</span></button>' : '') +
+          (!tiles && !canEdit ? '<div class="es">У розділі ще немає альбомів</div>' : '') +
+        '</div></section>';
+    }).join('');
+    const rec = this._recommendedAlbums(s);
+    const recTiles = rec.albums.map(a => this._albumTile(a)).join('');
+    const recNote = rec.personal
+      ? (recTiles ? 'Підібрано з того, що відкриваєш саме ти. В іншого гравця список інший.' : 'Ти вже відкрив альбоми поруч. Новий з’явиться тут, щойно відкриєш щось інше.')
+      : 'Відкрий альбом або схему. Тут з’являться альбоми саме для тебе.';
     return '<div class="ym">' +
       '<div class="ym-head"><h1>Схеми</h1>' +
         (canEdit
-          ? '<span><button type="button" class="btn btn-s btn-sm" data-action="new-scheme-album">+ Альбом</button> <button type="button" class="btn btn-p btn-sm" data-action="new-board">+ Схема</button></span>'
+          ? '<span><button type="button" class="btn btn-s btn-sm" data-action="new-scheme-section">+ Розділ</button> <button type="button" class="btn btn-s btn-sm" data-action="new-scheme-album">+ Альбом</button> <button type="button" class="btn btn-p btn-sm" data-action="new-board">+ Схема</button></span>'
           : '') +
       '</div>' +
-      '<p class="note-sm">Альбоми можна ділити на розділи. Усі схеми лежать в архіві.</p>' +
-      '<div class="ym-shelf-h">Альбоми</div>' +
-      '<div class="ym-row">' + archive + tiles +
-        (canEdit ? '<button type="button" class="ym-tile ym-tile-new" data-action="new-scheme-album"><span class="ym-tile-art">+</span><span class="ym-tile-name">Новий альбом</span></button>' : '') +
-        (!tiles && !canEdit ? '<div class="es">Альбомів ще немає</div>' : '') +
-      '</div></div>';
+      '<p class="note-sm">Перша плашка — архів усіх схем. Далі розділи, а в розділі вже альбоми: наприклад перший товариський матч, а в ньому аут і перший м’яч.</p>' +
+      '<div class="ym-shelf-h">Всі альбоми</div>' +
+      '<div class="ym-row">' + this._archiveTile(boards.length) + loose.map(a => this._albumTile(a)).join('') + newAlbum + '</div>' +
+      sectionHtml +
+      '<section class="ym-section">' +
+        '<div class="ym-shelf-h">Рекомендовані альбоми</div>' +
+        '<p class="note-sm">' + recNote + '</p>' +
+        '<div class="ym-row">' + (recTiles || '<div class="es">Поки порожньо</div>') + '</div>' +
+      '</section></div>';
   },
 
   _trainingCancelled(tr) {

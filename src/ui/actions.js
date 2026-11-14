@@ -1707,9 +1707,9 @@ const Actions = {
     return ((Store.get().schemeAlbums) || []).find(a => a && String(a.id) === String(id)) || null;
   },
 
-  newSchemeAlbum() {
+  newSchemeAlbum(sectionId) {
     if (!this._coachOnly()) return;
-    Modal.prompt('Назва альбому', 'Стандарти', name => {
+    Modal.prompt('Назва альбому', 'Аут', name => {
       const title = String(name || '').trim();
       if (!title) return;
       const s = Store.get();
@@ -1717,6 +1717,14 @@ const Actions = {
       const now = new Date().toISOString();
       const album = { id: uid(), name: title, boardIds: [], createdAt: now, updatedAt: now };
       s.schemeAlbums.push(album);
+      if (sectionId) {
+        const sec = (s.schemeSections || []).find(x => x && String(x.id) === String(sectionId));
+        if (sec) {
+          sec.albumIds = sec.albumIds || [];
+          if (!sec.albumIds.some(id => String(id) === String(album.id))) sec.albumIds.push(album.id);
+          sec.updatedAt = now;
+        }
+      }
       s.ui = s.ui || {};
       s.ui.schemeAlbumId = album.id;
       s.ui.view = 'tactics';
@@ -1747,6 +1755,9 @@ const Actions = {
     Modal.confirm('Видалити альбом «' + (album.name || '') + '»? Схеми залишаться.', () => {
       const s = Store.get();
       s.schemeAlbums = (s.schemeAlbums || []).filter(a => String(a.id) !== String(id));
+      (s.schemeSections || []).forEach(sec => {
+        if (sec) sec.albumIds = (sec.albumIds || []).filter(aid => String(aid) !== String(id));
+      });
       if (s.ui && String(s.ui.schemeAlbumId) === String(id)) s.ui.schemeAlbumId = null;
       StorageManager.save();
       Toast.show('Альбом видалено', 'ok');
@@ -1754,20 +1765,104 @@ const Actions = {
     });
   },
 
-  newAlbumSection(id) {
+  newSchemeSection() {
     if (!this._coachOnly()) return;
-    const album = this._albumById(id);
-    if (!album) return;
-    Modal.prompt('Назва розділу', 'Атака', name => {
+    Modal.prompt('Назва розділу', 'Перший товариський матч', name => {
       const title = String(name || '').trim();
       if (!title) return;
-      album.sections = Array.isArray(album.sections) ? album.sections : [];
-      album.sections.push({ id: uid(), name: title, boardIds: [] });
-      album.updatedAt = new Date().toISOString();
+      const s = Store.get();
+      s.schemeSections = s.schemeSections || [];
+      const now = new Date().toISOString();
+      s.schemeSections.push({ id: uid(), name: title, albumIds: [], createdAt: now, updatedAt: now });
       StorageManager.save();
       Toast.show('Розділ додано', 'ok');
       App.renderCurrent();
     });
+  },
+
+  renameSchemeSection(id) {
+    if (!this._coachOnly()) return;
+    const s = Store.get();
+    const sec = (s.schemeSections || []).find(x => x && String(x.id) === String(id));
+    if (!sec) return;
+    Modal.prompt('Назва розділу', sec.name || '', name => {
+      const title = String(name || '').trim();
+      if (!title) return;
+      sec.name = title;
+      sec.updatedAt = new Date().toISOString();
+      StorageManager.save();
+      App.renderCurrent();
+    });
+  },
+
+  deleteSchemeSection(id) {
+    if (!this._coachOnly()) return;
+    const s = Store.get();
+    const sec = (s.schemeSections || []).find(x => x && String(x.id) === String(id));
+    if (!sec) return;
+    Modal.confirm('Видалити розділ «' + (sec.name || '') + '»? Альбоми залишаться.', () => {
+      const state = Store.get();
+      state.schemeSections = (state.schemeSections || []).filter(x => String(x.id) !== String(id));
+      StorageManager.save();
+      Toast.show('Розділ видалено', 'ok');
+      App.renderCurrent();
+    });
+  },
+
+  moveAlbumToSection(albumId) {
+    if (!this._coachOnly()) return;
+    const album = this._albumById(albumId);
+    if (!album) return;
+    const sections = Store.get().schemeSections || [];
+    const rows = '<button type="button" class="btn btn-s btn-sm" data-action="set-album-section" data-album-id="' + sanitize(album.id) + '" data-section-id="">Без розділу</button>' +
+      sections.map(sec => '<button type="button" class="btn btn-s btn-sm" data-action="set-album-section" data-album-id="' + sanitize(album.id) + '" data-section-id="' + sanitize(sec.id || '') + '">' + sanitize(sec.name || 'Розділ') + '</button>').join('');
+    Modal.open('У який розділ', '<div class="ym-actions">' + (rows || '<div class="es">Спочатку створи розділ</div>') + '</div>', [
+      { label: 'Закрити', cls: 'btn-s', action: 'cancel' }
+    ]);
+  },
+
+  setAlbumSection(albumId, sectionId) {
+    if (!this._coachOnly()) return;
+    const s = Store.get();
+    const album = this._albumById(albumId);
+    if (!album) return;
+    (s.schemeSections || []).forEach(sec => {
+      if (sec) sec.albumIds = (sec.albumIds || []).filter(id => String(id) !== String(albumId));
+    });
+    if (sectionId) {
+      const sec = (s.schemeSections || []).find(x => x && String(x.id) === String(sectionId));
+      if (sec) {
+        sec.albumIds = sec.albumIds || [];
+        sec.albumIds.push(album.id);
+        sec.updatedAt = new Date().toISOString();
+      }
+    }
+    StorageManager.save();
+    try { Modal.close(); } catch (_) {}
+    Toast.show(sectionId ? 'Альбом у розділі' : 'Альбом без розділу', 'ok');
+    App.renderCurrent();
+  },
+
+  noteSchemeOpen(info) {
+    const s = Store.get();
+    if (!s) return;
+    const albumId = info && info.albumId ? String(info.albumId) : '';
+    const boardId = info && info.boardId ? String(info.boardId) : '';
+    if (!albumId && !boardId) return;
+    const who = (typeof Views !== 'undefined' && Views._viewerKey) ? Views._viewerKey() : 'guest';
+    s.schemeOpens = Array.isArray(s.schemeOpens) ? s.schemeOpens : [];
+    const now = Date.now();
+    const recent = s.schemeOpens.some(o => o && o.who === who && String(o.albumId || '') === albumId && String(o.boardId || '') === boardId && (now - Date.parse(o.at || '')) < 120000);
+    if (recent) return;
+    s.schemeOpens.push({
+      id: (typeof uid === 'function') ? uid() : ('op-' + now),
+      who: who,
+      albumId: albumId,
+      boardId: boardId,
+      at: new Date(now).toISOString()
+    });
+    if (s.schemeOpens.length > 400) s.schemeOpens = s.schemeOpens.slice(-400);
+    try { StorageManager.save(); } catch (_) {}
   },
 
   pickBoardForAlbum(id, sectionId) {

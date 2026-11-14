@@ -4,7 +4,7 @@
  * Відвідуваність зливається по гравцю. Час тренера береться більший.
  */
 (function (root) {
-  const LISTS = ['players', 'trainings', 'exercises', 'boards', 'schemeAlbums', 'calendar', 'matches', 'diary', 'myExercises', 'animations', 'gifts', 'moments', 'chat', 'feed'];
+  const LISTS = ['players', 'trainings', 'exercises', 'boards', 'schemeAlbums', 'schemeSections', 'schemeOpens', 'calendar', 'matches', 'diary', 'myExercises', 'animations', 'gifts', 'moments', 'chat', 'feed'];
 
   function stamp(value) {
     const n = Date.parse(value || '');
@@ -226,7 +226,7 @@ function applyStampedFields(merged, a, b) {
     if ((!winner || winner.number == null || winner.number === '' || winner.number === 0) && loser && loser.number) {
       merged.number = loser.number;
     }
-    ['structure', 'slides', 'objects', 'tags', 'secondaryPositions', 'boardIds', 'sections'].forEach(function (key) {
+    ['structure', 'slides', 'objects', 'tags', 'secondaryPositions', 'boardIds', 'sections', 'albumIds'].forEach(function (key) {
       const older = loser && loser[key];
       const newer = winner && winner[key];
       if (Array.isArray(older) && older.length && (!Array.isArray(newer) || !newer.length)) merged[key] = older;
