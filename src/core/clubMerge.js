@@ -226,7 +226,7 @@ function applyStampedFields(merged, a, b) {
     if ((!winner || winner.number == null || winner.number === '' || winner.number === 0) && loser && loser.number) {
       merged.number = loser.number;
     }
-    ['structure', 'slides', 'objects', 'tags', 'secondaryPositions', 'boardIds'].forEach(function (key) {
+    ['structure', 'slides', 'objects', 'tags', 'secondaryPositions', 'boardIds', 'sections'].forEach(function (key) {
       const older = loser && loser[key];
       const newer = winner && winner[key];
       if (Array.isArray(older) && older.length && (!Array.isArray(newer) || !newer.length)) merged[key] = older;

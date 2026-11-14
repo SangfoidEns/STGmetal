@@ -125,7 +125,9 @@ const Actions = {
       '<div class="fg">' +
         '<div class="fgr full"><label>Назва</label><input id="schName" value="' + sanitize(b.name || '') + '"></div>' +
         '<div class="fgr full"><label>Тип</label><select id="schType">' + opts + '</select></div>' +
-        '<div class="fgr full"><label>Опис</label><textarea id="schDesc" rows="6" placeholder="Повний опис: ідея, фаза, завдання гравцям">' + sanitize(b.description || b.notes || '') + '</textarea></div>' +
+        '<div class="fgr full"><label>Опис</label>' +
+          ((typeof Views !== 'undefined' && Views._fmtBar) ? Views._fmtBar() : '') +
+          '<textarea id="schDesc" rows="6" placeholder="Повний опис. Ж — жирний, К — курсив, П — підкреслення, З — закреслений.">' + sanitize(b.description || b.notes || '') + '</textarea></div>' +
       '</div>',
       [
         { label: 'Скасувати', cls: 'btn-s', action: 'cancel' },
@@ -226,7 +228,9 @@ const Actions = {
       '<div class="fg">' +
         '<div class="fgr full"><label>Назва</label><input id="schName" value="' + sanitize(preset) + '"></div>' +
         '<div class="fgr full"><label>Тип</label><select id="schType"><option>тактика</option><option>тренування</option><option>фаза</option><option>стандарт</option></select></div>' +
-        '<div class="fgr full"><label>Опис</label><textarea id="schDesc" rows="5" placeholder="Повний опис: ідея, фаза, завдання"></textarea></div>' +
+        '<div class="fgr full"><label>Опис</label>' +
+          ((typeof Views !== 'undefined' && Views._fmtBar) ? Views._fmtBar() : '') +
+          '<textarea id="schDesc" rows="5" placeholder="Повний опис. Ж — жирний, К — курсив, П — підкреслення."></textarea></div>' +
       '</div>',
       [
         { label: 'Скасувати', cls: 'btn-s', action: 'cancel' },
@@ -543,7 +547,7 @@ const Actions = {
         <div class="fgr"><label>RPE</label><input type="number" id="teInt" value="${t.intensity || 6}" min="1" max="10"></div>
         <div class="fgr full"><label>${(typeof I18n!=='undefined'?I18n.t('label_goal','Мета'):'Мета')}</label><input id="teGoal" value="${sanitize(t.mainGoal || '')}"></div>
         <div class="fgr full"><label>Коментар</label><textarea id="teCom">${sanitize(t.comment || '')}</textarea></div>
-        <div class="fgr full"><label>Альбом схем</label><select id="teAlbum">${(typeof Views !== 'undefined' && Views._albumOptions) ? Views._albumOptions(t.schemeAlbumId) : ''}</select></div>
+        <div class="fgr full"><label>Альбом схем</label>${(typeof Views !== 'undefined' && Views._albumPickRow) ? Views._albumPickRow(t.schemeAlbumId, 'teAlbum') : ''}</div>
         <div class="fgr full"><label><input type="checkbox" id="teAttachBoard"> ${t.board ? 'Оновити прикріплену дошку з поточної' : 'Прикріпити поточну дошку до тренування'}</label></div>
         ${t.board ? '<p class="note-sm">До тренування вже прикріплена дошка (' + (t.board.objects||[]).length + ' об\'єктів).</p>' : ''}
       </div>
@@ -1750,10 +1754,29 @@ const Actions = {
     });
   },
 
-  pickBoardForAlbum(id) {
+  newAlbumSection(id) {
     if (!this._coachOnly()) return;
     const album = this._albumById(id);
     if (!album) return;
+    Modal.prompt('Назва розділу', 'Атака', name => {
+      const title = String(name || '').trim();
+      if (!title) return;
+      album.sections = Array.isArray(album.sections) ? album.sections : [];
+      album.sections.push({ id: uid(), name: title, boardIds: [] });
+      album.updatedAt = new Date().toISOString();
+      StorageManager.save();
+      Toast.show('Розділ додано', 'ok');
+      App.renderCurrent();
+    });
+  },
+
+  pickBoardForAlbum(id, sectionId) {
+    if (!this._coachOnly()) return;
+    const album = this._albumById(id);
+    if (!album) return;
+    const s = Store.get();
+    s.ui = s.ui || {};
+    s.ui.albumSectionId = sectionId || '';
     const have = new Set((album.boardIds || []).map(String));
     const boards = (Store.get().boards || []).filter(b => b && b.id != null && !have.has(String(b.id)));
     const rows = boards.map(b => (typeof Views !== 'undefined' && Views._schemePickButton)
@@ -1770,6 +1793,14 @@ const Actions = {
     if (!album || boardId == null) return;
     album.boardIds = album.boardIds || [];
     if (!album.boardIds.some(id => String(id) === String(boardId))) album.boardIds.push(boardId);
+    const secId = Store.get().ui && Store.get().ui.albumSectionId;
+    if (secId) {
+      const sec = (album.sections || []).find(x => x && String(x.id) === String(secId));
+      if (sec) {
+        sec.boardIds = sec.boardIds || [];
+        if (!sec.boardIds.some(id => String(id) === String(boardId))) sec.boardIds.push(boardId);
+      }
+    }
     album.updatedAt = new Date().toISOString();
     StorageManager.save();
     const tile = document.querySelector('#modal.show .ym-pick[data-board-id="' + String(boardId).replace(/"/g, '') + '"]');
@@ -1793,6 +1824,9 @@ const Actions = {
     const album = this._albumById(albumId);
     if (!album) return;
     album.boardIds = (album.boardIds || []).filter(id => String(id) !== String(boardId));
+    (album.sections || []).forEach(sec => {
+      if (sec) sec.boardIds = (sec.boardIds || []).filter(id => String(id) !== String(boardId));
+    });
     album.updatedAt = new Date().toISOString();
     StorageManager.save();
     App.renderCurrent();

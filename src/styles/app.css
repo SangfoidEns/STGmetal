@@ -12943,3 +12943,13 @@ body.board-only-mode #mobileNav.glass-nav {
   color: inherit; font-weight: 800; cursor: pointer;
 }
 .squad-match-row { width: 100%; }
+.fmt-bar { display: flex; gap: 6px; margin: 0 0 8px; }
+.fmt-bar button {
+  min-width: 36px; height: 32px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.06);
+  color: #fff; font-weight: 800;
+}
+.ym-desc b, .ym-desc i, .ym-desc u, .scheme-card-desc b, .scheme-card-desc i, .scheme-card-desc u { color: inherit; }
+.train-month-tile.on, .ym-album-picks .ym-pick.on { outline: 2px solid #e8c547; }
+.cal-ev-card { display: block; width: 100%; margin: 8px 0; text-align: left; }
+.match-peek .ct { margin-top: 10px; }

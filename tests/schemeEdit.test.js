@@ -43,6 +43,11 @@ function boot(coach) {
 describe('scheme cards', () => {
   it('keeps the full description and coach edit and delete on the ready list', () => {
     const ctx = boot(true);
+    const shelf = ctx.Views.tactics();
+    assert.match(shelf, /Архів/);
+    assert.match(shelf, /Альбоми/);
+    assert.equal(shelf.includes('data-action="edit-scheme"'), false);
+    ctx.Store.get().ui.schemeArchive = true;
     const html = ctx.Views.tactics();
     assert.match(html, /Воротар віддає на крайнього центрального/);
     assert.match(html, /data-board-id="sch-1"/);
@@ -52,11 +57,13 @@ describe('scheme cards', () => {
     assert.match(html, /ym-expand-title/);
     assert.match(html, /ym-dots/);
     assert.match(html, /ym-art/);
-    assert.match(html, /Альбоми/);
+    assert.match(html, /Архів схем/);
+    assert.equal(ctx.Views._richText('пас **в** зону'), 'пас <b>в</b> зону');
   });
 
   it('shows the description to a player and hides edit and delete', () => {
     const ctx = boot(false);
+    ctx.Store.get().ui.schemeArchive = true;
     const html = ctx.Views.tactics();
     assert.match(html, /Воротар віддає на крайнього центрального/);
     assert.equal(html.includes('data-action="edit-scheme"'), false);

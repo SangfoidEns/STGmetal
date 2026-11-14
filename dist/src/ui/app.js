@@ -2334,8 +2334,9 @@ const App = {
       if (e.target.closest && e.target.closest('#teamChat, #teamChatForm, .team-chat, .team-chat-form, .scheme-card-detail, .ym-expand, #modal, .match-plan, .match-chip')) return;
       const schemeCard = e.target.closest && e.target.closest('.scheme-card[data-board-id]');
       const track = e.target.closest && e.target.closest('.ym-track[data-board-id]');
-      if (!schemeCard && !track && e.target.closest && e.target.closest('button:not(.coach-tools-handle), a, input, select, textarea')) return;
-      const row = track || schemeCard || (e.target.closest && e.target.closest(
+      const matchCard = e.target.closest && e.target.closest('.match-list-card[data-match-id], .cal-ev-row.is-match[data-match-id]');
+      if (!schemeCard && !track && !matchCard && e.target.closest && e.target.closest('button:not(.coach-tools-handle), a, input, select, textarea')) return;
+      const row = track || schemeCard || matchCard || (e.target.closest && e.target.closest(
         '.card-training[data-training-id], .tg-row[data-training-id], .pl-row[data-player-id], .scheme-row[data-board-id], .sc-next-training[data-next-training], .coach-tools-handle, .sc-tap[data-view="players"]'
       ));
       if (!row) return;
@@ -2343,19 +2344,21 @@ const App = {
       this._lpTarget = row;
       row.classList.add('tg-row-holding');
       const kind = track ? 'ym-track' : schemeCard ? 'scheme-card'
+        : matchCard ? 'match'
         : row.classList.contains('pl-row') ? 'player'
         : (row.matches && row.matches('.sc-tap[data-view="players"]')) ? 'squad'
         : row.classList.contains('scheme-row') ? 'scheme'
         : row.classList.contains('sc-next-training') ? 'next-training'
         : row.classList.contains('coach-tools-handle') ? 'coach-tools'
         : 'training';
-      const id = (track && track.dataset.boardId) || (schemeCard && schemeCard.dataset.boardId) || row.dataset.trainingId || row.dataset.editTraining || row.dataset.playerId || row.dataset.boardId || row.dataset.nextTraining || '';
+      const id = (track && track.dataset.boardId) || (schemeCard && schemeCard.dataset.boardId) || (matchCard && matchCard.dataset.matchId) || row.dataset.trainingId || row.dataset.editTraining || row.dataset.playerId || row.dataset.boardId || row.dataset.nextTraining || '';
       this._lpTimer = setTimeout(() => {
         this._lpTimer = null;
         if (this._lpTarget && !this._lpMoved) {
           this._lpTarget.classList.remove('tg-row-holding');
           if (kind === 'squad') this.openSquadDialog();
           else if (kind === 'player') this.openPlayerActionSheet(id);
+          else if (kind === 'match') this.openMatchPeek(id);
           else if (kind === 'ym-track') this.expandSchemeTrack(id);
           else if (kind === 'scheme-card') this.expandSchemeCard(id);
           else if (kind === 'scheme') this.openSchemeActionSheet(id);
@@ -2444,6 +2447,41 @@ const App = {
     });
   },
 
+  formatField(cmd) {
+    const el = document.getElementById('schDesc') || document.querySelector('#modalBody textarea');
+    if (!el) return;
+    const pairs = { bold: ['**', '**'], italic: ['*', '*'], underline: ['__', '__'], strike: ['~~', '~~'] };
+    const pair = pairs[cmd] || pairs.bold;
+    const start = el.selectionStart || 0;
+    const end = el.selectionEnd || 0;
+    const text = String(el.value || '');
+    const selected = text.slice(start, end) || 'текст';
+    el.value = text.slice(0, start) + pair[0] + selected + pair[1] + text.slice(end);
+    const from = start + pair[0].length;
+    try {
+      el.focus();
+      el.setSelectionRange(from, from + selected.length);
+    } catch (_) {}
+  },
+
+  openMatchPeek(id) {
+    const s = Store.get();
+    const m = (s.matches || []).find(x => x && String(x.id) === String(id));
+    if (!m) return;
+    const byId = {};
+    (s.players || []).forEach(p => { if (p && p.id != null) byId[String(p.id)] = p; });
+    const names = (m.xi || []).map(pid => byId[String(pid)]).filter(Boolean).map(p => p.lastName || p.firstName || ('#' + (p.number || '')));
+    const desc = String(m.plan || m.tactics || m.preNotes || m.notes || m.description || '').trim();
+    const plaque = (typeof Views !== 'undefined' && Views._matchPlaque) ? Views._matchPlaque(m, { kicker: 'Матч', plain: true }) : '';
+    const body = '<div class="match-peek">' + plaque +
+      '<div class="ct">Основа · ' + names.length + '</div>' +
+      '<p>' + (names.length ? names.map(n => sanitize(n)).join(' · ') : 'Основу ще не зібрано.') + '</p>' +
+      '<div class="ct">Опис</div>' +
+      '<p class="ym-desc">' + ((typeof Views !== 'undefined' && Views._richText) ? Views._richText(desc) : sanitize(desc || 'Опису ще немає.')) + '</p></div>';
+    try { TelegramManager.haptic && TelegramManager.haptic('medium'); } catch (_) {}
+    Modal.open('vs ' + (m.opponent || 'Суперник'), body, [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
+  },
+
   photoFallback(img) {
     if (!img) return;
     const parts = String(img.getAttribute('data-fallback') || '').split('|').filter(Boolean);
@@ -2526,6 +2564,17 @@ const App = {
   },
 
   bindEvents() {
+    if (!this._fmtBound) {
+      this._fmtBound = true;
+      document.addEventListener('click', (e) => {
+        const fmt = e.target && e.target.closest && e.target.closest('[data-fmt]');
+        if (!fmt) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        try { App.formatField(fmt.getAttribute('data-fmt')); } catch (err) { console.error(err); }
+      }, true);
+    }
     if (!this._modalActionBound) {
       this._modalActionBound = true;
       document.addEventListener('click', (e) => {
@@ -2842,6 +2891,7 @@ const App = {
         const s = Store.get();
         s.ui = s.ui || {};
         s.ui.schemeAlbumId = null;
+        s.ui.schemeArchive = false;
         if (this._playerSchemesHome(s)) {
           try { this.navigate('trainings'); } catch (_) { this.renderCurrent(); }
           return;
@@ -2860,7 +2910,41 @@ const App = {
       }
       if (action === 'album-pick-board') {
         e.preventDefault(); e.stopPropagation();
-        return Actions.pickBoardForAlbum(t.dataset.albumId);
+        return Actions.pickBoardForAlbum(t.dataset.albumId, t.dataset.sectionId);
+      }
+      if (action === 'new-album-section') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.newAlbumSection(t.dataset.albumId);
+      }
+      if (action === 'open-scheme-archive') {
+        e.preventDefault(); e.stopPropagation();
+        const s = Store.get();
+        s.ui = s.ui || {};
+        s.ui.schemeAlbumId = null;
+        s.ui.schemeArchive = true;
+        if (this._playerSchemesHome(s)) {
+          try { this.navigate('trainings'); } catch (_) { this.renderCurrent(); }
+          return;
+        }
+        s.ui.view = 'tactics';
+        try { App.renderCurrent(); } catch (_) {}
+        return;
+      }
+      if (action === 'pick-album-field') {
+        e.preventDefault(); e.stopPropagation();
+        const field = document.getElementById(t.dataset.albumField || '');
+        if (field) field.value = t.dataset.albumId || '';
+        const host = t.closest && t.closest('.ym-album-picks');
+        if (host) host.querySelectorAll('.ym-pick').forEach(el => el.classList.toggle('on', el === t));
+        return;
+      }
+      if (action === 'toggle-train-month') {
+        e.preventDefault(); e.stopPropagation();
+        const s = Store.get();
+        s.ui = s.ui || {};
+        s.ui.trainMonth = t.dataset.month || '';
+        try { this.renderCurrent(); } catch (_) {}
+        return;
       }
       if (action === 'album-add-board') {
         e.preventDefault(); e.stopPropagation();
@@ -3449,17 +3533,25 @@ const App = {
           const file = input.files && input.files[0];
           if (!file) return;
           if (file.size > 2.5e6) { Toast.show('Максимум 2.5 МБ', 'warn'); return; }
-          const reader = new FileReader();
-          reader.onload = () => {
-            const data = reader.result;
+          const storePhoto = (data) => {
+            if (!data) { Toast.show('Не вдалося прочитати фото', 'warn'); return; }
             const s = Store.get().settings;
-            if (isCoach) s.coachPhoto = data;
-            else s.logoData = data;
+            if (isCoach) {
+              s.coachPhoto = data;
+              try { StorageManager.rememberCoachPhoto(data); } catch (_) {}
+            } else s.logoData = data;
             try { StorageManager.save(); } catch (_) {}
             try { App.applyBranding && App.applyBranding(); } catch (_) {}
             try { App.renderCurrent && App.renderCurrent(); } catch (_) {}
             Toast.show(isCoach ? 'Фото тренера оновлено' : 'Логотип оновлено', 'ok');
           };
+          if (isCoach && typeof Actions !== 'undefined' && Actions._compressImageFile) {
+            Actions._compressImageFile(file, 480, 0.72).then(storePhoto).catch(() => storePhoto(''));
+            input.value = '';
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = () => storePhoto(reader.result);
           reader.readAsDataURL(file);
           input.value = '';
         };
@@ -4507,14 +4599,11 @@ const App = {
       if (e.target.dataset.filter === 'trainings') {
         const q = (document.getElementById('trSearch')?.value || '').toLowerCase();
         const st = document.getElementById('trStatus')?.value || '';
-        const isCoach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
-        let list = Store.get().trainings.slice();
-        if (!isCoach) list = list.filter(t => (typeof Views !== 'undefined' && Views._trainingCancelled && Views._trainingCancelled(t)) || (t.status !== 'draft' && t.status !== 'pinned'));
-        list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-        if (q) list = list.filter(t => (t.name || '').toLowerCase().includes(q));
-        if (st) list = list.filter(t => t.status === st);
-        const el = document.getElementById('trList');
-        if (el) el.innerHTML = Views._trList(list);
+        document.querySelectorAll('.card-training').forEach(card => {
+          const name = (card.querySelector('.tr-title')?.textContent || '').toLowerCase();
+          const status = card.getAttribute('data-status') || '';
+          card.hidden = !!((q && name.indexOf(q) < 0) || (st && status !== st));
+        });
       }
       if (e.target.dataset.filter === 'players') {
         const q = (document.getElementById('plSearch')?.value || '').toLowerCase();
