@@ -26,7 +26,7 @@ const ClickGuard = {
     if (this.matchSquadClick(node)) return false;
     if (node.closest('#mobileNav, .mn')) return true;
     if (!inBand) return false;
-    if (node.closest('#sidebar, .sidebar, #modal, .md, .mo, .tg-sheet, .tg-sheet-backdrop, .sw-sheet, .match-plan, .match-toolbar, .match-savebar, [data-action="match-save"], [data-action="match-warmup"], [data-action="match-logo"]')) return false;
+    if (node.closest('#sidebar, .sidebar, #modal, .md, .mo, .tg-sheet, .tg-sheet-backdrop, .sw-sheet, .match-plan, .match-toolbar, .match-savebar, .ym, .ym-track, .ym-expand, .ym-pick, .ym-picks, .ym-tile, .ym-menu, [data-action="match-save"], [data-action="match-warmup"], [data-action="match-logo"]')) return false;
     const own = this.ownControl(node);
     if (!own || !own.getBoundingClientRect) return true;
     const r = own.getBoundingClientRect();
@@ -38,7 +38,7 @@ const ClickGuard = {
 
   trainingOpensSheet(node) {
     if (!node || !node.closest) return false;
-    if (this.matchSquadClick(node) || node.closest('.match-plan, #modal, .mo, .roster-pick, .tg-next-btn, .match-plaque, .match-toolbar')) return false;
+    if (this.matchSquadClick(node) || node.closest('.match-plan, #modal, .mo, .roster-pick, .tg-next-btn, .match-plaque, .match-toolbar, .ym, .ym-track, .ym-expand, .ym-pick, .ym-picks, .ym-tile, .ym-menu, .tg-sheet, .tg-sheet-backdrop')) return false;
     const explicit = node.closest('[data-action]');
     if (explicit) {
       const act = explicit.getAttribute('data-action') || '';

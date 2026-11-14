@@ -1756,11 +1756,10 @@ const Actions = {
     if (!album) return;
     const have = new Set((album.boardIds || []).map(String));
     const boards = (Store.get().boards || []).filter(b => b && b.id != null && !have.has(String(b.id)));
-    const rows = boards.map(b =>
-      '<button type="button" class="ym-track" data-action="album-add-board" data-album-id="' + sanitize(album.id) + '" data-board-id="' + sanitize(b.id) + '">' +
-      '<span class="ym-track-copy"><b>' + sanitize(b.name || 'Схема') + '</b><small>' + sanitize(b.type || 'тактика') + '</small></span></button>'
-    ).join('');
-    Modal.open('Додати схему', '<div class="ym-list">' + (rows || '<div class="es">Усі схеми вже в альбомі</div>') + '</div>', [
+    const rows = boards.map(b => (typeof Views !== 'undefined' && Views._schemePickButton)
+      ? Views._schemePickButton(b, album.id)
+      : '').join('');
+    Modal.open('Додати схему', '<div class="ym-picks">' + (rows || '<div class="es">Усі схеми вже в альбомі</div>') + '</div>', [
       { label: 'Закрити', cls: 'btn-s', action: 'cancel' }
     ]);
   },
@@ -1773,6 +1772,17 @@ const Actions = {
     if (!album.boardIds.some(id => String(id) === String(boardId))) album.boardIds.push(boardId);
     album.updatedAt = new Date().toISOString();
     StorageManager.save();
+    const tile = document.querySelector('#modal.show .ym-pick[data-board-id="' + String(boardId).replace(/"/g, '') + '"]');
+    if (tile) {
+      if (typeof App !== 'undefined') App._albumPickDirty = true;
+      tile.remove();
+      if (!document.querySelector('#modal.show .ym-pick')) {
+        const box = document.querySelector('#modal.show .ym-picks');
+        if (box) box.innerHTML = '<div class="es">Усі схеми вже в альбомі</div>';
+      }
+      Toast.show('Схему додано в альбом', 'ok');
+      return;
+    }
     try { Modal.close(); } catch (_) {}
     Toast.show('Схему додано в альбом', 'ok');
     App.renderCurrent();

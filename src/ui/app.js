@@ -106,7 +106,7 @@ const App = {
     let sx = 0, sy = 0, tracking = false;
     main.addEventListener('pointerdown', (e) => {
       if (document.body.classList.contains('mode-board-focus')) return;
-      if (e.target.closest('.btb, button, a, input, select, textarea, .pt, .ball')) return;
+      if (e.target.closest('.btb, button, a, input, select, textarea, .pt, .ball, .ym, .ym-track, .ym-pick, #modal, .md')) return;
       tracking = true;
       sx = e.clientX;
       sy = e.clientY;
@@ -2352,6 +2352,8 @@ const App = {
             const body = document.querySelector('.coach-tools-body');
             if (body) body.removeAttribute('hidden');
             try { TelegramManager.haptic && TelegramManager.haptic('medium'); } catch (_) {}
+          } else if (row.closest && row.closest('.ym, .ym-pick, .ym-picks, #modal, .tg-sheet')) {
+            /* схема і її меню не відкривають тренування */
           } else this.openTrainingActionSheet(id);
           this._lpTarget = null;
           this._lpSuppressClick = true;
@@ -2371,6 +2373,63 @@ const App = {
 
     root.addEventListener('pointerup', () => clear.call(this), { passive: true });
     root.addEventListener('pointercancel', () => clear.call(this), { passive: true });
+  },
+
+  bindAlbumSwipe() {
+    if (this._albumSwipeBound) return;
+    this._albumSwipeBound = true;
+    let row = null;
+    let sx = 0;
+    let sy = 0;
+    let active = false;
+    document.addEventListener('pointerdown', (e) => {
+      row = null;
+      active = false;
+      if (!e.target.closest) return;
+      if (e.target.closest('.ym-menu, .ym-dots, #modal, .ym-pick, .ym-picks')) return;
+      const track = e.target.closest('.ym-track[data-album-id]');
+      if (!track) return;
+      const coach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+      if (!coach) return;
+      row = track;
+      sx = e.clientX;
+      sy = e.clientY;
+      active = true;
+    }, { passive: true });
+    document.addEventListener('pointermove', (e) => {
+      if (!active || !row) return;
+      const dx = e.clientX - sx;
+      const dy = e.clientY - sy;
+      if (dx < -10 && Math.abs(dx) > Math.abs(dy)) {
+        row.style.transform = 'translateX(' + Math.max(dx, -112) + 'px)';
+        row.classList.add('ym-swiping');
+      }
+    }, { passive: true });
+    const end = (e) => {
+      if (!active || !row) return;
+      const track = row;
+      const dx = (e.clientX || sx) - sx;
+      const dy = (e.clientY || sy) - sy;
+      active = false;
+      row = null;
+      track.style.transform = '';
+      track.classList.remove('ym-swiping');
+      if (dx > -64 || Math.abs(dx) < Math.abs(dy)) return;
+      this._lpSuppressClick = true;
+      setTimeout(() => { this._lpSuppressClick = false; }, 500);
+      if (typeof Actions !== 'undefined' && Actions.removeBoardFromAlbum) {
+        Actions.removeBoardFromAlbum(track.dataset.albumId, track.dataset.boardId);
+      }
+    };
+    document.addEventListener('pointerup', end);
+    document.addEventListener('pointercancel', () => {
+      if (row) {
+        row.style.transform = '';
+        row.classList.remove('ym-swiping');
+      }
+      row = null;
+      active = false;
+    });
   },
 
   bindEvents() {
@@ -2527,6 +2586,7 @@ const App = {
     try { this.bindLogoAndImport(); } catch (e) { console.warn(e); }
     try { this.bindEdgeSwipeDrawer(); } catch (e) { console.warn(e); }
     try { this.bindTrainingLongPress(); } catch (e) { console.warn(e); }
+    try { this.bindAlbumSwipe(); } catch (e) { console.warn(e); }
 
 
 
@@ -2561,7 +2621,12 @@ const App = {
         // close search
         if (!e.target.closest('.gs')) document.getElementById('gResults')?.classList.remove('show');
         // close modal on backdrop only
-        if (e.target.id === 'modal') Modal.close();
+        if (e.target.id === 'modal') {
+          const dirty = this._albumPickDirty;
+          this._albumPickDirty = false;
+          Modal.close();
+          if (dirty) this.renderCurrent();
+        }
         return;
       }
 
@@ -4066,6 +4131,7 @@ const App = {
       if (action === 'microcycle') return Actions.applyMicrocycle();
       if (action === 'export-stats') return StorageManager.exportJSON();
 
+      if (e.target.closest && e.target.closest('.ym, .ym-track, .ym-expand, .ym-pick, .ym-picks, .ym-tile, .ym-menu, .tg-sheet, .tg-sheet-backdrop, #modal')) return;
       if (action && action !== 'open-training' && action !== 'preview-next-training') return;
       if (inMatchPlan) return;
       if (t.dataset.editTraining) {
@@ -4300,7 +4366,13 @@ const App = {
       if (t.dataset.delMatch) return Modal.confirm('Видалити матч?', () => { Store.get().matches = Store.get().matches.filter(x => x.id !== t.dataset.delMatch); StorageManager.save(); App.renderCurrent(); });
       if (t.dataset.tpl) return Actions.applyTemplate(t.dataset.tpl);
 
-      if (t.dataset.modalAction === 'cancel') return Modal.close({ action: 'cancel' });
+      if (t.dataset.modalAction === 'cancel') {
+        const dirty = this._albumPickDirty;
+        this._albumPickDirty = false;
+        Modal.close({ action: 'cancel' });
+        if (dirty) this.renderCurrent();
+        return;
+      }
       if (t.dataset.modalAction === 'ok') {
         const values = {};
         try {

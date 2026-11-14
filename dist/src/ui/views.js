@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z91',
+  APP_BUILD: 'z92',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -2074,6 +2074,15 @@ trainings() {
     return hues[index % hues.length];
   },
 
+  _schemePickButton(board, albumId) {
+    const id = sanitize(String((board && board.id) || ''));
+    const name = sanitize((board && (board.name || board.title)) || 'Схема');
+    const thumb = (typeof this._schemeThumbSvg === 'function') ? this._schemeThumbSvg(board) : '';
+    return '<button type="button" class="ym-pick" data-action="album-add-board" data-album-id="' + sanitize(albumId || '') + '" data-board-id="' + id + '">' +
+      '<span class="ym-pick-art">' + thumb + '</span>' +
+      '<span class="ym-pick-name">' + name + '</span></button>';
+  },
+
   _albumCover(album) {
     const s = Store.get() || {};
     const byId = {};
@@ -2110,7 +2119,8 @@ trainings() {
           '<button type="button" data-action="load-scheme-board" data-board-id="' + id + '">На дошку</button>' +
         '</div>'
       : '';
-    return '<div class="ym-track" data-name="' + title + '" data-board-id="' + id + '">' +
+    const albumAttr = (o.editable && o.albumId) ? ' data-album-id="' + sanitize(o.albumId) + '"' : '';
+    return '<div class="ym-track"' + albumAttr + ' data-name="' + title + '" data-board-id="' + id + '">' +
       '<button type="button" class="ym-play" data-action="load-scheme-board" data-board-id="' + id + '">' +
         '<span class="ym-thumb">' + thumb + '</span>' +
         '<span class="ym-track-copy"><b>' + title + '</b><small>' + typ + '</small></span>' +
@@ -2171,7 +2181,8 @@ trainings() {
         '<div><div class="ym-kicker">Альбом схем</div><h1>' + sanitize(album.name || 'Альбом') + '</h1>' +
         '<p>' + (album.boardIds || []).length + ' схем</p></div></div>' +
       tools +
-      '<p class="note-sm">' + (attached.length ? ('Прикріплено: ' + sanitize(attached.join(' · '))) : 'Ще не прикріплено. Альбом можна додати до тренування, матчу або гравця.') + '</p>' +
+      '<p class="note-sm">' + (attached.length ? ('Прикріплено: ' + sanitize(attached.join(' · '))) : 'Ще не прикріплено. Альбом можна додати до тренування, матчу або гравця.') +
+        (canEdit ? ' Свайп вліво прибирає схему з альбому.' : '') + '</p>' +
       '<div class="ym-list">' + (tracks || '<div class="es">В альбомі ще немає схем</div>') + '</div></div>';
   },
 

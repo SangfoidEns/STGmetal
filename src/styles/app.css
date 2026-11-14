@@ -12867,7 +12867,30 @@ body.board-only-mode #mobileNav.glass-nav {
 .ym-hero h1 { font-size: 26px; }
 .ym-hero p, .ym-list { margin: 0; }
 .ym-list { display: flex; flex-direction: column; }
-.ym-track { display: flex; align-items: stretch; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.ym-track[data-album-id] { touch-action: pan-y; }
+.ym-track.ym-swiping { background: rgba(231, 76, 60, 0.28); border-radius: 14px; }
+.ym-track.ym-swiping::after {
+  content: 'Прибрати';
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  color: #fff; font-size: 13px; font-weight: 800;
+}
+.ym-picks {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;
+  max-height: 62vh; overflow: auto; padding: 2px;
+}
+.ym-pick {
+  border: 0; background: transparent; color: inherit; padding: 0; text-align: center; cursor: pointer;
+}
+.ym-pick-art {
+  display: block; height: 132px; border-radius: 12px; overflow: hidden; background: #166534;
+  border: 2px solid rgba(255,255,255,0.16);
+}
+.ym-pick-art svg { width: 100%; height: 100%; display: block; }
+.ym-pick-name {
+  display: block; margin-top: 6px; font-size: 12px; font-weight: 700; line-height: 1.25;
+  white-space: normal;
+}
+.ym-track { position: relative; display: flex; align-items: stretch; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
 .ym-play {
   flex: 1; display: flex; align-items: center; gap: 12px; min-height: 64px;
   border: 0; background: transparent; color: inherit; text-align: left; padding: 8px 0; cursor: pointer;

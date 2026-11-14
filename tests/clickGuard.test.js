@@ -142,6 +142,34 @@ describe('click guard', () => {
     assert.equal(guard.trainingOpensSheet(card), true);
   });
 
+  it('keeps a scheme when the row sits on the training tab', () => {
+    const nav = node({
+      id: 'mobileNav',
+      className: 'mn',
+      rect: { top: 700, left: 0, right: 390, bottom: 760, width: 390, height: 60 }
+    });
+    const guard = boot(nav);
+    const card = node({
+      tag: 'div',
+      className: 'card-training',
+      attrs: { 'data-action': 'open-training', 'data-training-id': 'tr-3' }
+    });
+    const lib = node({ className: 'ym' }, card);
+    const track = node({
+      className: 'ym-track',
+      attrs: { 'data-board-id': 'sch-1', 'data-album-id': 'a1' },
+      rect: { top: 620, left: 0, right: 390, bottom: 820, width: 390, height: 200 }
+    }, lib);
+    const title = node({
+      tag: 'b',
+      className: 'ym-expand-title',
+      rect: { top: 690, left: 16, right: 220, bottom: 730, width: 204, height: 40 }
+    }, track);
+    assert.equal(guard.stealNav(title, 80, 710), false);
+    assert.equal(guard.trainingOpensSheet(title), false);
+    assert.equal(guard.trainingOpensSheet(track), false);
+  });
+
   it('does not open a training from the save button inside a training card', () => {
     const guard = boot(null);
     const card = node({
