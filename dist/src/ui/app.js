@@ -2562,6 +2562,8 @@ const App = {
       'open-attendance': () => Actions.openAttendance(button.dataset.tid),
       'save-attendance': () => Actions.saveAttendance(button.dataset.tid),
       'save-match-attendance': () => Actions.saveMatchAttendance(button.dataset.matchId),
+      'save-tournament-group': () => Actions.saveTournamentGroup(button.dataset.tournamentId),
+      'save-tournament-tie': () => Actions.saveTournamentTie(button.dataset.tournamentId),
       'save-beats': () => Actions.saveBeats(button.dataset.tid),
       'save-slides': () => Actions.saveSlides(button.dataset.tid),
       'create-player': () => Actions.createPlayer(),
@@ -2868,6 +2870,26 @@ const App = {
         if (!tid) { Toast.show('Тренування не знайдено', 'warn'); return; }
         if (!this._allowTrainingOpen(e, tid)) return;
         return this.openTrainingActionSheet(tid);
+      }
+      if (action === 'match-focus-player') {
+        e.preventDefault(); e.stopPropagation();
+        const s = Store.get(); s.ui = s.ui || {};
+        s.ui.matchFocusId = t.dataset.playerId || '';
+        try { StorageManager.save(); } catch (_) {}
+        this.renderCurrent();
+        return;
+      }
+      if (action === 'new-tournament') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.newTournament();
+      }
+      if (action === 'tournament-group') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.openTournamentGroup(t.dataset.tournamentId);
+      }
+      if (action === 'tournament-tie') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.openTournamentTie(t.dataset.tournamentId);
       }
       if (action === 'player-train-tab') {
         e.preventDefault(); e.stopPropagation();

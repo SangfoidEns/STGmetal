@@ -446,6 +446,7 @@ const StorageManager = {
       schemeOpens: s.schemeOpens || [],
       calendar: s.calendar,
       matches: s.matches,
+      tournaments: s.tournaments || [],
       diary: s.diary || [],
       myExercises: s.myExercises || [],
       animations: s.animations || [],
@@ -681,6 +682,7 @@ const StorageManager = {
     if (Array.isArray(data.schemeOpens)) base.schemeOpens = data.schemeOpens;
     if (Array.isArray(data.calendar)) base.calendar = data.calendar;
     if (Array.isArray(data.matches)) base.matches = data.matches;
+    if (Array.isArray(data.tournaments)) base.tournaments = data.tournaments;
     if (data.activeBoard) {
       base.activeBoard.objects = (data.activeBoard.objects || data.activeBoard.players || []).map(o => this.normalizeBoardObj(o));
       // convert old format players → objects
@@ -864,6 +866,7 @@ const StorageManager = {
       schemeOpens: clone(s.schemeOpens) || [],
       calendar: clone(s.calendar) || [],
       matches: clone(s.matches) || [],
+      tournaments: clone(s.tournaments) || [],
       diary: clone(s.diary) || [],
       myExercises: clone(s.myExercises) || [],
       animations: clone(s.animations) || [],
@@ -917,6 +920,7 @@ const StorageManager = {
       players: JSON.parse(JSON.stringify(s.players || [])),
       trainings: JSON.parse(JSON.stringify(s.trainings || [])),
       matches: JSON.parse(JSON.stringify(s.matches || [])),
+      tournaments: JSON.parse(JSON.stringify(s.tournaments || [])),
       boards: JSON.parse(JSON.stringify(s.boards || [])),
       schemeAlbums: JSON.parse(JSON.stringify(s.schemeAlbums || [])),
       schemeSections: JSON.parse(JSON.stringify(s.schemeSections || [])),
@@ -1395,6 +1399,7 @@ const StorageManager = {
             packed.players = mergeById(s.players, data.players);
             packed.trainings = mergeById(s.trainings, data.trainings);
             if (data.matches) packed.matches = mergeById(s.matches, data.matches);
+            if (data.tournaments) packed.tournaments = mergeById(s.tournaments, data.tournaments);
             if (data.boards) packed.boards = mergeById(s.boards, data.boards);
             if (data.schemeAlbums) packed.schemeAlbums = mergeById(s.schemeAlbums, data.schemeAlbums);
             if (data.schemeSections) packed.schemeSections = mergeById(s.schemeSections, data.schemeSections);

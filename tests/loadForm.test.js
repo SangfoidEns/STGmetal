@@ -101,4 +101,17 @@ describe('automatic load from ratings', () => {
     assert.ok(matchDay.minutes > trainDay.minutes);
     assert.ok(matchDay.load > trainDay.load);
   });
+
+  it('uses the minutes the coach wrote for that player', () => {
+    const LM = boot({
+      matches: [{
+        id: 'm1', date: iso(-1), status: 'played', minutes: 90,
+        xi: ['p1'],
+        attendance: { p1: { present: true, rating: 8, minutes: 20 } }
+      }]
+    });
+    const match = LM._matches()[0];
+    assert.equal(LM.playerMinutes(match, 'p1'), 20);
+    assert.equal(LM.matchPlayerLoad(match, 'p1'), Math.round(20 * 8 * LM.MATCH_WEIGHT));
+  });
 });

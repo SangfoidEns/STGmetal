@@ -22,6 +22,7 @@ const Store = (() => {
       schemeOpens: [],
       calendar: [],
       matches: [],
+      tournaments: [],
       diary: [],
       gifts: [],
       moments: [],

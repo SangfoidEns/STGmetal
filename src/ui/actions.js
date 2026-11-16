@@ -956,6 +956,105 @@ const Actions = {
     });
   },
 
+  newTournament() {
+    if (!this._coachOnly()) return;
+    Modal.prompt('Назва турніру', '', name => {
+      const title = String(name || '').trim();
+      if (!title) return;
+      const s = Store.get();
+      s.tournaments = s.tournaments || [];
+      s.tournaments.push({
+        id: (typeof uid === 'function') ? uid() : ('tour-' + Date.now()),
+        name: title,
+        groups: [],
+        bracket: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      try { StorageManager.save(); } catch (_) {}
+      Toast.show('Турнір «' + title + '»', 'ok');
+      App.renderCurrent();
+    });
+  },
+
+  openTournamentGroup(tournamentId) {
+    if (!this._coachOnly()) return;
+    Modal.open('Група', `
+      <label class="fl"><span class="fl-label">Назва</span><input class="fl-input" id="tgName" value="Група A"></label>
+      <label class="fl"><span class="fl-label">Команди, кожна з нового рядка</span>
+        <textarea class="fl-input" id="tgTeams" rows="5">Металіст Штуттгарт</textarea>
+      </label>
+      <p class="note-sm">Наша команда має збігатися з назвою клубу. Суперники — як у полі суперника матчу.</p>
+    `, [
+      { label: 'Скасувати', cls: 'btn-s', action: 'cancel' },
+      { label: 'Додати', cls: 'btn-p', action: 'save-tournament-group' }
+    ]);
+    const btn = document.querySelector('[data-modal-action="save-tournament-group"]');
+    if (btn) btn.dataset.tournamentId = tournamentId || '';
+  },
+
+  saveTournamentGroup(tournamentId) {
+    const s = Store.get();
+    const tour = (s.tournaments || []).find(item => item && String(item.id) === String(tournamentId));
+    if (!tour) return;
+    const name = (document.getElementById('tgName')?.value || 'Група').trim();
+    const teams = String(document.getElementById('tgTeams')?.value || '').split(/\n/).map(line => line.trim()).filter(Boolean);
+    tour.groups = tour.groups || [];
+    tour.groups.push({ id: (typeof uid === 'function') ? uid() : ('grp-' + Date.now()), name: name, teams: teams });
+    tour.updatedAt = new Date().toISOString();
+    try { StorageManager.save(); } catch (_) {}
+    Modal.close({ action: 'ok' });
+    Toast.show('Групу додано', 'ok');
+    App.renderCurrent();
+  },
+
+  openTournamentTie(tournamentId) {
+    if (!this._coachOnly()) return;
+    const s = Store.get();
+    const tour = (s.tournaments || []).find(item => item && String(item.id) === String(tournamentId));
+    const games = (s.matches || []).filter(m => m && tour && String(m.competition || '').trim().toLowerCase() === String(tour.name || '').trim().toLowerCase());
+    const options = '<option value="">Без прив’язки</option>' + games.map(m =>
+      '<option value="' + sanitize(m.id) + '">' + sanitize((m.date || '') + ' vs ' + (m.opponent || '')) + '</option>').join('');
+    Modal.open('Пара сітки', `
+      <label class="fl"><span class="fl-label">Раунд</span><input class="fl-input" id="ttRound" value="1/4"></label>
+      <label class="fl"><span class="fl-label">Хто вдома</span><input class="fl-input" id="ttHome" value="Металіст Штуттгарт"></label>
+      <label class="fl"><span class="fl-label">Хто в гостях</span><input class="fl-input" id="ttAway" placeholder="Суперник"></label>
+      <div class="match-grid">
+        <label class="fl"><span class="fl-label">Голи хазяїв</span><input class="fl-input" id="ttHomeScore" type="number"></label>
+        <label class="fl"><span class="fl-label">Голи гостей</span><input class="fl-input" id="ttAwayScore" type="number"></label>
+      </div>
+      <label class="fl"><span class="fl-label">Матч клубу</span><select class="fl-input" id="ttMatch">${options}</select></label>
+    `, [
+      { label: 'Скасувати', cls: 'btn-s', action: 'cancel' },
+      { label: 'Додати', cls: 'btn-p', action: 'save-tournament-tie' }
+    ]);
+    const btn = document.querySelector('[data-modal-action="save-tournament-tie"]');
+    if (btn) btn.dataset.tournamentId = tournamentId || '';
+  },
+
+  saveTournamentTie(tournamentId) {
+    const s = Store.get();
+    const tour = (s.tournaments || []).find(item => item && String(item.id) === String(tournamentId));
+    if (!tour) return;
+    const homeScore = document.getElementById('ttHomeScore')?.value;
+    const awayScore = document.getElementById('ttAwayScore')?.value;
+    tour.bracket = tour.bracket || [];
+    tour.bracket.push({
+      id: (typeof uid === 'function') ? uid() : ('tie-' + Date.now()),
+      round: (document.getElementById('ttRound')?.value || 'Сітка').trim(),
+      home: (document.getElementById('ttHome')?.value || '').trim(),
+      away: (document.getElementById('ttAway')?.value || '').trim(),
+      scoreHome: homeScore === '' || homeScore == null ? '' : Number(homeScore),
+      scoreAway: awayScore === '' || awayScore == null ? '' : Number(awayScore),
+      matchId: document.getElementById('ttMatch')?.value || ''
+    });
+    tour.updatedAt = new Date().toISOString();
+    try { StorageManager.save(); } catch (_) {}
+    Modal.close({ action: 'ok' });
+    Toast.show('Пару додано в сітку', 'ok');
+    App.renderCurrent();
+  },
+
   openMatchAttendance(matchId) {
     const s = Store.get();
     const m = (s.matches || []).find(x => x && String(x.id) === String(matchId || (s.ui && s.ui.matchId)));
@@ -987,6 +1086,7 @@ const Actions = {
         cards +
         '<div class="mat-grid">' +
           '<label>Оцінка<input type="number" class="mat-rating" min="1" max="10" value="' + rating + '"></label>' +
+          '<label>Хв<input type="number" class="mat-min" min="0" max="130" value="' + ((typeof LoadModel !== 'undefined' && LoadModel.playerMinutes) ? LoadModel.playerMinutes(m, p.id) : (a.minutes != null ? a.minutes : 90)) + '"></label>' +
           '<label>Голи<input type="number" class="mat-goals" min="0" max="9" value="' + goals + '"></label>' +
           '<label>Жовта<input type="number" class="mat-yellow" min="0" max="2" value="' + yellow + '"></label>' +
           '<label>Червона<input type="number" class="mat-red" min="0" max="1" value="' + red + '"></label>' +
@@ -1015,11 +1115,12 @@ const Actions = {
       if (!pid) return;
       const present = !!row.querySelector('.mat-present')?.checked;
       const rating = Math.max(1, Math.min(10, +row.querySelector('.mat-rating')?.value || 6));
+      const minutes = Math.max(0, Math.min(130, +row.querySelector('.mat-min')?.value || 0));
       const g = Math.max(0, Math.min(9, +row.querySelector('.mat-goals')?.value || 0));
       const yellow = Math.max(0, Math.min(2, +row.querySelector('.mat-yellow')?.value || 0));
       const red = Math.max(0, Math.min(1, +row.querySelector('.mat-red')?.value || 0));
       if (present) goals += g;
-      m.attendance[pid] = { present, rating, goals: present ? g : 0, yellow: present ? yellow : 0, red: present ? red : 0, updatedAt: markedAt };
+      m.attendance[pid] = { present, rating, minutes: present ? minutes : 0, goals: present ? g : 0, yellow: present ? yellow : 0, red: present ? red : 0, updatedAt: markedAt };
     });
     m.stamps = Object.assign({}, m.stamps || {}, { attendance: markedAt });
     if (m.status !== 'cancelled' && m.status !== 'canceled') m.status = 'played';

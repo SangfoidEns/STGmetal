@@ -65,13 +65,43 @@ const LoadModel = {
     } catch (_) { return []; }
   },
 
+  /** Хвилини гравця: своє поле, інакше заміна, інакше повний матч для основи. */
+  playerMinutes(match, playerId) {
+    if (!match || playerId == null) return 0;
+    const cell = match.attendance && (match.attendance[playerId] != null ? match.attendance[playerId] : match.attendance[String(playerId)]);
+    if (cell && cell.minutes != null && cell.minutes !== '' && !isNaN(Number(cell.minutes))) {
+      return Math.max(0, Math.round(Number(cell.minutes)));
+    }
+    if (cell && (cell.present === false || cell.present === 0 || cell.present === '0')) return 0;
+    const id = String(playerId);
+    const full = Math.max(1, Number(match.minutes) || 90);
+    const subs = Array.isArray(match.subs) ? match.subs : [];
+    let came = null;
+    let left = null;
+    subs.forEach(function (sub) {
+      if (!sub) return;
+      if (String(sub.onId) === id) came = Number(sub.minute) || 0;
+      if (String(sub.offId) === id) left = Number(sub.minute) || full;
+    });
+    if (came != null || left != null) {
+      const start = came == null ? 0 : came;
+      const end = left == null ? full : left;
+      return Math.max(0, end - start);
+    }
+    const inXi = (match.xi || []).some(function (x) { return x != null && String(x) === id; });
+    const present = cell && (cell.present === true || cell.present === 1 || cell.present === '1');
+    if (inXi || present) return full;
+    return 0;
+  },
+
   matchPlayerLoad(match, playerId) {
     if (!match || !match.attendance || playerId == null) return 0;
     const cell = match.attendance[playerId] != null ? match.attendance[playerId] : match.attendance[String(playerId)];
     if (!cell || cell.present === false || cell.present === 0 || cell.present === '0') return 0;
     if (cell.present !== true && cell.present !== 1 && cell.present !== '1') return 0;
     const intensity = cell.rating != null && cell.rating !== '' ? Number(cell.rating) : 6;
-    const minutes = Math.max(1, Number(match.minutes) || 90);
+    const minutes = this.playerMinutes(match, playerId);
+    if (!minutes) return 0;
     return Math.round(this.sessionLoad(minutes, intensity) * (this.MATCH_WEIGHT || 1));
   },
 
@@ -133,7 +163,8 @@ const LoadModel = {
       if (cell.present !== true && cell.present !== 1 && cell.present !== '1') return;
       const rating = self._clampRating(cell.rating != null && cell.rating !== '' ? cell.rating : 6);
       if (rating == null) return;
-      const minutes = Math.max(1, Number(m.minutes) || 90);
+      const minutes = self.playerMinutes(m, playerId);
+      if (!minutes) return;
       const weight = minutes * (self.MATCH_WEIGHT || 1);
       events.push({
         kind: 'match',
