@@ -1,5 +1,8 @@
 /** Session load & attendance analytics */
 const LoadModel = {
+  /** Матч важчий за тренування тієї ж довжини: ті самі хвилини й оцінка важать у 1.7 раза більше. */
+  MATCH_WEIGHT: 1.7,
+
   sessionLoad(duration, intensity) {
     return Math.round((+duration || 0) * (+intensity || 0));
   },
@@ -69,7 +72,121 @@ const LoadModel = {
     if (cell.present !== true && cell.present !== 1 && cell.present !== '1') return 0;
     const intensity = cell.rating != null && cell.rating !== '' ? Number(cell.rating) : 6;
     const minutes = Math.max(1, Number(match.minutes) || 90);
-    return this.sessionLoad(minutes, intensity);
+    return Math.round(this.sessionLoad(minutes, intensity) * (this.MATCH_WEIGHT || 1));
+  },
+
+  _trainings(trainings) {
+    if (Array.isArray(trainings)) return trainings;
+    try {
+      const s = (typeof Store !== 'undefined' && Store.get) ? Store.get() : null;
+      return (s && s.trainings) || [];
+    } catch (_) { return []; }
+  },
+
+  _inWindow(date, days) {
+    const today = this.todayStr();
+    const fromD = new Date();
+    fromD.setDate(fromD.getDate() - ((days || 28) - 1));
+    const from = this.todayStr(fromD);
+    const day = String(date || '');
+    return !!day && day >= from && day <= today;
+  },
+
+  _clampRating(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return null;
+    return Math.max(0, Math.min(10, n));
+  },
+
+  /**
+   * Лоад гравця за вікно днів: середня оцінка, де вага — хвилини.
+   * Матч множить хвилини на MATCH_WEIGHT, тож одна гра тягне число сильніше за тренування.
+   */
+  formLoad(playerId, days, trainings, matches) {
+    days = days || 28;
+    const events = [];
+    const self = this;
+    this.pastTrainings(this._trainings(trainings)).forEach(function (t) {
+      if (!self._inWindow(t.date, days)) return;
+      const mark = self._attEntry(null, playerId, t);
+      const present = self._isPresent(mark);
+      if (present === false) return;
+      if (present == null && !(mark && typeof mark === 'object')) return;
+      const rating = self._clampRating(self._entryRpe(mark, t));
+      if (rating == null) return;
+      const minutes = Math.max(1, Number(t.duration) || 75);
+      events.push({
+        kind: 'train',
+        id: t.id,
+        date: String(t.date || ''),
+        name: t.name || 'Тренування',
+        rating: rating,
+        minutes: minutes,
+        weight: minutes,
+        units: self.sessionLoad(minutes, rating)
+      });
+    });
+    this.playedMatches(this._matches(matches)).forEach(function (m) {
+      if (!self._inWindow(m.date, days)) return;
+      const cell = m.attendance[playerId] != null ? m.attendance[playerId] : m.attendance[String(playerId)];
+      if (!cell || cell.present === false || cell.present === 0 || cell.present === '0') return;
+      if (cell.present !== true && cell.present !== 1 && cell.present !== '1') return;
+      const rating = self._clampRating(cell.rating != null && cell.rating !== '' ? cell.rating : 6);
+      if (rating == null) return;
+      const minutes = Math.max(1, Number(m.minutes) || 90);
+      const weight = minutes * (self.MATCH_WEIGHT || 1);
+      events.push({
+        kind: 'match',
+        id: m.id,
+        date: String(m.date || ''),
+        name: m.opponent ? ('Матч · ' + m.opponent) : 'Матч',
+        rating: rating,
+        minutes: minutes,
+        weight: weight,
+        units: Math.round(self.sessionLoad(minutes, rating) * (self.MATCH_WEIGHT || 1))
+      });
+    });
+    events.sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
+    let weightSum = 0;
+    let rated = 0;
+    let trainUnits = 0;
+    let matchUnits = 0;
+    let trainN = 0;
+    let matchN = 0;
+    let trainRated = 0;
+    let matchRated = 0;
+    events.forEach(function (ev) {
+      weightSum += ev.weight;
+      rated += ev.rating * ev.weight;
+      if (ev.kind === 'match') {
+        matchUnits += ev.units;
+        matchN += 1;
+        matchRated += ev.rating;
+      } else {
+        trainUnits += ev.units;
+        trainN += 1;
+        trainRated += ev.rating;
+      }
+    });
+    const round1 = function (n) { return Math.round(n * 10) / 10; };
+    return {
+      score: weightSum ? round1(rated / weightSum) : null,
+      trainAvg: trainN ? round1(trainRated / trainN) : null,
+      matchAvg: matchN ? round1(matchRated / matchN) : null,
+      trainN: trainN,
+      matchN: matchN,
+      trainUnits: trainUnits,
+      matchUnits: matchUnits,
+      weight: this.MATCH_WEIGHT || 1,
+      days: days,
+      events: events
+    };
+  },
+
+  shownScore(player, days) {
+    if (!player || player.id == null) return null;
+    const form = this.formLoad(player.id, days);
+    return form && form.score != null ? form.score : null;
   },
 
   matchLoadFor(playerId, days, matches) {

@@ -2235,7 +2235,8 @@ const BoardEngine = {
     const chipHtml = (o) => {
       const pl = o.playerId ? (s.players || []).find(p => p.id === o.playerId) : null;
       const readiness = o.readiness != null ? o.readiness : (pl && (pl.readiness != null ? pl.readiness : pl.condition)) || 70;
-      const loadVal = o.load != null ? o.load : (pl && pl.load != null ? pl.load : null);
+      const autoLoad = (pl && typeof LoadModel !== 'undefined' && LoadModel.shownScore) ? LoadModel.shownScore(pl) : null;
+      const loadVal = autoLoad != null ? autoLoad : (o.load != null ? o.load : (pl && pl.load != null ? pl.load : null));
       const ringC = readiness >= 80 ? '#2ecc71' : readiness >= 50 ? '#f1c40f' : '#e74c3c';
       const loadPct = loadVal != null ? Math.max(0, Math.min(1, (+loadVal) / 10)) : (readiness / 100);
       const loadCol = loadVal != null
@@ -2434,6 +2435,10 @@ const BoardEngine = {
         const pl = Store.get().players.find(p => p.id === o.playerId);
         if (pl) {
           if (readiness == null) readiness = pl.readiness != null ? pl.readiness : pl.condition;
+          if (typeof LoadModel !== 'undefined' && LoadModel.shownScore) {
+            const autoLoad = LoadModel.shownScore(pl);
+            if (autoLoad != null) loadVal = autoLoad;
+          }
           if (loadVal == null) loadVal = pl.load;
         }
       }

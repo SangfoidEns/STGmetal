@@ -3650,12 +3650,41 @@ body.board-fs-nav #boardToolbar .tb {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 2px 10px;
+  width: 100%;
   padding: 8px 0;
+  border: 0;
   border-top: 1px solid rgba(255,255,255,0.06);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   font-size: 13px;
 }
 .load-hist-row small { grid-column: 1 / -1; color: var(--muted, #9aa4b2); font-size: 11px; }
 .load-hist-row b { color: #e8c547; }
+.load-hist-row.is-me { background: rgba(232, 197, 71, 0.08); border-radius: 10px; padding-left: 8px; padding-right: 8px; }
+.load-split { grid-column: 1 / -1; display: flex; height: 6px; border-radius: 99px; overflow: hidden; background: rgba(255,255,255,0.08); }
+.load-split i { display: block; height: 100%; }
+.load-split .is-train { background: #3b82f6; }
+.load-split .is-match { background: #e8c547; }
+.load-panel { margin-top: 10px; }
+.load-panel-top { display: flex; align-items: baseline; gap: 8px; }
+.load-panel-score { font-size: 28px; line-height: 1; color: #e8c547; }
+.load-panel-top span { color: var(--muted, #9aa4b2); font-size: 12px; }
+.load-event {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 0;
+  border: 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.load-event b { color: #e8c547; font-weight: 700; white-space: nowrap; }
 
 /* Інтерактивна лавка */
 .bench-chip {

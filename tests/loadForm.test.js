@@ -1,0 +1,81 @@
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+
+function iso(offset) {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+
+function boot(state) {
+  const context = { console, Store: { get() { return state; } } };
+  context.window = context;
+  context.globalThis = context;
+  vm.createContext(context);
+  vm.runInContext(readFileSync(new URL('../src/core/loadModel.js', import.meta.url), 'utf8'), context, { filename: 'loadModel.js' });
+  return context.LoadModel;
+}
+
+describe('automatic load from ratings', () => {
+  it('weights a match more than a training of the same length and rating', () => {
+    const LM = boot({
+      trainings: [{
+        id: 't1', date: iso(-2), status: 'done', duration: 90, intensity: 8,
+        attendance: { p1: { present: true, rpe: 8 } }
+      }],
+      matches: [{
+        id: 'm1', date: iso(-1), status: 'played', opponent: 'Друзі', minutes: 90,
+        attendance: { p1: { present: true, rating: 8 } }
+      }]
+    });
+    const form = LM.formLoad('p1');
+    assert.equal(form.trainN, 1);
+    assert.equal(form.matchN, 1);
+    assert.equal(form.trainUnits, 720);
+    assert.equal(form.matchUnits, Math.round(720 * LM.MATCH_WEIGHT));
+    assert.ok(form.matchUnits > form.trainUnits);
+    assert.equal(form.score, 8);
+    assert.ok(form.events[1].weight > form.events[0].weight);
+  });
+
+  it('lets the match pull the average above the plain middle', () => {
+    const LM = boot({
+      trainings: [{
+        id: 't1', date: iso(-4), status: 'done', duration: 60, intensity: 4,
+        attendance: { p1: { present: true, rpe: 4 } }
+      }],
+      matches: [{
+        id: 'm1', date: iso(-1), status: 'played', minutes: 90,
+        attendance: { p1: { present: true, rating: 9 } }
+      }]
+    });
+    const form = LM.formLoad('p1');
+    const plain = (4 + 9) / 2;
+    assert.ok(form.score > plain);
+    assert.ok(form.score > 7);
+    assert.equal(form.score, 7.6);
+  });
+
+  it('ignores an absence, a cancelled match and a session outside the window', () => {
+    const LM = boot({
+      trainings: [
+        { id: 'miss', date: iso(-1), status: 'done', duration: 80, attendance: { p1: { present: false, rpe: 9 } } },
+        { id: 'old', date: iso(-40), status: 'done', duration: 80, attendance: { p1: { present: true, rpe: 10 } } },
+        { id: 'ok', date: iso(-2), status: 'done', duration: 80, attendance: { p1: { present: true, rpe: 6 } } }
+      ],
+      matches: [
+        { id: 'off', date: iso(-1), status: 'cancelled', attendance: { p1: { present: true, rating: 10 } } }
+      ]
+    });
+    const form = LM.formLoad('p1');
+    assert.equal(form.trainN, 1);
+    assert.equal(form.matchN, 0);
+    assert.equal(form.score, 6);
+    assert.equal(form.trainUnits, 480);
+  });
+});

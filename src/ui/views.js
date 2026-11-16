@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z99',
+  APP_BUILD: 'z100',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -582,7 +582,7 @@ const Views = {
             <span class="cp-stat-ic">📊</span>
             <span class="cp-stat-val">${weekLoad || 0}</span>
             <span class="cp-stat-lb">Тижневе навантаження</span>
-            <span class="cp-stat-sub">сер. 3 сесії: ${avg3} · тренування і матчі</span>
+            <span class="cp-stat-sub">сер. 3 сесії: ${avg3} · матч ×${(typeof LoadModel !== 'undefined' && LoadModel.MATCH_WEIGHT) || 1.7}</span>
             <div class="cp-stat-spark">${this._sparkline(loadBySession, { color: '#3d7eff', fill: 'rgba(61,126,255,.12)' })}</div>
           </div>
           <div class="cp-stat cp-stat-chart">
@@ -827,7 +827,8 @@ const Views = {
     const st = p.status || 'available';
     const stLabel = ({ available: 'Здоровий', healthy: 'Здоровий', injured: 'Травмований', rehab: 'Відновлення', recovery: 'Відновлення' })[st] || st;
     const pos = p.position || '—';
-    const ovr = Math.round((Number(p.readiness != null ? p.readiness : p.condition) || 70) * 0.85 + (100 - Math.min(100, (p.load || 0) * 8)) * 0.15);
+    const loadNow = this._loadScore(p);
+    const ovr = Math.round((Number(p.readiness != null ? p.readiness : p.condition) || 70) * 0.85 + (100 - Math.min(100, (loadNow != null ? loadNow : (p.load || 0)) * 8)) * 0.15);
     const att = stats.attPct != null ? stats.attPct + '%' : '—';
     const rpe = stats.avgRpe != null ? stats.avgRpe : '—';
     const load = stats.load28 != null ? stats.load28 : '—';
@@ -904,7 +905,7 @@ const Views = {
           <div class="fifa-stat"><b>${att}</b><span>${typeof t==='function'?t('longpress_attendance'):'Відвідування'}</span></div>
           <div class="fifa-stat"><b>${rpe}</b><span>Сер. RPE</span></div>
           <div class="fifa-stat"><b>${load}</b><span>Load 28д</span></div>
-          <div class="fifa-stat"><b>${p.load != null ? p.load : '—'}</b><span>Load</span></div>
+          <div class="fifa-stat"><b>${loadNow != null ? this._fmtLoad(loadNow) : '—'}</b><span>Лоад</span></div>
           <div class="fifa-stat"><b>${p.age || '—'}</b><span>Вік</span></div>
         </div>
         ${(() => {
@@ -977,7 +978,7 @@ const Views = {
         sumAtt += st.attPct || 0;
         sumRpe += st.avgRpe || 0;
         sumL28 += st.load28 || 0;
-        sumLoad += (p.load != null ? p.load : 0);
+        sumLoad += (this._loadScore(p) || 0);
       });
       condB = Math.round(sumCond / n);
       b = { attPct: Math.round(sumAtt / n), avgRpe: +(sumRpe / n).toFixed(1), load28: Math.round(sumL28 / n) };
@@ -989,7 +990,7 @@ const Views = {
       b = this._playerStats(other.id);
       condB = other.readiness != null ? other.readiness : (other.condition != null ? other.condition : 80);
       nameB = '#' + (other.number || '') + ' ' + sanitize(other.lastName || other.firstName || '');
-      loadB = other.load != null ? other.load : 0;
+      loadB = this._loadScore(other) || 0;
     }
     const maxLoad = Math.max(200, (a.load28 || 0) * 1.2, (b.load28 || 0) * 1.2);
     const fakeOther = { load: loadB };
@@ -1002,7 +1003,7 @@ const Views = {
           ${this._statBar('Відвідування %', a.attPct || 0, 100, '#3498db')}
           ${this._statBar('Сер. RPE', a.avgRpe || 0, 10, '#f1c40f')}
           ${this._statBar('Load 28д', a.load28 || 0, maxLoad, '#e67e22')}
-          ${this._statBar('Load', me.load != null ? me.load : 0, 10, '#9b59b6')}
+          ${this._statBar('Лоад', this._loadScore(me) || 0, 10, '#9b59b6')}
         </div>
         <div class="compare-col">
           <div class="compare-name">${nameB}</div>
@@ -1010,7 +1011,7 @@ const Views = {
           ${this._statBar('Відвідування %', b.attPct || 0, 100, '#3498db')}
           ${this._statBar('Сер. RPE', b.avgRpe || 0, 10, '#f1c40f')}
           ${this._statBar('Load 28д', b.load28 || 0, maxLoad, '#e67e22')}
-          ${this._statBar('Load', loadB, 10, '#9b59b6')}
+          ${this._statBar('Лоад', loadB, 10, '#9b59b6')}
         </div>
       </div>
       <div class="compare-chart-wrap">${chart}</div>`;
@@ -1023,7 +1024,7 @@ const Views = {
       { label: 'Відвід.%', va: a.attPct || 0, vb: b.attPct || 0, max: 100 },
       { label: 'RPE', va: a.avgRpe || 0, vb: b.avgRpe || 0, max: 10 },
       { label: 'Load28', va: a.load28 || 0, vb: b.load28 || 0, max: Math.max(1, a.load28 || 0, b.load28 || 0, 50) },
-      { label: 'Load', va: me.load || 0, vb: other.load || 0, max: 10 }
+      { label: 'Лоад', va: this._loadScore(me) || 0, vb: other.load || 0, max: 10 }
     ];
     const W = 320, H = 140, pad = 28, gap = 12;
     const barW = (W - pad * 2 - gap * (metrics.length - 1)) / metrics.length;
@@ -1212,6 +1213,7 @@ const Views = {
           ${this._accountProgress(me.id)}
           ${bio ? '<p class="player-bio-home">' + sanitize(bio) + '</p>' : ''}
           <div class="cp-status"><span class="cp-dot"></span>${(typeof I18n!=='undefined'?I18n.t('attendance','Відвідуваність'):'Відвідуваність')} ${Math.round(stats.attPct || 0)}% · тап по фото — на весь екран</div>
+          ${this._loadPanel(me, true)}
         </div>` : this._noPlayerLink()}
 
       ${this._clubForgeHtml()}
@@ -1806,7 +1808,9 @@ trainings() {
       '<div class="pl-card-body"><div class="pl-card-name"><span class="pl-card-name-txt">' + sanitize(name) + '</span>' + (badge || '') + '</div>' +
       (this.appointmentHtml(p) ? ('<div class="pl-card-marks">' + this.appointmentHtml(p) + '</div>') : '') +
       '<div class="pl-card-meta">' + num + sanitize(p.position || '') + (roleText ? (' · ' + roleText) : '') + '</div>' +
-      '<div class="pl-card-att">Відвідуваність ' + att + '% · ' + xp + ' XP</div></div></div>';
+      '<div class="pl-card-att">Відвідуваність ' + att + '% · ' + xp + ' XP' +
+      (this._loadScore(p) != null ? (' · лоад ' + this._fmtLoad(this._loadScore(p))) : '') +
+      '</div></div></div>';
   },
 
   _teamChat() {
@@ -2713,7 +2717,7 @@ trainings() {
     players.forEach(p => { if (p && p.id != null) byId[String(p.id)] = p; });
     const surnameOf = (p) => (p && (p.lastName || p.firstName)) || 'Гравець';
     const metaOf = (p) => p
-      ? ('#' + (p.number || '—') + (p.load != null && p.load !== '' ? (' · L' + p.load) : ''))
+      ? ('#' + (p.number || '—') + (this._loadScore(p) != null ? (' · L' + this._fmtLoad(this._loadScore(p))) : ''))
       : '';
     const xi = (m.xi || []).slice(0, 11);
     while (xi.length < 11) xi.push(null);
@@ -3019,13 +3023,13 @@ trainings() {
       card('Навантаження сесій', 'Тривалість × RPE', bars(sessionStats.map(x => x.load), '#3b82f6')) +
       card('Відвідуваність гравців', 'Хто тримає ритм сезону', hbars(names.map(n => ({ label: n.label, value: n.st.attPct || 0, text: (n.st.attPct != null ? n.st.attPct + '%' : '—'), color: n.color })), r => r.color)) +
       card('RPE гравців', 'Середнє відчуття навантаження', hbars(names.map(n => ({ label: n.label, value: n.st.avgRpe || 0, text: n.st.avgRpe != null ? n.st.avgRpe : '—', color: n.color })), r => r.color)) +
-      card('Навантаження 28 днів', 'Тренування і матчі: хв × RPE, матч — 90 хв × оцінка', hbars(names.map(n => ({ label: n.label, value: n.st.load28 || 0, color: n.color })), r => r.color)) +
+      card('Навантаження 28 днів', 'Тренування: хв × RPE. Матч: 90 хв × оцінка × ' + ((typeof LoadModel !== 'undefined' && LoadModel.MATCH_WEIGHT) || 1.7), hbars(names.map(n => ({ label: n.label, value: n.st.load28 || 0, color: n.color })), r => r.color)) +
       card('XP гравців', 'Тренування, матчі, голи й оцінка', hbars(names.map(n => {
         let xp = 0;
         try { xp = (typeof PlayerProgress !== 'undefined' && PlayerProgress.compute) ? ((PlayerProgress.compute(n.p.id) || {}).xp || 0) : 0; } catch (_) {}
         return { label: n.label, value: xp, color: n.color };
       }), r => r.color)) +
-      card('Навантаження матчів', 'Хто виходив: 90 хв × оцінка тренера', hbars(names.map(n => {
+      card('Навантаження матчів', 'Хто виходив: 90 хв × оцінка × ' + ((typeof LoadModel !== 'undefined' && LoadModel.MATCH_WEIGHT) || 1.7), hbars(names.map(n => {
         let load = 0;
         try { load = (typeof LoadModel !== 'undefined' && LoadModel.matchLoadFor) ? LoadModel.matchLoadFor(n.p.id, 365) : 0; } catch (_) {}
         return { label: n.label, value: load, text: load ? String(load) : '—', color: n.color };
@@ -3112,20 +3116,98 @@ trainings() {
       '<div class="an-body">' + (rows || '<div class="es">Немає даних</div>') + '</div></div>';
   },
 
+  _fmtLoad(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '—';
+    const rounded = Math.round(n * 10) / 10;
+    return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  },
+
+  _loadForm(playerId) {
+    try {
+      if (typeof LoadModel !== 'undefined' && LoadModel.formLoad) return LoadModel.formLoad(playerId) || {};
+    } catch (_) {}
+    return {};
+  },
+
+  _loadScore(p) {
+    if (!p) return null;
+    const form = this._loadForm(p.id);
+    return form && form.score != null ? form.score : null;
+  },
+
+  _loadRole() {
+    try {
+      if (typeof AuthManager !== 'undefined' && AuthManager.isGuest && AuthManager.isGuest()) return 'guest';
+      if (typeof AuthManager !== 'undefined' && AuthManager.isPlayer && AuthManager.isPlayer()) return 'player';
+    } catch (_) {}
+    return 'coach';
+  },
+
+  _loadWeightText() {
+    const w = (typeof LoadModel !== 'undefined' && LoadModel.MATCH_WEIGHT) || 1.7;
+    return String(w).replace('.', ',');
+  },
+
+  _loadSplit(form) {
+    const total = (form.trainUnits || 0) + (form.matchUnits || 0);
+    const matchPct = total ? Math.round((form.matchUnits / total) * 100) : 0;
+    const trainPct = total ? (100 - matchPct) : 0;
+    return '<div class="load-split" aria-hidden="true"><i class="is-train" style="width:' + trainPct + '%"></i><i class="is-match" style="width:' + matchPct + '%"></i></div>';
+  },
+
+  _loadPanel(p, interactive) {
+    if (!p) return '';
+    const form = this._loadForm(p.id);
+    const role = this._loadRole();
+    const score = form.score != null ? this._fmtLoad(form.score) : '—';
+    const weight = this._loadWeightText();
+    const blurb = role === 'guest'
+      ? ('Середня оцінка за 28 днів. Синя смуга — тренування, жовта — матчі. Матч важить у ' + weight + ' раза більше за ті самі хвилини.')
+      : (role === 'player'
+        ? ('Це твоя середня оцінка. Матч важчий: ті самі хвилини важать у ' + weight + ' раза більше, ніж тренування. Натисни рядок — відкриється гра або тренування.')
+        : ('Рахується сам з оцінок. Тренування: хвилини × RPE. Матч: хвилини × оцінка × ' + weight + '.'));
+    const events = (form.events || []).slice().reverse().slice(0, 5);
+    const rows = events.map(ev => {
+      const label = String(ev.date || '').slice(5) + ' · ' + (ev.name || '');
+      const meta = 'оцінка ' + this._fmtLoad(ev.rating) + ' · ' + ev.units;
+      if (interactive && role !== 'guest' && ev.id) {
+        const action = ev.kind === 'match' ? 'open-match' : 'open-training';
+        const attr = ev.kind === 'match'
+          ? (' data-match-id="' + sanitize(String(ev.id)) + '"')
+          : (' data-training-id="' + sanitize(String(ev.id)) + '"');
+        return '<button type="button" class="load-event" data-action="' + action + '"' + attr + '><span>' + sanitize(label) + '</span><b>' + sanitize(meta) + '</b></button>';
+      }
+      return '<div class="load-event"><span>' + sanitize(label) + '</span><b>' + sanitize(meta) + '</b></div>';
+    }).join('');
+    const bits = 'Тренування ' + (form.trainN || 0) +
+      (form.trainAvg != null ? (' · сер. ' + this._fmtLoad(form.trainAvg)) : '') +
+      ' · матчі ' + (form.matchN || 0) +
+      (form.matchAvg != null ? (' · сер. ' + this._fmtLoad(form.matchAvg)) : '');
+    return '<div class="load-panel">' +
+      '<div class="load-panel-top"><b class="load-panel-score">' + score + '</b><span>лоад · 28 днів</span></div>' +
+      this._loadSplit(form) +
+      '<p class="note-sm">' + blurb + '</p>' +
+      '<p class="note-sm">' + bits + '</p>' +
+      rows +
+      '</div>';
+  },
+
   playerMiniStats(p) {
     if (!p) return '';
     let st = { attPct: null, avgRpe: null, load28: null, present: 0, absent: 0 };
     try { st = this._playerStats(p.id) || st; } catch (_) {}
     const cond = p.readiness != null ? p.readiness : (p.condition != null ? p.condition : '—');
     const cell = (value, label) => '<div class="sms-cell"><b>' + value + '</b><span>' + label + '</span></div>';
+    const score = this._loadScore(p);
     return '<div class="sheet-mini-stats" aria-label="Статистика гравця">' +
       cell((cond === '—' ? cond : cond + '%'), 'Готовність') +
       cell(st.attPct != null ? (st.attPct + '%') : '—', 'Відвідування') +
       cell(st.avgRpe != null ? st.avgRpe : '—', 'RPE') +
-      cell(p.load != null ? p.load : '—', 'Лоад') +
+      cell(score != null ? this._fmtLoad(score) : '—', 'Лоад') +
       '</div><p class="sheet-mini-note">Був ' + (st.present || 0) + ' · пропуск ' + (st.absent || 0) +
-      ' · load 28д ' + (st.load28 != null ? st.load28 : '—') +
-      (this._loadChangeNote(p) ? (' · ' + sanitize(this._loadChangeNote(p))) : '') + '</p>';
+      ' · load 28д ' + (st.load28 != null ? st.load28 : '—') + '</p>' +
+      this._loadPanel(p, true);
   },
 
   _loadChangeNote(p) {
@@ -3138,17 +3220,36 @@ trainings() {
 
   _loadHistoryCard() {
     const s = Store.get();
-    const rows = (s.players || []).slice().sort((a, b) => (Number(b.load) || 0) - (Number(a.load) || 0));
+    const role = this._loadRole();
+    let meId = '';
+    try {
+      const me = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer) ? AuthManager.getLinkedPlayer() : null;
+      meId = me ? String(me.id) : '';
+    } catch (_) {}
+    const rows = (s.players || []).slice().sort((a, b) => (this._loadScore(b) || 0) - (this._loadScore(a) || 0));
     if (!rows.length) return '';
+    const weight = this._loadWeightText();
+    const intro = role === 'guest'
+      ? ('Число від 1 до 10 — середня оцінка за 28 днів. Синя частина смуги — тренування, жовта — матчі. Матч важить у ' + weight + ' раза більше.')
+      : (role === 'player'
+        ? ('Твій рядок підсвічений. Натисни гравця, щоб відкрити картку. Матч важить у ' + weight + ' раза більше за тренування тієї ж довжини.')
+        : ('Лоад більше не з анкети. Він сам збирається з RPE на тренуванні і оцінки за матч. Матч × ' + weight + '.'));
     const line = rows.map(p => {
       const name = [p.lastName, p.firstName].filter(Boolean).join(' ') || p.name || ('#' + (p.number || '—'));
-      const note = this._loadChangeNote(p);
-      const value = p.load != null && p.load !== '' ? String(p.load) : '—';
-      return '<div class="load-hist-row"><span>' + sanitize(name) + '</span><b>' + sanitize(value) + '</b><small>' +
-        sanitize(note || 'без змін') + '</small></div>';
+      const form = this._loadForm(p.id);
+      const value = form.score != null ? this._fmtLoad(form.score) : '—';
+      const mine = meId && String(p.id) === meId ? ' is-me' : '';
+      const note = 'тренування ' + (form.trainN || 0) +
+        (form.trainAvg != null ? (' · ' + this._fmtLoad(form.trainAvg)) : '') +
+        ' · матчі ' + (form.matchN || 0) +
+        (form.matchAvg != null ? (' · ' + this._fmtLoad(form.matchAvg)) : '');
+      return '<button type="button" class="load-hist-row' + mine + '" data-action="open-player-card" data-player-id="' + sanitize(String(p.id)) + '">' +
+        '<span>' + sanitize(name) + '</span><b>' + value + '</b>' +
+        this._loadSplit(form) +
+        '<small>' + sanitize(note) + '</small></button>';
     }).join('');
-    return '<div class="card glass load-hist"><div class="ct">Лоад з анкети</div>' +
-      '<p class="note-sm">Кожна зміна тренера записується тут і в новинах клубу.</p>' + line + '</div>';
+    return '<div class="card glass load-hist"><div class="ct">Лоад з оцінок</div>' +
+      '<p class="note-sm">' + intro + '</p>' + line + '</div>';
   },
 
   _staffCard() {

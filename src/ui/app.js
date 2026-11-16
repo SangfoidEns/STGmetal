@@ -499,7 +499,8 @@ const App = {
     let ratingSum = 0, ratingN = 0;
     (s.players || []).forEach(p => {
       if (!p) return;
-      const ovr = Math.round((Number(p.readiness != null ? p.readiness : p.condition) || 70) * 0.85 + (100 - Math.min(100, (p.load || 0) * 8)) * 0.15);
+      const autoLoad = (typeof LoadModel !== 'undefined' && LoadModel.shownScore) ? LoadModel.shownScore(p) : null;
+      const ovr = Math.round((Number(p.readiness != null ? p.readiness : p.condition) || 70) * 0.85 + (100 - Math.min(100, ((autoLoad != null ? autoLoad : p.load) || 0) * 8)) * 0.15);
       ratingSum += ovr;
       ratingN++;
     });

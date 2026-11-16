@@ -1560,7 +1560,7 @@ CoachTools.lineupRole = function (player) {
   if (['ST', 'CF', 'LW', 'RW', 'SS', 'LF', 'RF', 'ATT', 'FW'].indexOf(pos) >= 0) return 'ATT';
   return 'MID';
 };
-/** Одинадцять із найбільшим лоадом, який тренер ставить в анкеті. Решта йде на лавку. */
+/** Одинадцять із найбільшим лоадом з оцінок. Якщо оцінок ще немає — з анкети. Решта йде на лавку. */
 CoachTools.pickLineup = function (players) {
   const list = (players || []).filter(function (p) { return p && p.id != null; });
   const hurt = function (p) {
@@ -1568,6 +1568,12 @@ CoachTools.pickLineup = function (players) {
     return st === 'injured' || st === 'rehab' || st === 'recovery' || st === 'suspended' || st === 'unavailable';
   };
   const loadOf = function (p) {
+    try {
+      if (typeof LoadModel !== 'undefined' && LoadModel.shownScore) {
+        const auto = LoadModel.shownScore(p);
+        if (auto != null) return auto;
+      }
+    } catch (_) {}
     const n = Number(p && p.load);
     return Number.isFinite(n) ? n : 0;
   };
