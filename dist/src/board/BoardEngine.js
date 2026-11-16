@@ -195,6 +195,19 @@ const BoardEngine = {
       .sort((a, b) => (a.step || 999) - (b.step || 999) || 0);
   },
 
+  zonePaint(color) {
+    const raw = String(color || (Store.get().activeBoard && Store.get().activeBoard.drawColor) || '#c8a84b');
+    const hex = raw.charAt(0) === '#' ? raw.slice(1) : '';
+    let r = 200, g = 168, b = 75;
+    if (hex.length === 6) {
+      r = parseInt(hex.slice(0, 2), 16);
+      g = parseInt(hex.slice(2, 4), 16);
+      b = parseInt(hex.slice(4, 6), 16);
+    }
+    const stroke = hex.length === 6 ? ('#' + hex) : raw;
+    return { stroke: stroke, fill: 'rgba(' + r + ',' + g + ',' + b + ',0.28)' };
+  },
+
   strokeColorFor(type, explicit) {
     if (explicit) return explicit;
     const palette = (Store.get().activeBoard && Store.get().activeBoard.drawColor) || null;
@@ -462,6 +475,29 @@ const BoardEngine = {
 
   /** Стрілки/паси/рухи — hit-test (світ 0..1) */
   PATH_TYPES: ['arrow', 'arrowDash', 'pass', 'run', 'dribble', 'press', 'shot'],
+  hitTestZone(wx, wy) {
+    const objs = ((Store.get().activeBoard && Store.get().activeBoard.objects) || []).slice().reverse();
+    for (let i = 0; i < objs.length; i++) {
+      const o = objs[i];
+      if (!o || o.type !== 'zone' || o.visible === false) continue;
+      if (o.shape === 'circle' || o.shape === 'ellipse') {
+        const rx = o.rx || o.r || 0.05;
+        const ry = o.ry || o.r || 0.05;
+        const dx = (wx - o.x) / (rx || 0.01);
+        const dy = (wy - o.y) / (ry || 0.01);
+        if (dx * dx + dy * dy <= 1.08) return o;
+      } else if (o.shape === 'polygon' && o.points && o.points.length >= 3) {
+        if (this._pointInZone(wx, wy, { type: 'polygon', points: o.points })) return o;
+      } else {
+        const w = o.w || 0, h = o.h || 0;
+        const x1 = Math.min(o.x, o.x + w), x2 = Math.max(o.x, o.x + w);
+        const y1 = Math.min(o.y, o.y + h), y2 = Math.max(o.y, o.y + h);
+        if (wx >= x1 && wx <= x2 && wy >= y1 && wy <= y2) return o;
+      }
+    }
+    return null;
+  },
+
   hitTestArrow(wx, wy, tol) {
     tol = tol == null ? 0.028 : tol;
     const s = Store.get();
@@ -725,8 +761,16 @@ const BoardEngine = {
       return;
     }
 
-    // Select: спочатку стрілки (переміщення / кінці), інакше зняти вибір
+    // Select: периметр, потім стрілки, інакше зняти вибір
     if (tool === 'select') {
+      const zoneHit = this.hitTestZone(world.x, world.y);
+      if (zoneHit) {
+        s.activeBoard.selectedId = zoneHit.id;
+        this.dragObj = null;
+        this.renderDrawings();
+        try { this.renderToolbar && this.renderToolbar(); } catch (_) {}
+        return;
+      }
       const hit = this.hitTestArrow(world.x, world.y);
       if (hit && hit.obj) {
         const handle = this.hitTestArrowHandle(world.x, world.y, hit.obj);
@@ -993,33 +1037,42 @@ const BoardEngine = {
       const w = Math.abs(world.x - this.startPos.x);
       const h = Math.abs(world.y - this.startPos.y);
       if (w > 0.02 && h > 0.02) {
-        s.activeBoard.objects.push({
+        const paint = this.zonePaint();
+        const zone = {
           id: uid(), type: 'zone', shape: 'rect',
-          x, y, w, h, fill: 'rgba(200,168,75,0.25)', opacity: 0.4,
+          x, y, w, h, fill: paint.fill, stroke: paint.stroke, color: paint.stroke, opacity: 0.4,
           label: '', locked: false, visible: true
-        });
+        };
+        s.activeBoard.objects.push(zone);
+        s.activeBoard.selectedId = zone.id;
         this.pushHistory();
       }
     } else if (tool === 'circle' || tool === 'ellipse') {
       const r = Math.hypot(world.x - this.startPos.x, world.y - this.startPos.y);
       if (r > 0.015) {
-        s.activeBoard.objects.push({
+        const paint = this.zonePaint();
+        const zone = {
           id: uid(), type: 'zone', shape: tool === 'ellipse' ? 'ellipse' : 'circle',
           x: this.startPos.x, y: this.startPos.y, r,
           rx: r, ry: tool === 'ellipse' ? r * 0.6 : r,
-          fill: 'rgba(52,152,219,0.2)', opacity: 0.35,
+          fill: paint.fill, stroke: paint.stroke, color: paint.stroke, opacity: 0.35,
           label: '', locked: false, visible: true
-        });
+        };
+        s.activeBoard.objects.push(zone);
+        s.activeBoard.selectedId = zone.id;
         this.pushHistory();
       }
     } else if (tool === 'freehand' && this._freehand && this._freehand.length > 3) {
       // Close freehand into polygon zone
-      s.activeBoard.objects.push({
+      const paint = this.zonePaint();
+      const zone = {
         id: uid(), type: 'zone', shape: 'polygon',
         points: this._freehand.slice(),
-        fill: 'rgba(46,204,113,0.2)', opacity: 0.3,
+        fill: paint.fill, stroke: paint.stroke, color: paint.stroke, opacity: 0.3,
         label: '', locked: false, visible: true
-      });
+      };
+      s.activeBoard.objects.push(zone);
+      s.activeBoard.selectedId = zone.id;
       this._freehand = null;
       this.pushHistory();
     }
@@ -1033,12 +1086,15 @@ const BoardEngine = {
   closePolygon() {
     if (this.polygonPoints.length < 3) return;
     const s = Store.get();
-    s.activeBoard.objects.push({
+    const paint = this.zonePaint();
+    const zone = {
       id: uid(), type: 'zone', shape: 'polygon',
       points: this.polygonPoints.slice(),
-      fill: 'rgba(200,168,75,0.25)', opacity: 0.4,
+      fill: paint.fill, stroke: paint.stroke, color: paint.stroke, opacity: 0.4,
       label: 'Zone', locked: false, visible: true
-    });
+    };
+    s.activeBoard.objects.push(zone);
+    s.activeBoard.selectedId = zone.id;
     this.polygonPoints = [];
     this.polygonMode = false;
     this.pushHistory();
@@ -2621,15 +2677,18 @@ const BoardEngine = {
           html += `<text x="${mx}" y="${my + 4}" text-anchor="middle" fill="#fff" font-size="11" font-weight="700" font-family="system-ui,sans-serif">${o.step}</text>`;
         }
       } else if (o.type === 'zone') {
+        const stroke = o.stroke || o.color || '#c8a84b';
+        const selected = s.activeBoard.selectedId === o.id;
+        const sw = selected ? 4 : 2;
         if (o.shape === 'rect' || (!o.shape && o.w)) {
-          html += `<rect x="${tx(o.x)}" y="${ty(o.y)}" width="${tx(o.w || 0)}" height="${ty(o.h || 0)}" fill="${o.fill || 'rgba(200,168,75,0.25)'}" stroke="#c8a84b" stroke-width="2" stroke-dasharray="6,4" opacity="${o.opacity || 0.4}"/>`;
+          html += `<rect x="${tx(o.x)}" y="${ty(o.y)}" width="${tx(o.w || 0)}" height="${ty(o.h || 0)}" fill="${o.fill || 'rgba(200,168,75,0.25)'}" stroke="${stroke}" stroke-width="${sw}" stroke-dasharray="6,4" opacity="${o.opacity || 0.4}"/>`;
           if (o.label) html += `<text x="${tx(o.x + (o.w || 0) / 2)}" y="${ty(o.y) + 16}" fill="#fff" font-size="14" text-anchor="middle" font-weight="600">${sanitize(o.label)}</text>`;
         } else if (o.shape === 'circle' || o.shape === 'ellipse') {
           const rx = tx(o.rx || o.r || 0.05), ry = ty(o.ry || o.r || 0.05);
-          html += `<ellipse cx="${tx(o.x)}" cy="${ty(o.y)}" rx="${rx}" ry="${ry}" fill="${o.fill || 'rgba(52,152,219,0.2)'}" stroke="#3498db" stroke-width="2" opacity="${o.opacity || 0.35}"/>`;
+          html += `<ellipse cx="${tx(o.x)}" cy="${ty(o.y)}" rx="${rx}" ry="${ry}" fill="${o.fill || 'rgba(52,152,219,0.2)'}" stroke="${stroke}" stroke-width="${sw}" opacity="${o.opacity || 0.35}"/>`;
         } else if (o.shape === 'polygon' && o.points && o.points.length) {
           const pts = o.points.map(p => tx(p.x) + ',' + ty(p.y)).join(' ');
-          html += `<polygon points="${pts}" fill="${o.fill || 'rgba(200,168,75,0.25)'}" stroke="#c8a84b" stroke-width="2" stroke-dasharray="6,4" opacity="${o.opacity || 0.4}"/>`;
+          html += `<polygon points="${pts}" fill="${o.fill || 'rgba(200,168,75,0.25)'}" stroke="${stroke}" stroke-width="${sw}" stroke-dasharray="6,4" opacity="${o.opacity || 0.4}"/>`;
           if (o.label) {
             const cx = o.points.reduce((a, p) => a + p.x, 0) / o.points.length;
             const cy = o.points.reduce((a, p) => a + p.y, 0) / o.points.length;

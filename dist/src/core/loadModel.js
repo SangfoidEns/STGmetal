@@ -183,6 +183,65 @@ const LoadModel = {
     };
   },
 
+  /**
+   * День = усі тренування цього дня плюс зіграний матч.
+   * Матч додає хвилини × MATCH_WEIGHT, тож розминка в день гри не робить графік нижчим.
+   */
+  dayActivity(trainings, matches) {
+    const days = {};
+    const self = this;
+    const touch = function (date) {
+      const key = String(date || '').slice(0, 10);
+      if (!key) return null;
+      if (!days[key]) days[key] = { date: key, minutes: 0, load: 0, trainings: 0, matches: 0 };
+      return days[key];
+    };
+    this.pastTrainings(trainings).forEach(function (t) {
+      const row = touch(t.date);
+      if (!row) return;
+      const minutes = Math.max(0, Number(t.duration) || 0);
+      let intensity = Number(t.intensity) || 0;
+      if (!intensity) {
+        const att = t.attendance || {};
+        const rpes = Object.keys(att).map(function (id) {
+          const mark = att[id];
+          if (!mark || typeof mark !== 'object') return null;
+          if (mark.rpe != null && mark.rpe !== '') return Number(mark.rpe);
+          if (mark.intensity != null && mark.intensity !== '') return Number(mark.intensity);
+          return null;
+        }).filter(function (v) { return v != null && !isNaN(v); });
+        intensity = rpes.length ? (rpes.reduce(function (a, v) { return a + v; }, 0) / rpes.length) : 0;
+      }
+      row.minutes += minutes;
+      row.load += self.sessionLoad(minutes, intensity);
+      row.trainings += 1;
+    });
+    const today = this.todayStr();
+    (this._matches(matches) || []).forEach(function (m) {
+      if (!m || !m.date || String(m.date) > today) return;
+      const st = String(m.status || '').toLowerCase();
+      if (st === 'cancelled' || st === 'canceled' || st === 'скасовано') return;
+      const hasAtt = !!(m.attendance && Object.keys(m.attendance).length);
+      if (st !== 'played' && st !== 'done' && st !== 'completed' && st !== 'зіграно' && !hasAtt) return;
+      const row = touch(m.date);
+      if (!row) return;
+      const minutes = Math.max(1, Number(m.minutes) || 90);
+      const att = m.attendance || {};
+      const ratings = Object.keys(att).map(function (id) {
+        const cell = att[id];
+        if (!cell || cell.present === false || cell.present === 0 || cell.present === '0') return null;
+        if (cell.present !== true && cell.present !== 1 && cell.present !== '1') return null;
+        return cell.rating != null && cell.rating !== '' ? Number(cell.rating) : 6;
+      }).filter(function (v) { return v != null && !isNaN(v); });
+      const avg = ratings.length ? (ratings.reduce(function (a, v) { return a + v; }, 0) / ratings.length) : 6;
+      const weight = self.MATCH_WEIGHT || 1;
+      row.minutes += Math.round(minutes * weight);
+      row.load += Math.round(self.sessionLoad(minutes, avg) * weight);
+      row.matches += 1;
+    });
+    return Object.keys(days).sort().map(function (key) { return days[key]; });
+  },
+
   shownScore(player, days) {
     if (!player || player.id == null) return null;
     const form = this.formLoad(player.id, days);

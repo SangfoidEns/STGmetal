@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z100',
+  APP_BUILD: 'z101',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -442,8 +442,11 @@ const Views = {
     const weekLoad = LoadModel.weeklyLoad(s.trainings);
     const pastForStats = (typeof LoadModel !== 'undefined' && LoadModel.pastTrainings)
       ? LoadModel.pastTrainings(s.trainings) : s.trainings.filter(t => t.date && t.date <= today() && t.status !== 'cancelled');
-    const totalHours = Math.round(pastForStats.reduce((a, t) => a + (t.duration || 0), 0) / 60 * 10) / 10;
-    const totalMin = pastForStats.reduce((a, t) => a + (t.duration || 0), 0);
+    const activity = (typeof LoadModel !== 'undefined' && LoadModel.dayActivity)
+      ? LoadModel.dayActivity(s.trainings, s.matches) : [];
+    const totalMin = activity.reduce((a, d) => a + (d.minutes || 0), 0);
+    const totalHours = Math.round(totalMin / 60 * 10) / 10;
+    const matchDays = activity.reduce((a, d) => a + (d.matches || 0), 0);
     const todayStr = today();
     const nextMatch = (s.matches || []).filter(m => m && m.date >= todayStr).sort((a, b) => a.date.localeCompare(b.date))[0];
     const pastMatch = (s.matches || []).filter(m => m && m.date && m.date < todayStr && (!nextMatch || String(m.id) !== String(nextMatch.id)))
@@ -452,12 +455,9 @@ const Views = {
     const drafts = s.trainings.filter(t => t.status === 'draft' || t.status === 'pinned');
     const boardCount = (s.boards || []).length;
     // Graphs for coach home cards
-    const pastSorted = pastForStats.slice().sort((a, b) => String(a.date||'').localeCompare(String(b.date||'')));
-    const last14 = pastSorted.slice(-14);
-    const minByDay = last14.map(t => t.duration || 0);
-    const loadBySession = pastSorted.slice(-8).map(t => {
-      try { return (typeof LoadModel !== 'undefined' && LoadModel.sessionLoad) ? LoadModel.sessionLoad(t.duration, t.intensity) : ((t.duration||0)*(t.intensity||0)); } catch(_) { return 0; }
-    });
+    const recentDays = activity.slice(-14);
+    const minByDay = recentDays.map(d => d.minutes || 0);
+    const loadBySession = recentDays.map(d => d.load || 0);
     const last3Load = loadBySession.slice(-3);
     const avg3 = last3Load.length ? Math.round(last3Load.reduce((a,b)=>a+b,0)/last3Load.length) : 0;
     const recentBoards = (s.boards || []).slice().sort((a,b)=>String(b.createdAt||b.updatedAt||'').localeCompare(String(a.createdAt||a.updatedAt||''))).slice(0, 3);
@@ -575,14 +575,14 @@ const Views = {
             <span class="cp-stat-ic">⏱</span>
             <span class="cp-stat-val">${totalMin || 0}</span>
             <span class="cp-stat-lb">хв загалом</span>
-            <span class="cp-stat-sub">${pastForStats.length} тренувань</span>
+            <span class="cp-stat-sub">${pastForStats.length} тренувань · ${matchDays} матчів</span>
             <div class="cp-stat-spark">${this._sparkline(minByDay, { color: '#7cf0c0', fill: 'rgba(124,240,192,.12)' })}</div>
           </div>
           <div class="cp-stat cp-stat-chart">
             <span class="cp-stat-ic">📊</span>
             <span class="cp-stat-val">${weekLoad || 0}</span>
             <span class="cp-stat-lb">Тижневе навантаження</span>
-            <span class="cp-stat-sub">сер. 3 сесії: ${avg3} · матч ×${(typeof LoadModel !== 'undefined' && LoadModel.MATCH_WEIGHT) || 1.7}</span>
+            <span class="cp-stat-sub">сер. 3 дні: ${avg3} · матч разом із розминкою</span>
             <div class="cp-stat-spark">${this._sparkline(loadBySession, { color: '#3d7eff', fill: 'rgba(61,126,255,.12)' })}</div>
           </div>
           <div class="cp-stat cp-stat-chart">

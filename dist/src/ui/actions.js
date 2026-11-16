@@ -1849,8 +1849,8 @@ const Actions = {
     const album = this._albumById(albumId);
     if (!album) return;
     const sections = Store.get().schemeSections || [];
-    const rows = '<button type="button" class="btn btn-s btn-sm" data-action="set-album-section" data-album-id="' + sanitize(album.id) + '" data-section-id="">Без розділу</button>' +
-      sections.map(sec => '<button type="button" class="btn btn-s btn-sm" data-action="set-album-section" data-album-id="' + sanitize(album.id) + '" data-section-id="' + sanitize(sec.id || '') + '">' + sanitize(sec.name || 'Розділ') + '</button>').join('');
+    const rows = '<button type="button" class="btn btn-s btn-sm" data-modal-action="set-album-section" data-album-id="' + sanitize(album.id) + '" data-section-id="">Без розділу</button>' +
+      sections.map(sec => '<button type="button" class="btn btn-s btn-sm" data-modal-action="set-album-section" data-album-id="' + sanitize(album.id) + '" data-section-id="' + sanitize(sec.id || '') + '">' + sanitize(sec.name || 'Розділ') + '</button>').join('');
     Modal.open('У який розділ', '<div class="ym-actions">' + (rows || '<div class="es">Спочатку створи розділ</div>') + '</div>', [
       { label: 'Закрити', cls: 'btn-s', action: 'cancel' }
     ]);
@@ -1864,17 +1864,22 @@ const Actions = {
     (s.schemeSections || []).forEach(sec => {
       if (sec) sec.albumIds = (sec.albumIds || []).filter(id => String(id) !== String(albumId));
     });
+    let placed = '';
     if (sectionId) {
       const sec = (s.schemeSections || []).find(x => x && String(x.id) === String(sectionId));
       if (sec) {
         sec.albumIds = sec.albumIds || [];
-        sec.albumIds.push(album.id);
+        if (!sec.albumIds.some(id => String(id) === String(album.id))) sec.albumIds.push(album.id);
         sec.updatedAt = new Date().toISOString();
+        placed = sec.name || 'Розділ';
       }
     }
+    s.ui = s.ui || {};
+    s.ui.schemeAlbumId = null;
+    s.ui.schemeArchive = false;
     StorageManager.save();
     try { Modal.close(); } catch (_) {}
-    Toast.show(sectionId ? 'Альбом у розділі' : 'Альбом без розділу', 'ok');
+    Toast.show(placed ? ('Альбом у розділі «' + placed + '»') : 'Альбом без розділу', 'ok');
     App.renderCurrent();
   },
 

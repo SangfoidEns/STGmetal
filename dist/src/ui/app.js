@@ -1522,55 +1522,73 @@ const App = {
       return date || '';
     } catch (_) { return date || ''; }
   },
-  _paintNextHeader() {
-    const el = document.getElementById('nextTr');
-    const sub = document.getElementById('nextTrCountdown');
-    const crest = document.getElementById('nextTrCrest');
-    const btn = document.getElementById('nextTrBtn');
-    const ev = this._nextHeaderEvent();
-    if (!ev) {
+  _nextHeaderMatch() {
+    const s = (typeof Store !== 'undefined' && Store.get) ? Store.get() : { matches: [] };
+    const todayStr = (typeof today === 'function') ? today() : '';
+    return (s.matches || []).filter(m => {
+      if (!m || !m.date) return false;
+      if (m.status === 'played' || m.status === 'cancelled' || m.status === 'canceled') return false;
+      return !todayStr || String(m.date) >= todayStr;
+    }).sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.time || '').localeCompare(String(b.time || '')))[0] || null;
+  },
+  _paintHeaderMatch() {
+    const el = document.getElementById('nextMatchName');
+    const sub = document.getElementById('nextMatchCd');
+    const crest = document.getElementById('nextMatchCrest');
+    const btn = document.getElementById('nextMatchBtn');
+    const m = this._nextHeaderMatch();
+    if (!m) {
       if (el) { el.textContent = '—'; el.title = ''; }
       if (sub) sub.textContent = '';
       if (crest) { crest.hidden = true; crest.textContent = ''; }
+      if (btn) btn.removeAttribute('data-match-id');
       return;
     }
-    if (ev.kind === 'match') {
-      const m = ev.match;
-      const name = m.opponent || 'Матч';
-      if (el) { el.textContent = name; el.title = name + ' · ' + (m.date || '') + ' ' + (m.time || ''); }
-      if (sub) sub.textContent = this._countdownText(m.date, m.time);
-      if (crest) {
-        crest.hidden = false;
-        crest.textContent = '';
-        if (m.opponentLogo) {
-          const img = document.createElement('img');
-          img.alt = '';
-          img.src = m.opponentLogo;
-          crest.appendChild(img);
-        } else {
-          crest.textContent = String(name).replace(/[^A-Za-zА-Яа-яІіЇїЄєҐґ0-9]/g, '').slice(0, 3).toUpperCase() || 'VS';
-        }
+    const name = m.opponent || 'Матч';
+    if (el) { el.textContent = name; el.title = name + ' · ' + (m.date || '') + ' ' + (m.time || ''); }
+    if (sub) sub.textContent = this._countdownText(m.date, m.time);
+    if (crest) {
+      crest.hidden = false;
+      crest.textContent = '';
+      if (m.opponentLogo) {
+        const img = document.createElement('img');
+        img.alt = '';
+        img.src = m.opponentLogo;
+        crest.appendChild(img);
+      } else {
+        crest.textContent = String(name).replace(/[^A-Za-zА-Яа-яІіЇїЄєҐґ0-9]/g, '').slice(0, 3).toUpperCase() || 'VS';
       }
-      if (btn) {
-        btn.dataset.action = 'open-match';
-        btn.dataset.matchId = m.id || '';
-        btn.removeAttribute('data-view');
-        btn.title = 'Наступний матч';
-      }
+    }
+    if (btn) {
+      btn.dataset.action = 'open-match';
+      btn.dataset.matchId = m.id || '';
+      btn.title = 'Наступний матч';
+    }
+  },
+  _paintHeaderTraining() {
+    const el = document.getElementById('nextTr');
+    const sub = document.getElementById('nextTrCountdown');
+    const btn = document.getElementById('nextTrBtn');
+    const s = (typeof Store !== 'undefined' && Store.get) ? Store.get() : { trainings: [] };
+    const next = (typeof Views !== 'undefined' && Views._nextPlanned) ? Views._nextPlanned(s.trainings) : null;
+    if (!next) {
+      if (el) { el.textContent = '—'; el.title = ''; }
+      if (sub) sub.textContent = '';
+      if (btn) btn.removeAttribute('data-training-id');
       return;
     }
-    const next = ev.training;
     const name = this.formatNextTr ? this.formatNextTr(next) : (next.name || 'Тр.');
     if (el) { el.textContent = name; el.title = (next.name || '') + ' · ' + (next.date || '') + ' ' + (next.time || ''); }
     if (sub) sub.textContent = this._countdownText(next.date, next.time);
-    if (crest) { crest.hidden = true; crest.textContent = ''; }
     if (btn) {
       btn.dataset.action = 'preview-next-training';
       btn.dataset.trainingId = next.id || '';
-      btn.removeAttribute('data-view');
-      btn.removeAttribute('data-match-id');
       btn.title = 'Наступне тренування';
     }
+  },
+  _paintNextHeader() {
+    try { this._paintHeaderMatch(); } catch (_) {}
+    try { this._paintHeaderTraining(); } catch (_) {}
   },
   updateTrainingCountdown() {
     try { this._paintNextHeader(); } catch (_) {}
@@ -2503,6 +2521,10 @@ const App = {
     if (e) e._modalHandled = true;
     const act = button.dataset.modalAction || button.getAttribute('data-modal-action') || '';
     if (!act) return false;
+    if (act === 'set-album-section') {
+      try { Actions.setAlbumSection(button.dataset.albumId, button.getAttribute('data-section-id') || ''); } catch (err) { console.error(err); }
+      return true;
+    }
     if (act === 'cancel') {
       const dirty = this._albumPickDirty;
       this._albumPickDirty = false;
@@ -4316,7 +4338,12 @@ const App = {
           const obj = (ab.objects || []).find(o => o.id === sel);
           if (obj) {
             obj.color = col;
-            if (obj.type === 'player' || obj.team === 'own' || obj.team === 'opp' || obj.number != null) {
+            if (obj.type === 'zone') {
+              const paint = (typeof BoardEngine !== 'undefined' && BoardEngine.zonePaint) ? BoardEngine.zonePaint(col) : { stroke: col, fill: col };
+              obj.color = paint.stroke;
+              obj.stroke = paint.stroke;
+              obj.fill = paint.fill;
+            } else if (obj.type === 'player' || obj.team === 'own' || obj.team === 'opp' || obj.number != null) {
               obj.chipColor = col;
               obj.fill = col;
             }

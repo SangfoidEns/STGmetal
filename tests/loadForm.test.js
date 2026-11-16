@@ -78,4 +78,27 @@ describe('automatic load from ratings', () => {
     assert.equal(form.score, 6);
     assert.equal(form.trainUnits, 480);
   });
+
+  it('adds the played match onto the warm-up day so the day stays taller than the warm-up', () => {
+    const day = iso(-1);
+    const trainings = [
+      { id: 'long', date: iso(-3), status: 'done', duration: 75, intensity: 6 },
+      { id: 'wu', date: day, status: 'done', duration: 20, intensity: 3, md: 'WU' }
+    ];
+    const matches = [{
+      id: 'm1', date: day, status: 'played', minutes: 90,
+      attendance: { p1: { present: true, rating: 8 } }
+    }];
+    const LM = boot({ trainings: trainings, matches: matches });
+    const days = LM.dayActivity(trainings, matches);
+    const matchDay = days.find(function (row) { return row.date === day; });
+    const trainDay = days.find(function (row) { return row.date === iso(-3); });
+    assert.ok(matchDay);
+    assert.equal(matchDay.trainings, 1);
+    assert.equal(matchDay.matches, 1);
+    assert.ok(matchDay.minutes > 20);
+    assert.ok(matchDay.load > 20 * 3);
+    assert.ok(matchDay.minutes > trainDay.minutes);
+    assert.ok(matchDay.load > trainDay.load);
+  });
 });
