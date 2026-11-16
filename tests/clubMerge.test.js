@@ -422,4 +422,57 @@ describe('club snapshot merge', () => {
     assert.equal(merged.settings.coachPhoto, 'data:image/jpeg;base64,abc');
     assert.equal(merged.settings.coachName, 'Artem Serdiuk');
   });
+
+  it('merges a later empty Johnson with last week photos, load and the drawn board', () => {
+    const older = {
+      players: [{
+        id: 'p1',
+        firstName: 'Артем',
+        lastName: 'Сердюк',
+        photoUrl: 'data:image/jpeg;base64,OLD',
+        updatedAt: '2026-11-14T10:00:00.000Z'
+      }],
+      trainings: [{ id: 't1', name: 'старе', date: '2026-11-14', updatedAt: '2026-11-14T10:00:00.000Z' }],
+      matches: [{ id: 'm1', opponent: 'Старе', updatedAt: '2026-11-14T10:00:00.000Z' }],
+      activeBoard: { objects: [{ id: 'o1' }, { id: 'o2' }] },
+      settings: { logoData: 'LOGO', coachPhoto: 'COACH', updatedAt: '2026-11-14T10:00:00.000Z' },
+      feedMeta: { load: { p1: 3 }, loadAt: { p1: '2026-11-14T10:00:00.000Z' } }
+    };
+    const newer = {
+      players: [{
+        id: 'p1',
+        firstName: 'Артем',
+        lastName: 'Сердюк',
+        photoUrl: '',
+        profilePhoto: '',
+        updatedAt: '2026-11-16T10:00:00.000Z'
+      }],
+      trainings: [
+        { id: 't1', name: 'старе', date: '2026-11-14', updatedAt: '2026-11-14T10:00:00.000Z' },
+        { id: 't2', name: 'нове', date: '2026-11-16', updatedAt: '2026-11-16T10:00:00.000Z' }
+      ],
+      matches: [
+        { id: 'm1', opponent: 'Старе', updatedAt: '2026-11-14T10:00:00.000Z' },
+        { id: 'm2', opponent: 'Нове', updatedAt: '2026-11-16T10:00:00.000Z' }
+      ],
+      activeBoard: { objects: [] },
+      settings: { logoData: '', coachPhoto: '', updatedAt: '2026-11-16T12:00:00.000Z' },
+      feedMeta: { load: { p1: 5 }, loadAt: { p1: '2026-11-16T10:00:00.000Z' } }
+    };
+    const merged = mergePayload(newer, older);
+    assert.equal(merged.players.length, 1);
+    assert.equal(merged.players[0].photoUrl, 'data:image/jpeg;base64,OLD');
+    assert.equal(merged.trainings.length, 2);
+    assert.equal(merged.matches.length, 2);
+    assert.equal(merged.activeBoard.objects.length, 2);
+    assert.equal(merged.settings.logoData, 'LOGO');
+    assert.equal(merged.settings.coachPhoto, 'COACH');
+    assert.equal(merged.feedMeta.load.p1, 5);
+    assert.equal(merged.feedMeta.loadAt.p1, '2026-11-16T10:00:00.000Z');
+    const back = mergePayload(older, newer);
+    assert.equal(back.players.length, 1);
+    assert.equal(back.players[0].photoUrl, 'data:image/jpeg;base64,OLD');
+    assert.equal(back.activeBoard.objects.length, 2);
+    assert.equal(back.trainings.length, 2);
+  });
 });

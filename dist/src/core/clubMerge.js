@@ -392,6 +392,7 @@ function applyStampedFields(merged, a, b) {
     const out = Object.assign({}, loser, winner);
     out.coachStats = mergeCoachStats(base.coachStats, extra.coachStats);
     if (!out.coachPhoto) out.coachPhoto = (loser.coachPhoto || winner.coachPhoto || '');
+    if (!out.logoData) out.logoData = (loser.logoData || winner.logoData || '');
     if (!out.coachName) out.coachName = (loser.coachName || winner.coachName || '');
     const gone = [];
     [base.removedGiftIds, extra.removedGiftIds].forEach(function (list) {
@@ -406,16 +407,20 @@ function applyStampedFields(merged, a, b) {
 
   function mergeFeedMeta(base, extra) {
     const out = {};
-    ['status', 'photo', 'photoAt', 'level', 'streak'].forEach(function (key) {
+    ['status', 'photo', 'photoAt', 'level', 'streak', 'load', 'loadAt'].forEach(function (key) {
       const a = (base && base[key]) || {};
       const b = (extra && extra[key]) || {};
       const merged = Object.assign({}, a, b);
-      if (key === 'level' || key === 'streak') {
+      if (key === 'level' || key === 'streak' || key === 'load') {
         Object.keys(merged).forEach(function (id) {
-          merged[id] = Math.max(Number(a[id]) || 0, Number(b[id]) || 0);
+          const av = Number(a[id]);
+          const bv = Number(b[id]);
+          if (Number.isFinite(av) || Number.isFinite(bv)) {
+            merged[id] = Math.max(Number.isFinite(av) ? av : 0, Number.isFinite(bv) ? bv : 0);
+          }
         });
       }
-      if (key === 'photoAt') {
+      if (key === 'photoAt' || key === 'loadAt') {
         Object.keys(merged).forEach(function (id) {
           merged[id] = stamp(b[id]) >= stamp(a[id]) ? (b[id] || a[id]) : (a[id] || b[id]);
         });
@@ -606,7 +611,21 @@ function collapseTrainings(payload) {
     collapseTrainings(out);
     collapsePlayers(out);
     applyWornGifts(out);
+    keepActiveBoard(out, base, extra);
     return out;
+  }
+
+  function boardObjectCount(board) {
+    return board && Array.isArray(board.objects) ? board.objects.length : 0;
+  }
+
+  /** Порожня дошка в новішому файлі не стирає вже намальовану. */
+  function keepActiveBoard(out, base, extra) {
+    const baseBoard = base && base.activeBoard;
+    const extraBoard = extra && extra.activeBoard;
+    if (boardObjectCount(extraBoard) > boardObjectCount(baseBoard)) out.activeBoard = extraBoard;
+    else if (baseBoard) out.activeBoard = baseBoard;
+    else if (extraBoard) out.activeBoard = extraBoard;
   }
 
   root.ClubMerge = {

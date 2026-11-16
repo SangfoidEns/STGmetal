@@ -337,12 +337,33 @@ const StorageManager = {
       }
       let found = '';
       try { found = String(localStorage.getItem(this.PLAYER_PHOTO_PREFIX + p.id) || '').trim(); } catch (_) {}
+      if (!found) {
+        if (!this._photoBackupIndex) this._photoBackupIndex = this._readPhotoBackupIndex();
+        found = this._photoBackupIndex[String(p.id)] || '';
+      }
       if (!found) return;
       p.photoUrl = found;
       p.profilePhoto = found;
       restored += 1;
     });
+    this._photoBackupIndex = null;
     return restored;
+  },
+
+  /** Останній Джонсон і резервна копія, якщо в сесії фото вже стерлось. */
+  _readPhotoBackupIndex() {
+    const index = {};
+    const take = (data) => {
+      const list = data && (data.players || (data.payload && data.payload.players));
+      (list || []).forEach(p => {
+        if (!p || p.id == null || index[String(p.id)]) return;
+        const url = String(p.profilePhoto || p.photoUrl || '').trim();
+        if (url.indexOf('data:') === 0) index[String(p.id)] = url;
+      });
+    };
+    try { take(JSON.parse(localStorage.getItem('metalist_full_migration') || 'null')); } catch (_) {}
+    try { take(this._readBackupPayload()); } catch (_) {}
+    return index;
   },
 
   _photoFromPayload(data) {
@@ -807,14 +828,17 @@ const StorageManager = {
   },
 
   buildExportPayload() {
+    try { this.restorePlayerPhotos(); } catch (_) {}
+    try { this.restoreCoachPhoto(); } catch (_) {}
     const s = Store.get();
     const clone = (value) => JSON.parse(JSON.stringify(value == null ? null : value));
     try { if (typeof Views !== 'undefined' && Views.syncBirthdays) Views.syncBirthdays(); } catch (_) {}
     const players = (s.players || []).map(p => {
       const birth = p.birthDate || (p.profile && p.profile.birthDate) || p.birthday || '';
       const copy = clone(p) || {};
-      copy.photoUrl = p.photoUrl || p.profilePhoto || '';
-      copy.profilePhoto = p.profilePhoto || '';
+      const photo = p.photoUrl || p.profilePhoto || (p.profile && p.profile.photo) || '';
+      copy.photoUrl = photo;
+      copy.profilePhoto = photo;
       copy.birthDate = birth;
       copy.profile = Object.assign({}, copy.profile || {}, birth ? { birthDate: birth } : {});
       copy.stamps = Object.assign({}, p.stamps || {});
@@ -1393,9 +1417,15 @@ const StorageManager = {
           }
           if (data.club && packed.settings) packed.settings.clubName = packed.settings.clubName || data.club;
 
+          const photoCount = (list) => (list || []).filter(p => p && (p.photoUrl || p.profilePhoto)).length;
+          const photosBefore = photoCount(s.players);
+          const photosAfter = photoCount(packed.players);
+          try { this.rememberPlayerPhotos(packed); } catch (_) {}
+          try { this.rememberCoachPhoto(packed.settings && packed.settings.coachPhoto); } catch (_) {}
           try {
-            localStorage.setItem('metalist_full_migration', JSON.stringify(data));
-            localStorage.setItem('metalist_roster_migration', JSON.stringify(data));
+            const snapshot = JSON.stringify(packed);
+            localStorage.setItem('metalist_full_migration', snapshot);
+            localStorage.setItem('metalist_roster_migration', snapshot);
           } catch (_) {}
 
           applyMerged(packed);
@@ -1411,11 +1441,12 @@ const StorageManager = {
             if (typeof GiftFX !== 'undefined' && GiftFX.celebrateRecent) GiftFX.celebrateRecent();
           } catch (_) {}
 
-          const nP = (data.players || []).length;
-          const nT = (data.trainings || []).length;
-          const nB = (data.boards || []).length;
-          const nG = (data.gifts || []).length;
-          Toast.show('Повний імпорт: ' + nP + ' гравців · ' + nT + ' тренувань · ' + nB + ' схем · ' + nG + ' подарунків', 'ok');
+          const nP = (packed.players || []).length;
+          const nT = (packed.trainings || []).length;
+          const nB = (packed.boards || []).length;
+          const nG = (packed.gifts || []).length;
+          const gained = Math.max(0, photosAfter - photosBefore);
+          Toast.show('Злито без дублів: ' + nP + ' гравців · ' + nT + ' тренувань · ' + nB + ' схем · ' + nG + ' подарунків · фото ' + photosAfter + (gained ? (' · повернулось ' + gained) : ''), 'ok');
           return true;
         }
 
