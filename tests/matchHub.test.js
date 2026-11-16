@@ -81,6 +81,38 @@ describe('player match hub', () => {
     assert.match(html, /Група A/);
     assert.equal(html.includes('Іван Мельник'), false);
     assert.equal(html.includes('data-action="new-tournament"'), false);
+    assert.match(html, /data-action="match-bucket"/);
+    assert.match(html, /Усі/);
+    assert.match(html, /Кубок/);
+  });
+
+  it('shows a player every team match and can keep only friendlies', () => {
+    const state = club();
+    state.matches.push({
+      id: 'm2',
+      date: '2026-11-22',
+      time: '18:00',
+      opponent: 'FC Slop',
+      competition: '',
+      status: 'planned',
+      xi: ['p2'],
+      bench: [],
+      attendance: {}
+    });
+    const ctx = boot(state, {
+      isPlayer() { return true; },
+      isCoach() { return false; },
+      isGuest() { return false; },
+      getLinkedPlayer() { return state.players[0]; }
+    });
+    const all = ctx.Views._matchHub({ role: 'player' });
+    assert.match(all, /FC Slop/);
+    assert.match(all, /Товариські/);
+    assert.equal(all.includes('Іван Мельник'), false);
+    state.ui.matchBucket = 'Товариські';
+    const friendly = ctx.Views._matchHub({ role: 'player' });
+    assert.match(friendly, /FC Slop/);
+    assert.equal(friendly.includes('FC Freunde'), false);
   });
 
   it('lets a guest read the match without the coach rating', () => {

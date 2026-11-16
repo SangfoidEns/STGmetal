@@ -13,7 +13,7 @@ const Store = (() => {
         logoData: null, defaultDuration: 90, defaultIntensity: 6, autosave: true, sound: true, theme: 'dark', defaultScheme: '4-3-3',
         rbac: { coaches: ['Serdiuk_Artem'], playerLinks: {} }
       },
-      players: JSON.parse(JSON.stringify(DEMO.players)),
+      players: [],
       trainings: [],
       exercises: JSON.parse(JSON.stringify(DEMO.exercises)),
       boards: [],

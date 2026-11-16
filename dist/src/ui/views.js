@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z104',
+  APP_BUILD: 'z105',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -19,6 +19,16 @@ const Views = {
 
   versionLabel() {
     return String(this.APP_BUILD || '').replace(/^z/i, '');
+  },
+
+  _isSeed(player) {
+    try {
+      return !!(player && typeof ClubMerge !== 'undefined' && ClubMerge.isSeedPlayer && ClubMerge.isSeedPlayer(player));
+    } catch (_) { return false; }
+  },
+
+  _livePlayers(list) {
+    return (list || []).filter(p => p && p.id != null && !this._isSeed(p));
   },
 
   _pitchBar() {
@@ -448,7 +458,9 @@ const Views = {
     const totalHours = Math.round(totalMin / 60 * 10) / 10;
     const matchDays = activity.reduce((a, d) => a + (d.matches || 0), 0);
     const todayStr = today();
-    const nextMatch = (s.matches || []).filter(m => m && m.date >= todayStr).sort((a, b) => a.date.localeCompare(b.date))[0];
+    const nextMatch = (typeof CoachTools !== 'undefined' && CoachTools.nextMatch)
+      ? CoachTools.nextMatch(s.matches)
+      : (s.matches || []).filter(m => m && m.date >= todayStr && m.status !== 'played' && m.status !== 'cancelled' && m.status !== 'canceled').sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
     const pastMatch = (s.matches || []).filter(m => m && m.date && m.date < todayStr && (!nextMatch || String(m.id) !== String(nextMatch.id)))
       .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.time || '').localeCompare(String(a.time || '')))[0];
     const recent = s.trainings.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 6);
@@ -464,7 +476,7 @@ const Views = {
     const teamXpPack = (() => {
       const map = {};
       let total = 0;
-      (s.players || []).forEach(p => {
+      this._livePlayers(s.players).forEach(p => {
         if (!p || p.id == null || typeof PlayerProgress === 'undefined' || !PlayerProgress.compute) return;
         let pr = null;
         try { pr = PlayerProgress.compute(p.id); } catch (_) { pr = null; }
@@ -934,7 +946,7 @@ const Views = {
   _compareBlock(me, otherId) {
     const s = Store.get();
     if (!me) return '';
-    const others = (s.players || []).filter(p => p.id !== me.id).sort((a, b) => (a.number || 0) - (b.number || 0));
+    const others = this._livePlayers(s.players).filter(p => String(p.id) !== String(me.id)).sort((a, b) => (a.number || 0) - (b.number || 0));
     const opts = '<option value="">— оберіть гравця —</option>' +
       '<option value="__team__"' + (otherId === '__team__' ? ' selected' : '') + '>Середнє по команді</option>' +
       others.map(p =>
@@ -967,7 +979,7 @@ const Views = {
     const nameA = '#' + (me.number || '') + ' ' + sanitize(me.lastName || me.firstName || 'Ви');
     let condB = 0, b = { attPct: 0, avgRpe: 0, load28: 0 }, nameB = '', loadB = 0;
     if (otherId === '__team__') {
-      const pls = s.players || [];
+      const pls = this._livePlayers(s.players);
       if (!pls.length) return '<div class="compare-empty">Немає гравців</div>';
       let sumCond = 0, sumAtt = 0, sumRpe = 0, sumL28 = 0, sumLoad = 0, n = 0;
       pls.forEach(p => {
@@ -1120,7 +1132,9 @@ const Views = {
           ? PlayerProgress.sessionCounts(t)
           : t.status === 'done';
         if (!counts) return;
-        const a = t.attendance && t.attendance[playerId];
+        const a = (typeof PlayerProgress !== 'undefined' && PlayerProgress._cell)
+          ? PlayerProgress._cell(t.attendance, playerId)
+          : (t.attendance && (t.attendance[playerId] != null ? t.attendance[playerId] : t.attendance[String(playerId)]));
         const mark = (typeof PlayerProgress !== 'undefined' && PlayerProgress.attendanceMark)
           ? PlayerProgress.attendanceMark(a)
           : (a && a.present === true ? true : (a && a.present === false ? false : null));
@@ -1151,8 +1165,10 @@ const Views = {
     const next = this._nextPlanned(s.trainings);
     const todayStr = today();
     const monthPrefix = todayStr.slice(0, 7);
-    const nextMatch = s.matches.filter(m => m.date >= todayStr && String(m.date).slice(0, 7) === monthPrefix)
-      .sort((a, b) => a.date.localeCompare(b.date))[0];
+    const nextMatch = (typeof CoachTools !== 'undefined' && CoachTools.nextMatch)
+      ? CoachTools.nextMatch(s.matches)
+      : s.matches.filter(m => m.date >= todayStr && String(m.date).slice(0, 7) === monthPrefix)
+        .sort((a, b) => a.date.localeCompare(b.date))[0];
     const pastTr = (s.trainings || []).filter(t => t.status === 'done' || t.status === 'cancelled' || t.status === 'canceled' || (t.date && t.date < todayStr))
       .sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 10);
     const fullName = me ? this._cleanDisplayName([me.firstName, me.lastName].filter(Boolean).join(' ') || me.name || 'Гравець') : '';
@@ -1401,7 +1417,7 @@ const Views = {
     const s = Store.get();
     const set = s.settings || {};
     const social = set.social || {};
-    const players = (s.players || []).slice();
+    const players = this._livePlayers(s.players);
     const done = (s.trainings || []).filter(t => t && t.status === 'done')
       .slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
     const sessionAtt = done.map(t => {
@@ -1430,7 +1446,7 @@ const Views = {
       let pr = { level: 1, xp: 0, attPct: 0, streak: 0 };
       try { pr = PlayerProgress.compute(p.id); } catch (_) {}
       return { p, pr };
-    }).sort((a, b) => (b.pr.xp || 0) - (a.pr.xp || 0));
+    }).sort((a, b) => (b.pr.xp || 0) - (a.pr.xp || 0) || (Number(a.p.number) || 99) - (Number(b.p.number) || 99));
     const growth = ranked.slice(0, 6).map(({ p, pr }) => {
       const nm = [p.firstName, p.lastName].filter(Boolean).join(' ') || p.name || '';
       return '<button type="button" class="club-grow" data-action="open-player-card" data-player-id="' + p.id + '">' +
@@ -1895,12 +1911,17 @@ trainings() {
   },
 
   _focusMatch(s) {
-    const todayStr = (typeof today === 'function') ? today() : '';
-    const list = ((s && s.matches) || []).filter(m => m && m.status !== 'cancelled' && m.status !== 'canceled');
+    const list = (s && s.matches) || [];
+    if (typeof CoachTools !== 'undefined' && CoachTools.nextMatch) {
+      const next = CoachTools.nextMatch(list);
+      if (next) return next;
+    }
+    const todayStr = (typeof CoachTools !== 'undefined' && CoachTools.berlinToday) ? CoachTools.berlinToday() : ((typeof today === 'function') ? today() : '');
+    const open = list.filter(m => m && m.status !== 'cancelled' && m.status !== 'canceled' && m.status !== 'played' && m.status !== 'done');
     const byStart = (a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.time || '').localeCompare(String(b.time || ''));
-    const upcoming = list.filter(m => String(m.date || '') >= todayStr).sort(byStart);
+    const upcoming = open.filter(m => !todayStr || String(m.date || '') >= todayStr).sort(byStart);
     if (upcoming.length) return upcoming[0];
-    const past = list.filter(m => String(m.date || '') < todayStr).sort((a, b) => byStart(b, a));
+    const past = list.filter(m => m && m.date && (!todayStr || String(m.date) < todayStr) && m.status !== 'cancelled' && m.status !== 'canceled').sort((a, b) => byStart(b, a));
     return past[0] || null;
   },
 
@@ -1968,6 +1989,7 @@ trainings() {
 
     let list = (s.players || []).slice();
     const isCoach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+    if (!isCoach) list = list.filter(p => !this._isSeed(p));
     const isPlayerRole = typeof AuthManager !== 'undefined' && AuthManager.isPlayer && AuthManager.isPlayer();
     const mePlayer = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer)
       ? AuthManager.getLinkedPlayer() : null;
@@ -2814,7 +2836,7 @@ trainings() {
     opts = opts || {};
     const role = opts.role || 'player';
     const s = Store.get() || {};
-    const players = (s.players || []).filter(p => p && p.id != null);
+    const players = this._livePlayers(s.players);
     let focus = null;
     if (role === 'player') {
       try { focus = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer) ? AuthManager.getLinkedPlayer() : null; } catch (_) { focus = null; }
@@ -2840,9 +2862,20 @@ trainings() {
       const called = (m.xi || []).concat(m.bench || []).some(x => x != null && String(x) === id);
       return called || (cell && cell.present != null);
     }) : matches;
+    const bucketOf = (m) => String(m.competition || '').trim() || 'Товариські';
+    const catalog = role === 'player' ? matches : (focus ? mine : matches);
+    const bucketKeys = [];
+    const seenBucket = {};
+    catalog.forEach(m => {
+      const key = bucketOf(m);
+      if (!seenBucket[key]) { seenBucket[key] = true; bucketKeys.push(key); }
+    });
+    const pickedBucket = (s.ui && s.ui.matchBucket) || 'all';
+    const activeBucket = (pickedBucket === 'all' || seenBucket[pickedBucket]) ? pickedBucket : 'all';
+    const shown = activeBucket === 'all' ? catalog : catalog.filter(m => bucketOf(m) === activeBucket);
     let minutes = 0, load = 0, goals = 0, yellow = 0, red = 0, played = 0;
     if (focus) {
-      mine.forEach(m => {
+      matches.forEach(m => {
         const cell = (m.attendance || {})[focus.id] != null ? m.attendance[focus.id] : ((m.attendance || {})[String(focus.id)] || {});
         const present = cell.present === true || cell.present === 1 || cell.present === '1';
         if (!present) return;
@@ -2854,13 +2887,15 @@ trainings() {
         red += Number(cell.red) || 0;
       });
     }
+    const bucketChip = (key, label) => '<button type="button" class="pm-chip pm-bucket' + ((key === 'all' ? activeBucket === 'all' : activeBucket === key) ? ' on' : '') + '" data-action="match-bucket" data-bucket="' + sanitize(key) + '">' + sanitize(label) + '</button>';
+    const filters = '<div class="pm-rail pm-buckets">' + bucketChip('all', 'Усі') + bucketKeys.map(key => bucketChip(key, key)).join('') + '</div>';
     const name = focus ? ([focus.firstName, focus.lastName].filter(Boolean).join(' ') || focus.name || 'Гравець') : 'Команда';
     const intro = role === 'guest'
       ? 'Лоад рахується з оцінки тренера, зіграних хвилин і ваги матчу ×' + ((typeof LoadModel !== 'undefined' && LoadModel.MATCH_WEIGHT) || 1.7) + '. Саму оцінку бачать гравець і тренер.'
       : 'Лоад цього матчу — оцінка тренера × хвилини × ' + ((typeof LoadModel !== 'undefined' && LoadModel.MATCH_WEIGHT) || 1.7) + '.';
     const buckets = {};
     const order = [];
-    (focus ? mine : matches).forEach(m => {
+    shown.forEach(m => {
       const key = String(m.competition || '').trim() || 'Товариські';
       if (!buckets[key]) { buckets[key] = []; order.push(key); }
       buckets[key].push(m);
@@ -2895,6 +2930,7 @@ trainings() {
         (canEdit ? '<button type="button" class="btn btn-p btn-sm" data-action="new-tournament">+ Турнір</button>' : '') +
       '</div>' +
       '<p class="note-sm">' + intro + '</p>' +
+      filters +
       rail +
       (focus ? ('<div class="pm-season">' +
         '<span><b>' + played + '</b><small>ігор</small></span>' +
@@ -3006,10 +3042,22 @@ trainings() {
     const have = {};
     (s.trainings || []).forEach(t => { if (t && t.matchId === m.id && t.md) have[t.md] = true; });
     (s.calendar || []).forEach(e => { if (e && e.matchId === m.id && e.md === 'MD') have.MD = true; });
-    const weekHtml = days.map(day => '<span class="match-day' + (have[day.md] ? ' is-on' : '') + '">' +
-      sanitize(day.md) + '<small>' + sanitize(String(day.date || '').slice(5)) + '</small></span>').join('');
+    const pickedDay = (s.ui && s.ui.matchDay) || '';
+    const weekHtml = days.map(day => {
+      const on = pickedDay === day.md ? ' is-on' : (have[day.md] ? ' is-have' : '');
+      const tag = canEdit ? 'button' : 'span';
+      const act = canEdit ? (' type="button" data-action="match-day" data-md="' + sanitize(day.md) + '"') : '';
+      return '<' + tag + ' class="match-day' + on + '"' + act + '>' +
+        sanitize(day.md) + '<small>' + sanitize(String(day.date || '').slice(5)) + '</small></' + tag + '>';
+    }).join('');
+    const picked = days.find(day => day.md === pickedDay);
+    const dayTraining = picked ? (s.trainings || []).find(t => t && String(t.matchId) === String(m.id) && t.md === picked.md) : null;
+    const dayNote = picked
+      ? (picked.md + ' · ' + (picked.date || '') + (dayTraining ? (' · ' + (dayTraining.name || 'тренування')) : ' · тренування ще не складене'))
+      : 'Обери день тижня. Склад від цього не змінюється.';
     const schemes = (typeof SCHEMES !== 'undefined') ? Object.keys(SCHEMES) : ['3-1-2-2-1-1'];
-    const scheme = m.scheme || '3-1-2-2-1-1';
+    if (schemes.indexOf(m.scheme) < 0 && m.scheme) schemes.unshift(m.scheme);
+    const scheme = m.scheme || schemes[0] || '3-1-2-2-1-1';
     const status = m.status || 'planned';
     const field = (id, label, value, type) => '<label class="fl"><span class="fl-label">' + label + '</span>' +
       '<input class="fl-input" id="' + id + '" type="' + (type || 'text') + '" value="' + sanitize(value == null ? '' : String(value)) + '"' +
@@ -3057,15 +3105,16 @@ trainings() {
       '</section>' +
       '<section class="card glass"><div class="ct">Тиждень матчу</div>' +
         '<div class="match-week">' + weekHtml +
-          '<span class="match-day' + (warmOn ? ' is-on' : '') + '">WU<small>розминка</small></span>' +
+          '<span class="match-day' + (warmOn ? ' is-have' : '') + '">WU<small>розминка</small></span>' +
         '</div>' +
+        '<p class="note-sm" id="mpDayNote">' + sanitize(dayNote) + '</p>' +
         '<p class="note-sm">MD-3 тактика, MD-2 стандарти, MD-1 активація, розминка в день матчу і відновлення.</p>' +
         (canEdit ? '<button type="button" class="btn btn-s btn-sm" data-action="match-week">Скласти тиждень</button>' : '') +
       '</section>' +
-      '<section class="card glass"><div class="ct">Заявка · ' + sanitize(scheme) + '</div>' +
+      '<section class="card glass"><div class="ct" id="mpSchemeTitle">Заявка · ' + sanitize(scheme) + '</div>' +
         (canEdit ? (
           '<label class="fl"><span class="fl-label">Схема</span><select class="fl-input" id="mpScheme">' +
-            schemes.map(name => '<option' + (name === scheme ? ' selected' : '') + '>' + sanitize(name) + '</option>').join('') +
+            schemes.map(name => '<option value="' + sanitize(name) + '"' + (name === scheme ? ' selected' : '') + '>' + sanitize(name) + '</option>').join('') +
           '</select></label>' +
           '<div class="fl"><span class="fl-label">Альбом схем</span>' + this._albumPickRow(m.schemeAlbumId, 'mpAlbum') + '</div>' +
           '<div class="match-actions">' +
@@ -3189,7 +3238,7 @@ trainings() {
 
     const hbars = (rows, colorOf) => {
       if (!rows.length) return '<div class="an-empty">Немає даних</div>';
-      const ordered = rows.slice().sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0));
+      const ordered = rows.slice().sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0) || String(a.label || '').localeCompare(String(b.label || ''), 'uk'));
       const max = Math.max(...ordered.map(r => Number(r.value) || 0), 1);
       return '<div class="an-hbars">' + ordered.map(r => {
         const pct = Math.max(0, Math.min(100, ((Number(r.value) || 0) / max) * 100));
@@ -3267,7 +3316,7 @@ trainings() {
         try { load = (typeof LoadModel !== 'undefined' && LoadModel.matchLoadFor) ? LoadModel.matchLoadFor(n.p.id, 365) : 0; } catch (_) {}
         return { label: n.label, value: load, text: load ? String(load) : '—', color: n.color };
       }), r => r.color)) +
-      card('Подарунки', 'Скільки артефактів у кожного', hbars(names.map(n => ({ label: n.label, value: (s.gifts || []).filter(g => g && g.playerId === n.p.id).length, color: n.color })), r => r.color)) +
+      card('Подарунки', 'Скільки артефактів у кожного', hbars(names.map(n => ({ label: n.label, value: (s.gifts || []).filter(g => g && String(g.playerId) === String(n.p.id)).length, color: n.color })), r => r.color)) +
       card('Готовність', 'Стан з анкети гравця', readyRows.length ? hbars(readyRows, r => r.color) : '<div class="an-empty">Готовність ще не заповнена</div>') +
       card('Амплуа', 'Розподіл складу', donut(['GK', 'DEF', 'MID', 'ATT', 'IN'].filter(k => posMap[k]).map(k => ({ label: posLabels[k], value: posMap[k], color: posColor[k] })))) +
       card('Статус тренувань', 'План, факт і скасовані', donut([
@@ -3284,7 +3333,7 @@ trainings() {
 
   analytics() {
     const s = Store.get();
-    let players = (s.players || []).slice();
+    let players = this._livePlayers(s.players);
     const trainings = (s.trainings || []).filter(t => t.status === 'done');
     const sortKey = (s.ui && s.ui.playerSort) || 'name';
     const sortDir = (s.ui && s.ui.playerSortDir) === 'desc' ? -1 : 1;
@@ -3296,7 +3345,7 @@ trainings() {
       }
       return statsCache[pid];
     };
-    const giftCount = (pid) => (s.gifts || []).filter(g => g && g.playerId === pid).length;
+    const giftCount = (pid) => (s.gifts || []).filter(g => g && String(g.playerId) === String(pid)).length;
     players.sort((a, b) => {
       const sa = getSt(a.id), sb = getSt(b.id);
       let va, vb;
@@ -3459,7 +3508,7 @@ trainings() {
       const me = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer) ? AuthManager.getLinkedPlayer() : null;
       meId = me ? String(me.id) : '';
     } catch (_) {}
-    const rows = (s.players || []).slice().sort((a, b) => (this._loadScore(b) || 0) - (this._loadScore(a) || 0));
+    const rows = this._livePlayers(s.players).slice().sort((a, b) => (this._loadScore(b) || 0) - (this._loadScore(a) || 0) || (Number(a.number) || 99) - (Number(b.number) || 99));
     if (!rows.length) return '';
     const weight = this._loadWeightText();
     const intro = role === 'guest'

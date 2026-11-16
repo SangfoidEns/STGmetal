@@ -1136,7 +1136,9 @@ const Actions = {
     const t = Store.get().trainings.find(x => x.id === trainingId);
     if (!t) { Toast.show('Тренування не знайдено', 'warn'); return; }
     if (!t.attendance) t.attendance = {};
-    const players = (Store.get().players || []).slice().sort((a, b) => (a.number || 0) - (b.number || 0));
+    const players = (Store.get().players || []).filter(p => {
+      try { return !(typeof ClubMerge !== 'undefined' && ClubMerge.isSeedPlayer && ClubMerge.isSeedPlayer(p)); } catch (_) { return true; }
+    }).slice().sort((a, b) => (a.number || 0) - (b.number || 0));
     const rows = players.map(p => {
       const a = t.attendance[p.id] || {};
       const hasRecord = t.attendance[p.id] != null;
@@ -1727,6 +1729,49 @@ const Actions = {
     App.renderCurrent();
   },
 
+  setMatchScheme(value) {
+    if (!this._coachOnly()) return;
+    const m = this._matchByUi();
+    const scheme = String(value || '').trim();
+    if (!m || !scheme || m.scheme === scheme) {
+      const title = document.getElementById('mpSchemeTitle');
+      if (title && scheme) title.textContent = 'Заявка · ' + scheme;
+      return;
+    }
+    m.scheme = scheme;
+    const now = new Date().toISOString();
+    m.updatedAt = now;
+    m.stamps = Object.assign({}, m.stamps || {}, { plan: now });
+    try { StorageManager.save(); } catch (_) {}
+    const title = document.getElementById('mpSchemeTitle');
+    if (title) title.textContent = 'Заявка · ' + scheme;
+    try {
+      const roles = (typeof CoachTools !== 'undefined' && CoachTools.schemeRoles) ? CoachTools.schemeRoles(scheme) : [];
+      const roleUa = { GK: 'ВР', DEF: 'ЗХ', MID: 'ПЗ', ATT: 'НАП' };
+      const box = document.querySelector('.match-plan .match-chips');
+      if (box) box.querySelectorAll('.match-chip-role').forEach((el, i) => {
+        if (roles[i]) el.textContent = roleUa[roles[i]] || roles[i];
+      });
+    } catch (_) {}
+    try { Toast.show('Схема ' + scheme, 'ok'); } catch (_) {}
+  },
+
+  setMatchAlbum(albumId) {
+    if (!this._coachOnly()) return;
+    const m = this._matchByUi();
+    if (!m) return;
+    const next = albumId || '';
+    if (String(m.schemeAlbumId || '') === String(next)) return;
+    m.schemeAlbumId = next;
+    const now = new Date().toISOString();
+    m.updatedAt = now;
+    m.stamps = Object.assign({}, m.stamps || {}, { plan: now });
+    const field = document.getElementById('mpAlbum');
+    if (field) field.value = next;
+    try { StorageManager.save(); } catch (_) {}
+    try { Toast.show(next ? 'Альбом матчу збережено' : 'Матч без альбому', 'ok'); } catch (_) {}
+  },
+
   fillMatchSquad() {
     if (!this._coachOnly()) return;
     const m = this._matchByUi();
@@ -1744,6 +1789,7 @@ const Actions = {
   },
 
   toggleMatchPlayer(playerId, matchId) {
+    if (typeof App !== 'undefined' && App._squadQuietUntil && Date.now() < App._squadQuietUntil) return;
     if (!this._coachOnly()) return;
     const m = matchId
       ? ((Store.get().matches || []).find(item => item && String(item.id) === String(matchId)) || null)

@@ -264,7 +264,7 @@ function applyStampedFields(merged, a, b) {
       return !!(item && (item.opponent || item.xi || item.plan != null || item.warmup != null || item.opponentLogo));
     };
     if (!looks(loser) && !looks(winner)) return;
-    const keys = ['plan', 'plan1', 'plan2', 'tactics', 'preNotes', 'postNotes', 'warmup', 'warmupAt', 'warmupPlace', 'opponentLogo', 'meetTime', 'gatherPlace', 'kickoff', 'competition', 'scheme'];
+    const keys = ['plan', 'plan1', 'plan2', 'tactics', 'preNotes', 'postNotes', 'warmup', 'warmupAt', 'warmupPlace', 'opponentLogo', 'meetTime', 'gatherPlace', 'kickoff', 'competition', 'scheme', 'schemeAlbumId'];
     const loserAt = fieldTime(loser, 'plan');
     const winnerAt = fieldTime(winner, 'plan');
     if (loserAt || winnerAt) {
@@ -430,14 +430,77 @@ function applyStampedFields(merged, a, b) {
     return out;
   }
 
+  const SEED_NAMES = {
+    p01: 'олександр коваль', p02: 'ігор бондар', p03: 'андрій мельник', p04: 'сергій шевченко',
+    p05: 'максим ткаченко', p06: 'дмитро кравченко', p07: 'віктор лисенко', p08: 'роман петренко',
+    p09: 'юрій гончаренко', p10: 'тарас савченко', p11: 'богдан морозенко', p12: 'олег василенко',
+    p13: 'назар коваленко', p14: 'артем білий', p15: 'денис сидоренко', p16: 'євген поліщук',
+    p17: 'михайло захарченко', p18: 'вадим романенко', p19: 'павло гриценко', p20: 'кирило данилюк'
+  };
+
+  function personName(item) {
+    return (String((item && item.firstName) || '') + ' ' + String((item && item.lastName) || '') + ' ' + String((item && item.name) || ''))
+      .trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  /** Демо-склад і явні тестові картки. Їх не змішуємо з живим складом. */
+  function isSeedPlayer(item) {
+    if (!item) return false;
+    if (item.test === true || item.isTest === true || item.demo === true || item.seed === true || item.hiddenStats === true) return true;
+    const id = String(item.id || '');
+    const name = personName(item);
+    if (SEED_NAMES[id] && name === SEED_NAMES[id]) return true;
+    const handle = String(item.telegramUsername || item.telegram || '').replace(/^@/, '').trim().toLowerCase();
+    const compact = (handle + ' ' + name).trim();
+    if (/^(slop|test|тест|тестовий|test player|тестовий гравець)$/.test(handle)) return true;
+    if (/^(slop|test|тест|тестовий|test player|тестовий гравець)$/.test(name)) return true;
+    if (/(^|\s)(slop|тестовий гравець|test player)(\s|$)/.test(compact)) return true;
+    return false;
+  }
+
+  /** Якщо в файлі вже є живі гравці, демо і тестові картки прибираємо. */
+  function dropSeedPlayers(payload) {
+    if (!payload || !Array.isArray(payload.players)) return { removed: 0 };
+    const seeds = payload.players.filter(isSeedPlayer);
+    const live = payload.players.filter(function (p) { return p && !isSeedPlayer(p); });
+    if (!seeds.length || !live.length) return { removed: 0 };
+    const gone = {};
+    seeds.forEach(function (p) { if (p && p.id != null) gone[String(p.id)] = true; });
+    payload.players = live;
+    const dropId = function (id) { return id != null && gone[String(id)]; };
+    (payload.matches || []).forEach(function (match) {
+      if (!match) return;
+      if (Array.isArray(match.xi)) match.xi = match.xi.map(function (id) { return dropId(id) ? null : id; });
+      if (Array.isArray(match.bench)) match.bench = match.bench.filter(function (id) { return !dropId(id); });
+      if (match.attendance) {
+        Object.keys(match.attendance).forEach(function (id) { if (gone[String(id)]) delete match.attendance[id]; });
+      }
+    });
+    (payload.trainings || []).forEach(function (training) {
+      if (!training || !training.attendance) return;
+      Object.keys(training.attendance).forEach(function (id) { if (gone[String(id)]) delete training.attendance[id]; });
+    });
+    ['gifts', 'moments', 'chat', 'feed'].forEach(function (list) {
+      if (!Array.isArray(payload[list])) return;
+      payload[list] = payload[list].filter(function (item) { return !(item && dropId(item.playerId)); });
+    });
+    return { removed: seeds.length };
+  }
+
   function playerAlias(item) {
     if (!item) return '';
+    if (isSeedPlayer(item)) return 'seed:' + String(item.id || personName(item));
     const tg = String(item.telegramUsername || item.telegram || '').replace(/^@/, '').trim().toLowerCase();
     if (tg) return 'tg:' + tg;
     const name = (String(item.firstName || '') + ' ' + String(item.lastName || '')).trim().toLowerCase().replace(/\s+/g, ' ');
     const num = Number(item.number) || 0;
     if (name && num) return 'nm:' + name + '#' + num;
+    if (name && name.indexOf(' ') > 0) return 'nm:' + name + '#0';
     return '';
+  }
+
+  function fullName(item) {
+    return (String((item && item.firstName) || '') + ' ' + String((item && item.lastName) || '')).trim().toLowerCase().replace(/\s+/g, ' ');
   }
 
   function retargetId(value, idMap) {
@@ -472,6 +535,26 @@ function applyStampedFields(merged, a, b) {
       });
       kept.push(winner);
     });
+    const folded = [];
+    kept.forEach(function (item) {
+      const name = fullName(item);
+      const num = Number(item && item.number) || 0;
+      const mate = (name && name.indexOf(' ') > 0) ? folded.find(function (other) {
+        if (fullName(other) !== name) return false;
+        const otherNum = Number(other && other.number) || 0;
+        return !num || !otherNum || num === otherNum;
+      }) : null;
+      if (!mate) {
+        folded.push(item);
+        return;
+      }
+      const merged = mergeRecord(mate, item);
+      merged.id = mate.id;
+      if (item && item.id && item.id !== mate.id) idMap[String(item.id)] = mate.id;
+      folded[folded.indexOf(mate)] = merged;
+    });
+    kept.length = 0;
+    folded.forEach(function (item) { kept.push(item); });
     payload.players = kept;
     if (!Object.keys(idMap).length) return { removed: 0, idMap: idMap };
     (payload.trainings || []).forEach(function (training) {
@@ -610,6 +693,7 @@ function collapseTrainings(payload) {
     }
     collapseTrainings(out);
     collapsePlayers(out);
+    dropSeedPlayers(out);
     applyWornGifts(out);
     keepActiveBoard(out, base, extra);
     return out;
@@ -635,6 +719,8 @@ function collapseTrainings(payload) {
     recordStamp: recordStamp,
     collapseTrainings: collapseTrainings,
     collapsePlayers: collapsePlayers,
+    isSeedPlayer: isSeedPlayer,
+    dropSeedPlayers: dropSeedPlayers,
     trainingNameKey: trainingNameKey
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -27,36 +27,57 @@ const StorageManager = {
     } catch (_) { return false; }
   },
 
+  _stripDataUrls(value, seen) {
+    if (!value || typeof value !== 'object') return value;
+    if (seen.has(value)) return value;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      value.forEach(item => this._stripDataUrls(item, seen));
+      return value;
+    }
+    Object.keys(value).forEach(key => {
+      const item = value[key];
+      if (typeof item === 'string' && item.indexOf('data:') === 0) value[key] = '';
+      else if (item && typeof item === 'object') this._stripDataUrls(item, seen);
+    });
+    return value;
+  },
+
   _writeLocalPayload(payload) {
     const text = JSON.stringify(payload);
+    const kept = [];
+    const keepPhoto = (id, url) => {
+      if (id == null || typeof url !== 'string' || url.indexOf('data:') !== 0) return;
+      kept.push({ id: id, url: url });
+    };
+    (payload && payload.players || []).forEach(p => {
+      if (!p) return;
+      keepPhoto(p.id, p.profilePhoto || p.photoUrl || '');
+    });
+    if (payload && payload.settings) keepPhoto('coach', payload.settings.coachPhoto || payload.settings.coachPhotoUrl || '');
     try {
       localStorage.setItem(STORAGE_KEY, text);
       this.rememberPlayerPhotos();
       return true;
     } catch (err) {
-      const slim = JSON.parse(text);
-      const kept = [];
-      const keepUrl = (url) => (typeof url === 'string' && url.indexOf('data:') === 0) ? '' : (url || '');
-      (slim.players || []).forEach(p => {
-        if (!p) return;
-        const photo = String(p.profilePhoto || p.photoUrl || '');
-        if (photo.indexOf('data:') === 0) kept.push({ id: p.id, url: photo });
-        ['photo', 'photoUrl', 'profilePhoto', 'telegramPhotoUrl'].forEach(key => {
-          if (p[key]) p[key] = keepUrl(p[key]);
+      try {
+        const slim = JSON.parse(text);
+        const coach = slim.settings && (slim.settings.coachPhoto || slim.settings.coachPhotoUrl);
+        if (typeof coach === 'string' && coach.indexOf('data:') === 0) this.rememberCoachPhoto(coach);
+        this._stripDataUrls(slim, new Set());
+        (slim.trainings || []).forEach(t => { if (t && t.board) delete t.board; });
+        if (slim.activeBoard) slim.activeBoard = { objects: (slim.activeBoard.objects || []).slice(0, 80), fieldView: slim.activeBoard.fieldView || 'full' };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(slim));
+        kept.forEach(row => {
+          if (!row || !row.url) return;
+          if (row.id === 'coach') return;
+          try { localStorage.setItem(this.PLAYER_PHOTO_PREFIX + row.id, row.url); } catch (_) {}
         });
-      });
-      if (slim.settings) {
-        const coach = String(slim.settings.coachPhoto || slim.settings.coachPhotoUrl || '');
-        if (coach.indexOf('data:') === 0) this.rememberCoachPhoto(coach);
-        slim.settings.coachPhoto = keepUrl(slim.settings.coachPhoto);
-        slim.settings.coachPhotoUrl = keepUrl(slim.settings.coachPhotoUrl);
+        return true;
+      } catch (again) {
+        console.warn('[storage] quota', again && again.message);
+        return false;
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(slim));
-      kept.forEach(row => {
-        if (!row || row.id == null || !row.url) return;
-        try { localStorage.setItem(this.PLAYER_PHOTO_PREFIX + row.id, row.url); } catch (_) {}
-      });
-      return true;
     }
   },
 
@@ -414,15 +435,20 @@ const StorageManager = {
       this.rememberPlayerPhotos(s);
       s.updatedAt = new Date().toISOString();
       const payload = this._buildLocalPayload();
-      this._writeLocalPayload(payload);
+      const wrote = this._writeLocalPayload(payload);
+      if (!wrote) {
+        try { Toast.show('Мало місця в телефоні. Зміна лишилась на екрані, важкі фото відклав.', 'warn'); } catch (_) {}
+        return;
+      }
       if (!localOnly) {
         this._scheduleCloudPush(payload);
         this._clubDirty = true;
         this.scheduleClubPush();
       }
     } catch (e) {
-      ErrorManager.log('Storage.save', e);
-      Toast.show('Не вдалося зберегти (квота storage?)', 'err');
+      console.warn('[Storage.save]', e);
+      const quota = e && /quota/i.test(String(e.name || '') + String(e.message || ''));
+      try { Toast.show(quota ? 'Мало місця в телефоні. Спробуй ще раз після збереження.' : 'Не вдалося зберегти зміну.', 'err'); } catch (_) {}
     }
   },
 
@@ -641,6 +667,12 @@ const StorageManager = {
       if (!data || typeof data !== 'object') throw new Error('Invalid data');
       const version = data.schemaVersion || 1;
       const migrated = this.migrate(data, version);
+      try {
+        if (typeof ClubMerge !== 'undefined' && ClubMerge.dropSeedPlayers) ClubMerge.dropSeedPlayers(migrated);
+        if (typeof ClubMerge !== 'undefined' && ClubMerge.isSeedPlayer && Array.isArray(migrated.players) && migrated.players.length && migrated.players.every(ClubMerge.isSeedPlayer)) {
+          migrated.players = [];
+        }
+      } catch (_) {}
       let folded = { removed: 0 };
       try {
         if (typeof ClubMerge !== 'undefined' && ClubMerge.collapseTrainings) folded = ClubMerge.collapseTrainings(migrated) || folded;

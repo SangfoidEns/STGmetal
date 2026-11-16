@@ -1366,10 +1366,32 @@ const BoardEngine = {
       Toast.show('Суперник: схема ' + name + ' (дзеркало)', 'ok');
       return;
     }
-    const remembered = (typeof CoachTools !== 'undefined' && CoachTools.latestLineup)
-      ? CoachTools.latestLineup(s)
-      : ((typeof CoachTools !== 'undefined' && CoachTools.rememberedLineup) ? CoachTools.rememberedLineup(s) : null);
-    if (remembered && this.placeMatchLineup(Object.assign({}, remembered, { scheme: name }))) return;
+    const onPitch = (s.activeBoard.objects || []).filter(o => o && o.type === 'player' && o.team !== 'opp' && !o.onBench);
+    if (onPitch.length) {
+      const slots = scheme.slice(0, 11);
+      let slot = 0;
+      (s.activeBoard.objects || []).forEach(o => {
+        if (!o || o.type !== 'player' || o.team === 'opp' || o.onBench) return;
+        if (slot >= slots.length) {
+          o.onBench = true;
+          o.x = 0;
+          o.y = 0;
+          return;
+        }
+        const point = this.clampWorld(slots[slot][1], slots[slot][2]);
+        o.x = point.x;
+        o.y = point.y;
+        slot += 1;
+      });
+      s.activeBoard.scheme = name;
+      this.pushHistory();
+      this.render();
+      try { this.renderToolbar(); } catch (_) {}
+      try { Toast.show('Схема ' + name, 'ok'); } catch (_) {}
+      return;
+    }
+    const upcoming = (typeof CoachTools !== 'undefined' && CoachTools.nextMatch) ? CoachTools.nextMatch(s.matches) : null;
+    if (upcoming && this.placeMatchLineup(Object.assign({}, upcoming, { scheme: name }))) return;
     // Своя команда: 11 основи на поле; резерв / травма / відновлення — на лавку
     s.activeBoard.objects = s.activeBoard.objects.filter(o => !(o.type === 'player' && o.team !== 'opp'));
     const chipColor = s.activeBoard.drawColor || null;

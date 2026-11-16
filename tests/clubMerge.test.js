@@ -475,4 +475,22 @@ describe('club snapshot merge', () => {
     assert.equal(back.activeBoard.objects.length, 2);
     assert.equal(back.trainings.length, 2);
   });
+
+  it('drops a demo squad once a real player is in the file and keeps a lone test card', () => {
+    const mixed = mergePayload({
+      players: [
+        { id: 'p01', firstName: 'Олександр', lastName: 'Коваль' },
+        { id: 'yehor', firstName: 'Єгор', lastName: 'Коваль', number: 8 }
+      ]
+    }, {
+      players: [{ id: 'slop', firstName: 'Slop', lastName: 'Test' }]
+    });
+    assert.equal(mixed.players.length, 1);
+    assert.equal(mixed.players[0].id, 'yehor');
+    const only = mergePayload({
+      players: [{ id: 'p-test', firstName: 'Тест', birthDate: '2001-01-01' }]
+    }, {});
+    assert.equal(only.players.length, 1);
+    assert.equal(only.players[0].birthDate, '2001-01-01');
+  });
 });

@@ -1246,8 +1246,9 @@ const App = {
   },
 
   _takeMatchChip(e) {
+    if (this._squadQuietUntil && Date.now() < this._squadQuietUntil) return false;
     const node = e && e.target;
-    if (node && node.closest && node.closest('.match-savebar')) return false;
+    if (node && node.closest && node.closest('.match-savebar, .squad-view-toggle, .st, #appHeader, .header, select, .ym-pick, .ym-picks, .match-week, .match-toolbar, .pm-buckets')) return false;
     const direct = node && node.closest && node.closest('.match-chip, [data-action="match-toggle"]');
     const chip = (direct && direct.getAttribute('data-action') === 'match-toggle')
       ? direct
@@ -1491,12 +1492,7 @@ const App = {
   },
   _nextHeaderEvent() {
     const s = (typeof Store !== 'undefined' && Store.get) ? Store.get() : { matches: [], trainings: [] };
-    const todayStr = (typeof today === 'function') ? today() : '';
-    const match = (s.matches || []).filter(m => {
-      if (!m || !m.date) return false;
-      if (m.status === 'played' || m.status === 'cancelled' || m.status === 'canceled') return false;
-      return !todayStr || String(m.date) >= todayStr;
-    }).sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.time || '').localeCompare(String(b.time || '')))[0];
+    const match = this._nextHeaderMatch();
     if (match) return { kind: 'match', match: match };
     const training = (typeof Views !== 'undefined' && Views._nextPlanned) ? Views._nextPlanned(s.trainings) : null;
     return training ? { kind: 'training', training: training } : null;
@@ -1518,10 +1514,12 @@ const App = {
   },
   _nextHeaderMatch() {
     const s = (typeof Store !== 'undefined' && Store.get) ? Store.get() : { matches: [] };
+    if (typeof CoachTools !== 'undefined' && CoachTools.nextMatch) return CoachTools.nextMatch(s.matches);
     const todayStr = (typeof today === 'function') ? today() : '';
     return (s.matches || []).filter(m => {
       if (!m || !m.date) return false;
-      if (m.status === 'played' || m.status === 'cancelled' || m.status === 'canceled') return false;
+      if (m.status === 'played' || m.status === 'done' || m.status === 'cancelled' || m.status === 'canceled') return false;
+      if (!String(m.opponent || '').trim()) return false;
       return !todayStr || String(m.date) >= todayStr;
     }).sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.time || '').localeCompare(String(b.time || '')))[0] || null;
   },
@@ -1539,9 +1537,14 @@ const App = {
       return;
     }
     const name = m.opponent || 'Матч';
-    if (el) { el.textContent = name; el.title = name + ' · ' + (m.date || '') + ' ' + (m.time || ''); }
-    if (sub) sub.textContent = this._countdownText(m.date, m.time);
-    if (crest) {
+    if (el && el.textContent !== name) { el.textContent = name; el.title = name + ' · ' + (m.date || '') + ' ' + (m.time || ''); }
+    if (sub) {
+      const cd = this._countdownText(m.date, m.time);
+      if (sub.textContent !== cd) sub.textContent = cd;
+    }
+    const crestKey = String(m.id || '') + '|' + (m.opponentLogo || name);
+    if (crest && crest.dataset.crestKey !== crestKey) {
+      crest.dataset.crestKey = crestKey;
       crest.hidden = false;
       crest.textContent = '';
       if (m.opponentLogo) {
@@ -1726,6 +1729,7 @@ const App = {
           try { window.__squadViewMode = mode; } catch (_) {}
           try { sessionStorage.setItem('ms_squad_view', mode); } catch (_) {}
           if (s.ui.view !== 'players') s.ui.view = 'players';
+          try { App._squadQuietUntil = Date.now() + 900; } catch (_) {}
           try { Toast.show(mode === 'cards' ? 'Режим: картки' : (mode === 'match' ? 'Режим: матч' : 'Режим: список'), 'ok'); } catch (_) {}
           try { App.renderCurrent(); } catch (err) { console.error(err); }
         }, true);
@@ -2624,6 +2628,19 @@ const App = {
         }
       }, true);
     }
+    if (!this._schemeFormBound) {
+      this._schemeFormBound = true;
+      document.addEventListener('change', (e) => {
+        const node = e.target;
+        if (!node || node.id !== 'mpScheme') return;
+        try { App._squadQuietUntil = Date.now() + 900; } catch (_) {}
+        try { Actions.setMatchScheme(node.value); } catch (err) { console.error(err); }
+      }, true);
+      document.addEventListener('pointerdown', (e) => {
+        const node = e.target && e.target.closest && e.target.closest('.squad-view-toggle, select, .ym-pick, .match-week, .match-toolbar, .pm-buckets');
+        if (node) App._squadQuietUntil = Date.now() + 900;
+      }, true);
+    }
     if (!this._modalActionBound) {
       this._modalActionBound = true;
       document.addEventListener('click', (e) => {
@@ -3022,10 +3039,32 @@ const App = {
       }
       if (action === 'pick-album-field') {
         e.preventDefault(); e.stopPropagation();
+        this._squadQuietUntil = Date.now() + 900;
         const field = document.getElementById(t.dataset.albumField || '');
         if (field) field.value = t.dataset.albumId || '';
         const host = t.closest && t.closest('.ym-album-picks');
         if (host) host.querySelectorAll('.ym-pick').forEach(el => el.classList.toggle('on', el === t));
+        if ((t.dataset.albumField || '') === 'mpAlbum') {
+          try { Actions.setMatchAlbum(t.dataset.albumId || ''); } catch (err) { console.error(err); }
+        }
+        return;
+      }
+      if (action === 'match-bucket') {
+        e.preventDefault(); e.stopPropagation();
+        this._squadQuietUntil = Date.now() + 900;
+        const s = Store.get();
+        s.ui = s.ui || {};
+        s.ui.matchBucket = t.dataset.bucket || 'all';
+        try { this.renderCurrent(); } catch (_) {}
+        return;
+      }
+      if (action === 'match-day') {
+        e.preventDefault(); e.stopPropagation();
+        this._squadQuietUntil = Date.now() + 900;
+        const s = Store.get();
+        s.ui = s.ui || {};
+        s.ui.matchDay = t.dataset.md || '';
+        try { this.renderCurrent(); } catch (_) {}
         return;
       }
       if (action === 'toggle-train-month') {
@@ -4043,6 +4082,7 @@ const App = {
           try { sessionStorage.setItem('ms_squad_view', mode); } catch (_) {}
           // лишаємось на players
           if (s.ui.view !== 'players') s.ui.view = 'players';
+          try { App._squadQuietUntil = Date.now() + 900; } catch (_) {}
           try { Toast.show(mode === 'cards' ? 'Режим: картки' : (mode === 'match' ? 'Режим: матч' : 'Режим: список'), 'ok'); } catch (_) {}
           try { App.renderCurrent(); } catch (err) { console.error('[squad-view]', err); }
         } catch (err) { console.error('[squad-view]', err); }

@@ -1375,15 +1375,24 @@ const PlayerProgress = {
     return bonus;
   },
 
+  _cell(map, playerId) {
+    if (!map || playerId == null) return undefined;
+    if (map[playerId] != null) return map[playerId];
+    const key = String(playerId);
+    if (map[key] != null) return map[key];
+    const hit = Object.keys(map).find(k => String(k) === key);
+    return hit != null ? map[hit] : undefined;
+  },
+
   compute(playerId) {
     const s = Store.get();
-    const p = (s.players || []).find(x => x.id === playerId) || {};
+    const p = (s.players || []).find(x => x && String(x.id) === String(playerId)) || {};
     const trainings = (s.trainings || []).filter(t => this.sessionCounts(t));
     let xp = 0;
     let present = 0, absent = 0, sessions = 0;
     const history = [];
     trainings.forEach(t => {
-      const att = (t.attendance || {})[playerId];
+      const att = this._cell(t.attendance, playerId);
       const mark = this.attendanceMark(att);
       if (mark == null) return;
       sessions++;
@@ -1404,7 +1413,7 @@ const PlayerProgress = {
     let xpAttend = 0;
     let xpIntensity = 0;
     trainings.forEach(t => {
-      const att = (t.attendance || {})[playerId];
+      const att = this._cell(t.attendance, playerId);
       if (this.attendanceMark(att) !== true) return;
       xpAttend += this.RULES.present;
       const rpe = att.rpe != null ? +att.rpe : (att.intensity != null ? +att.intensity : 0);
@@ -1414,7 +1423,7 @@ const PlayerProgress = {
     let xpGoals = 0;
     (s.matches || []).forEach(m => {
       if (!m || m.status === 'cancelled' || m.status === 'canceled') return;
-      const cell = (m.attendance || {})[playerId];
+      const cell = this._cell(m.attendance, playerId);
       if (!cell || cell.present == null) return;
       const played = m.status === 'played' || cell.present === true || cell.present === false;
       if (!played) return;
@@ -1437,7 +1446,7 @@ const PlayerProgress = {
       xpGoals += goalXp;
       history.push({ date: m.date, name: 'Матч vs ' + (m.opponent || '') + (goals ? (' · ' + goals + ' гол') : ''), delta: gain, kind: 'match' });
     });
-    const gifts = (s.gifts || []).filter(g => g.playerId === playerId);
+    const gifts = (s.gifts || []).filter(g => g && String(g.playerId) === String(playerId));
     const xpGifts = gifts.length * this.RULES.giftBonus;
     xp += xpGifts;
     gifts.forEach(g => history.push({ date: (g.createdAt || '').slice(0, 10), name: g.label || 'Подарунок', delta: this.RULES.giftBonus, kind: 'gift' }));
@@ -1445,7 +1454,7 @@ const PlayerProgress = {
     const doneDesc = trainings.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
     let streak = 0;
     for (let i = 0; i < doneDesc.length; i++) {
-      const mark = this.attendanceMark((doneDesc[i].attendance || {})[playerId]);
+      const mark = this.attendanceMark(this._cell(doneDesc[i].attendance, playerId));
       if (mark == null) continue;
       if (mark === false) break;
       streak++;
@@ -1553,16 +1562,56 @@ CoachTools.playerXpTotal = function (playerId) {
 };
 
 /** Роль фішки для розстановки основи. */
+CoachTools.berlinToday = function () {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  } catch (_) {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+};
+
+CoachTools.isoDay = function (value) {
+  const s = String(value || '').trim();
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return iso[1] + '-' + iso[2] + '-' + iso[3];
+  const euro = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})/);
+  if (euro) return euro[3] + '-' + euro[2].padStart(2, '0') + '-' + euro[1].padStart(2, '0');
+  return '';
+};
+
+/** Найближчий ще не зіграний матч. Дата в Європі/Берлін, без скасованих і без порожнього суперника. */
+CoachTools.nextMatch = function (matches, todayStr) {
+  const today = todayStr || CoachTools.berlinToday();
+  return (matches || []).filter(function (m) {
+    if (!m) return false;
+    const st = String(m.status || '').toLowerCase();
+    if (st === 'played' || st === 'done' || st === 'cancelled' || st === 'canceled') return false;
+    if (!String(m.opponent || '').trim()) return false;
+    const day = CoachTools.isoDay(m.date);
+    if (!day) return false;
+    return !today || day >= today;
+  }).sort(function (a, b) {
+    return CoachTools.isoDay(a.date).localeCompare(CoachTools.isoDay(b.date)) || String(a.time || '').localeCompare(String(b.time || ''));
+  })[0] || null;
+};
+
 CoachTools.lineupRole = function (player) {
-  const pos = String((player && player.position) || '').toUpperCase();
-  if (pos === 'GK' || pos.indexOf('GK') === 0) return 'GK';
-  if (['CB', 'LB', 'RB', 'LCB', 'RCB', 'LWB', 'RWB', 'WB', 'SW', 'DEF'].indexOf(pos) >= 0) return 'DEF';
-  if (['ST', 'CF', 'LW', 'RW', 'SS', 'LF', 'RF', 'ATT', 'FW'].indexOf(pos) >= 0) return 'ATT';
+  const raw = String((player && player.position) || '').trim();
+  const pos = raw.toUpperCase();
+  if (pos === 'GK' || pos.indexOf('GK') === 0 || raw === 'ВР' || /ворот/i.test(raw)) return 'GK';
+  if (['CB', 'LB', 'RB', 'LCB', 'RCB', 'LWB', 'RWB', 'WB', 'SW', 'DEF'].indexOf(pos) >= 0 || raw === 'ЗХ' || /захис/i.test(raw)) return 'DEF';
+  if (['ST', 'CF', 'LW', 'RW', 'SS', 'LF', 'RF', 'ATT', 'FW'].indexOf(pos) >= 0 || raw === 'НАП' || /напад/i.test(raw)) return 'ATT';
+  if (raw === 'ПЗ' || /півзах/i.test(raw) || ['CM', 'CDM', 'CAM', 'LM', 'RM', 'DM', 'AM', 'MID'].indexOf(pos) >= 0) return 'MID';
   return 'MID';
 };
 /** Одинадцять із найбільшим лоадом з оцінок. Якщо оцінок ще немає — з анкети. Решта йде на лавку. */
 CoachTools.pickLineup = function (players) {
-  const list = (players || []).filter(function (p) { return p && p.id != null; });
+  const list = (players || []).filter(function (p) {
+    if (!p || p.id == null) return false;
+    try { if (typeof ClubMerge !== 'undefined' && ClubMerge.isSeedPlayer && ClubMerge.isSeedPlayer(p)) return false; } catch (_) {}
+    return true;
+  });
   const hurt = function (p) {
     const st = String(p.status || '').toLowerCase();
     return st === 'injured' || st === 'rehab' || st === 'recovery' || st === 'suspended' || st === 'unavailable';
