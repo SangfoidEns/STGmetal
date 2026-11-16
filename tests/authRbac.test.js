@@ -1,5 +1,24 @@
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+
+function bootAuth(host, tg) {
+  const context = {
+    console,
+    location: { hostname: host },
+    document: { body: { classList: { remove() {}, add() {} } }, getElementById() { return null; } },
+    Store: { get() { return { settings: { rbac: { coaches: ['Serdiuk_Artem'], playerLinks: {} } }, players: [] }; } }
+  };
+  context.window = context;
+  context.globalThis = context;
+  if (tg) context.Telegram = { WebApp: tg };
+  vm.createContext(context);
+  const src = readFileSync(new URL('../src/core/auth.js', import.meta.url), 'utf8');
+  vm.runInContext(src + '\nthis.AuthManager = AuthManager;', context, { filename: 'auth.js' });
+  context.AuthManager.init();
+  return context.AuthManager;
+}
 
 function resolveRole(user, rbac, host) {
   const local = host === 'localhost' || host === '127.0.0.1';
@@ -31,6 +50,21 @@ describe('RBAC foundation', () => {
   });
   it('listed coach by id', () => {
     assert.equal(resolveRole({ id: 42 }, { coaches: ['42'] }).role, 'coach');
+  });
+  it('ignores a coach object when Telegram did not pass initData', () => {
+    const auth = bootAuth('sangfoidens.github.io', {
+      initData: '',
+      initDataUnsafe: { user: { id: 1, username: 'Serdiuk_Artem', first_name: 'Artem' } }
+    });
+    assert.equal(auth.role, 'guest');
+    assert.equal(auth.user, null);
+  });
+  it('keeps the coach when Telegram passed initData', () => {
+    const auth = bootAuth('sangfoidens.github.io', {
+      initData: 'query_id=1&user=%7B%7D&auth_date=1&hash=ab',
+      initDataUnsafe: { user: { id: 1, username: 'Serdiuk_Artem', first_name: 'Artem' } }
+    });
+    assert.equal(auth.role, 'coach');
   });
   it('unlisted → player with link', () => {
     const r = resolveRole({ id: 7, username: 'striker' }, {

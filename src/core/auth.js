@@ -71,6 +71,9 @@ const AuthManager = {
     try {
       const tg = window.Telegram && window.Telegram.WebApp;
       if (!tg) return null;
+      // Рядок initData є лише всередині Telegram. Сам підпис перевіряє сервер.
+      // Об'єкт initDataUnsafe без цього рядка — підстановка в браузері, йому не віримо.
+      if (!tg.initData || !String(tg.initData).length) return null;
       const u = (tg.initDataUnsafe && tg.initDataUnsafe.user) || null;
       if (!u || !u.id) return null;
       return {
