@@ -1734,6 +1734,17 @@ CoachTools.warmupTitle = function (match, state) {
   return 'Розминка • ' + club + ' vs ' + opp;
 };
 
+/** Останній матч, у якому вже зібрана основа. Інші гравці лишаються на лавці. */
+CoachTools.latestLineup = function (state) {
+  const list = ((state && state.matches) || []).filter(function (m) {
+    return m && m.status !== 'cancelled' && m.status !== 'canceled' && (m.xi || []).some(Boolean);
+  });
+  list.sort(function (a, b) {
+    return String(b.date || '').localeCompare(String(a.date || '')) || String(b.time || '').localeCompare(String(a.time || ''));
+  });
+  return list[0] || null;
+};
+
 /** Наступний зібраний матч, інакше останній зіграний зі складом. */
 CoachTools.rememberedLineup = function (state, todayStr) {
   const today = todayStr || ((typeof today === 'function') ? today() : '');

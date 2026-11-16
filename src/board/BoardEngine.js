@@ -1282,7 +1282,10 @@ const BoardEngine = {
 
   applyScheme(name, forceTeam) {
     const scheme = SCHEMES[name];
-    if (!scheme) return;
+    if (!scheme) {
+      try { Toast.show('Немає схеми ' + name, 'warn'); } catch (_) {}
+      return;
+    }
     const s = Store.get();
     if (s.activeBoard) s.activeBoard.sourceBoardId = null;
     const tool = s.activeBoard.tool || 'select';
@@ -1307,9 +1310,9 @@ const BoardEngine = {
       Toast.show('Суперник: схема ' + name + ' (дзеркало)', 'ok');
       return;
     }
-    const remembered = (typeof CoachTools !== 'undefined' && CoachTools.rememberedLineup)
-      ? CoachTools.rememberedLineup(s)
-      : null;
+    const remembered = (typeof CoachTools !== 'undefined' && CoachTools.latestLineup)
+      ? CoachTools.latestLineup(s)
+      : ((typeof CoachTools !== 'undefined' && CoachTools.rememberedLineup) ? CoachTools.rememberedLineup(s) : null);
     if (remembered && this.placeMatchLineup(Object.assign({}, remembered, { scheme: name }))) return;
     // Своя команда: 11 основи на поле; резерв / травма / відновлення — на лавку
     s.activeBoard.objects = s.activeBoard.objects.filter(o => !(o.type === 'player' && o.team !== 'opp'));

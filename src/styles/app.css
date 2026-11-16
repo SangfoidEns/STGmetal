@@ -12957,3 +12957,7 @@ body.board-only-mode #mobileNav.glass-nav {
 .train-month-tile.on, .ym-album-picks .ym-pick.on { outline: 2px solid #e8c547; }
 .cal-ev-card { display: block; width: 100%; margin: 8px 0; text-align: left; }
 .match-peek .ct { margin-top: 10px; }
+.match-sub-add { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+.match-sub-add input, .match-sub-add select { min-width: 72px; flex: 1; }
+.match-sub-row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+.match-sub-row span { flex: 1; }

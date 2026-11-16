@@ -44,6 +44,48 @@ const LoadModel = {
     );
   },
 
+  playedMatches(matches, refDate) {
+    const today = this.todayStr(refDate);
+    return (matches || []).filter(function (m) {
+      if (!m || !m.date || String(m.date) > today) return false;
+      const st = String(m.status || '').toLowerCase();
+      if (st === 'cancelled' || st === 'canceled' || st === 'скасовано') return false;
+      return !!(m.attendance && Object.keys(m.attendance).length);
+    });
+  },
+
+  _matches(matches) {
+    if (Array.isArray(matches)) return matches;
+    try {
+      const s = (typeof Store !== 'undefined' && Store.get) ? Store.get() : null;
+      return (s && s.matches) || [];
+    } catch (_) { return []; }
+  },
+
+  matchPlayerLoad(match, playerId) {
+    if (!match || !match.attendance || playerId == null) return 0;
+    const cell = match.attendance[playerId] != null ? match.attendance[playerId] : match.attendance[String(playerId)];
+    if (!cell || cell.present === false || cell.present === 0 || cell.present === '0') return 0;
+    if (cell.present !== true && cell.present !== 1 && cell.present !== '1') return 0;
+    const intensity = cell.rating != null && cell.rating !== '' ? Number(cell.rating) : 6;
+    const minutes = Math.max(1, Number(match.minutes) || 90);
+    return this.sessionLoad(minutes, intensity);
+  },
+
+  matchLoadFor(playerId, days, matches) {
+    days = days || 28;
+    const today = this.todayStr();
+    const fromD = new Date();
+    fromD.setDate(fromD.getDate() - (days - 1));
+    const from = this.todayStr(fromD);
+    let sum = 0;
+    this.playedMatches(this._matches(matches)).forEach((m) => {
+      if (String(m.date) < from || String(m.date) > today) return;
+      sum += this.matchPlayerLoad(m, playerId);
+    });
+    return sum;
+  },
+
   weeklyLoad(trainings, refDate) {
     const d = refDate ? new Date(refDate) : new Date();
     const to = this.todayStr(d);
@@ -67,6 +109,9 @@ const LoadModel = {
           intensity = rpes.length ? (rpes.reduce((s, v) => s + v, 0) / rpes.length) : 5;
         }
         return a + this.sessionLoad(t.duration, intensity);
+      }, 0) + this.playedMatches(this._matches(), refDate).filter(m => m.date >= from && m.date <= to).reduce((a, m) => {
+        const att = m.attendance || {};
+        return a + Object.keys(att).reduce((s, id) => s + this.matchPlayerLoad(m, id), 0);
       }, 0);
   },
 
@@ -142,6 +187,7 @@ const LoadModel = {
       const rpe = this._entryRpe(a, t);
       sum += this.sessionLoad(t.duration, rpe != null ? rpe : (t.intensity || 0));
     });
+    sum += this.matchLoadFor(playerId, days);
     return sum;
   },
 

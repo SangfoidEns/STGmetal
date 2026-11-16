@@ -31,21 +31,31 @@ const StorageManager = {
     const text = JSON.stringify(payload);
     try {
       localStorage.setItem(STORAGE_KEY, text);
+      this.rememberPlayerPhotos();
       return true;
     } catch (err) {
       const slim = JSON.parse(text);
+      const kept = [];
       const keepUrl = (url) => (typeof url === 'string' && url.indexOf('data:') === 0) ? '' : (url || '');
       (slim.players || []).forEach(p => {
         if (!p) return;
+        const photo = String(p.profilePhoto || p.photoUrl || '');
+        if (photo.indexOf('data:') === 0) kept.push({ id: p.id, url: photo });
         ['photo', 'photoUrl', 'profilePhoto', 'telegramPhotoUrl'].forEach(key => {
           if (p[key]) p[key] = keepUrl(p[key]);
         });
       });
       if (slim.settings) {
+        const coach = String(slim.settings.coachPhoto || slim.settings.coachPhotoUrl || '');
+        if (coach.indexOf('data:') === 0) this.rememberCoachPhoto(coach);
         slim.settings.coachPhoto = keepUrl(slim.settings.coachPhoto);
         slim.settings.coachPhotoUrl = keepUrl(slim.settings.coachPhotoUrl);
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(slim));
+      kept.forEach(row => {
+        if (!row || row.id == null || !row.url) return;
+        try { localStorage.setItem(this.PLAYER_PHOTO_PREFIX + row.id, row.url); } catch (_) {}
+      });
       return true;
     }
   },
@@ -193,6 +203,7 @@ const StorageManager = {
     }
     if (migrated.settings) delete migrated.settings.lang;
     this.restoreCoachPhoto(migrated);
+    this.restorePlayerPhotos(migrated);
     this._suppressClubPush = true;
     try {
       Store.set(migrated, { keepStamp: true });
@@ -299,6 +310,40 @@ const StorageManager = {
   },
 
   COACH_PHOTO_KEY: 'metalist_coach_photo',
+  PLAYER_PHOTO_PREFIX: 'metalist_pphoto_',
+
+  rememberPlayerPhotos(state) {
+    const s = state || (typeof Store !== 'undefined' && Store.get && Store.get());
+    if (!s) return;
+    (s.players || []).forEach(p => {
+      if (!p || p.id == null) return;
+      const url = String(p.profilePhoto || p.photoUrl || '').trim();
+      if (url.indexOf('data:') !== 0) return;
+      try { localStorage.setItem(this.PLAYER_PHOTO_PREFIX + p.id, url); } catch (_) {}
+    });
+  },
+
+  restorePlayerPhotos(state) {
+    const s = state || (typeof Store !== 'undefined' && Store.get && Store.get());
+    if (!s) return 0;
+    let restored = 0;
+    (s.players || []).forEach(p => {
+      if (!p || p.id == null) return;
+      const current = String(p.profilePhoto || p.photoUrl || '').trim();
+      if (current) {
+        if (!p.photoUrl) p.photoUrl = current;
+        if (!p.profilePhoto) p.profilePhoto = current;
+        return;
+      }
+      let found = '';
+      try { found = String(localStorage.getItem(this.PLAYER_PHOTO_PREFIX + p.id) || '').trim(); } catch (_) {}
+      if (!found) return;
+      p.photoUrl = found;
+      p.profilePhoto = found;
+      restored += 1;
+    });
+    return restored;
+  },
 
   _photoFromPayload(data) {
     if (!data || typeof data !== 'object') return '';
@@ -344,6 +389,8 @@ const StorageManager = {
       const s = Store.get();
       if (!s) return;
       this.restoreCoachPhoto(s);
+      this.restorePlayerPhotos(s);
+      this.rememberPlayerPhotos(s);
       s.updatedAt = new Date().toISOString();
       const payload = this._buildLocalPayload();
       this._writeLocalPayload(payload);
@@ -364,7 +411,12 @@ const StorageManager = {
       schemaVersion: SCHEMA_VERSION,
       updatedAt: s.updatedAt || new Date().toISOString(),
       settings: s.settings,
-      players: s.players,
+      players: (s.players || []).map(p => {
+        if (!p || !p.profilePhoto || p.profilePhoto !== p.photoUrl) return p;
+        const copy = Object.assign({}, p);
+        copy.profilePhoto = '';
+        return copy;
+      }),
       trainings: s.trainings,
       exercises: s.exercises,
       boards: s.boards,
@@ -521,6 +573,7 @@ const StorageManager = {
           } catch (_) {}
         }
         this.restoreCoachPhoto(migrated);
+        this.restorePlayerPhotos(migrated);
         Store.set(migrated);
         // write local without re-push loop storm
         const payload = this._buildLocalPayload();
@@ -573,6 +626,7 @@ const StorageManager = {
       const photoBefore = (migrated.settings && migrated.settings.coachPhoto) || '';
       Store.set(migrated, { keepStamp: true });
       const photoAfter = this.restoreCoachPhoto();
+      this.restorePlayerPhotos();
       if (folded.removed || (photoAfter && photoAfter !== photoBefore)) {
         try { this.save({ localOnly: true }); } catch (_) {}
       }
@@ -667,7 +721,7 @@ const StorageManager = {
       photoUrl = '';
     }
     let profilePhoto = (typeof p.profilePhoto === 'string') ? p.profilePhoto : '';
-    if (profilePhoto.length > 400000) profilePhoto = '';
+    if (profilePhoto.length > 1200000) profilePhoto = '';
     const srcProfile = (p.profile && typeof p.profile === 'object') ? p.profile : null;
     const birth = p.birthDate || p.birthday || (srcProfile && srcProfile.birthDate) || '';
     const profile = srcProfile ? Object.assign({}, srcProfile, {

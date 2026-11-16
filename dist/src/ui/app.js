@@ -2575,6 +2575,36 @@ const App = {
         try { App.formatField(fmt.getAttribute('data-fmt')); } catch (err) { console.error(err); }
       }, true);
     }
+    if (!this._schemePickBound) {
+      this._schemePickBound = true;
+      document.addEventListener('click', (e) => {
+        const node = e.target && e.target.closest && e.target.closest('[data-action="apply-scheme"], [data-action="pick-scheme"]');
+        if (!node) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        const action = node.getAttribute('data-action');
+        if (action === 'pick-scheme') {
+          try { App.openSchemePicker(); } catch (err) { console.error(err); }
+          return;
+        }
+        const name = node.getAttribute('data-scheme') || '';
+        if (!name) return;
+        try {
+          if (typeof BoardEngine !== 'undefined' && BoardEngine.applyScheme) BoardEngine.applyScheme(name);
+          const board = Store.get().activeBoard;
+          if (board) board.scheme = name;
+          const lab = document.getElementById('schemePickVal');
+          if (lab) lab.textContent = name;
+          try { StorageManager.save(); } catch (_) {}
+          if (typeof Modal !== 'undefined') Modal.close();
+          if (typeof Toast !== 'undefined') Toast.show('Схема ' + name + ' · останній склад', 'ok');
+        } catch (err) {
+          console.error('[apply-scheme]', err);
+          if (typeof Toast !== 'undefined') Toast.show('Помилка схеми', 'err');
+        }
+      }, true);
+    }
     if (!this._modalActionBound) {
       this._modalActionBound = true;
       document.addEventListener('click', (e) => {
@@ -3176,6 +3206,14 @@ const App = {
         return Actions.openMatchAttendance(t.dataset.matchId || (Store.get().ui && Store.get().ui.matchId));
       }
       if (action === 'match-xi') return Actions.fillMatchSquad();
+      if (action === 'match-sub-add') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.addMatchSub();
+      }
+      if (action === 'match-sub-remove') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.removeMatchSub(t.dataset.subId);
+      }
       if (action === 'match-board') return Actions.openMatchBoard();
       if (action === 'match-week') return Actions.buildMatchWeek();
       if (action === 'match-toggle') return Actions.toggleMatchPlayer(t.dataset.playerId, t.dataset.matchId);

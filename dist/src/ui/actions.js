@@ -1591,6 +1591,42 @@ const Actions = {
     App.renderCurrent();
   },
 
+  addMatchSub() {
+    if (!this._coachOnly()) return;
+    this.flushMatchPlan();
+    const m = this._matchByUi();
+    if (!m) return;
+    const minute = Math.max(1, Math.min(120, Number(document.getElementById('mpSubMin')?.value) || 60));
+    const offId = document.getElementById('mpSubOff')?.value || '';
+    const onId = document.getElementById('mpSubOn')?.value || '';
+    if (!offId || !onId || String(offId) === String(onId)) {
+      Toast.show('Обери, кого зняти і кого випустити', 'warn');
+      return;
+    }
+    m.subs = Array.isArray(m.subs) ? m.subs : [];
+    m.subs.push({ id: uid(), minute: minute, offId: offId, onId: onId });
+    const xi = (m.xi || []).slice();
+    const slot = xi.findIndex(id => String(id) === String(offId));
+    if (slot >= 0) xi[slot] = onId;
+    m.xi = xi;
+    m.bench = (m.bench || []).filter(id => String(id) !== String(onId));
+    if (!m.bench.some(id => String(id) === String(offId))) m.bench.push(offId);
+    m.updatedAt = new Date().toISOString();
+    try { StorageManager.save(); } catch (_) {}
+    Toast.show('Заміна ' + minute + '′', 'ok');
+    App.renderCurrent();
+  },
+
+  removeMatchSub(subId) {
+    if (!this._coachOnly()) return;
+    const m = this._matchByUi();
+    if (!m) return;
+    m.subs = (m.subs || []).filter(sub => sub && String(sub.id) !== String(subId));
+    m.updatedAt = new Date().toISOString();
+    try { StorageManager.save(); } catch (_) {}
+    App.renderCurrent();
+  },
+
   fillMatchSquad() {
     if (!this._coachOnly()) return;
     const m = this._matchByUi();

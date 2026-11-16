@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z97',
+  APP_BUILD: 'z98',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -461,22 +461,24 @@ const Views = {
     const last3Load = loadBySession.slice(-3);
     const avg3 = last3Load.length ? Math.round(last3Load.reduce((a,b)=>a+b,0)/last3Load.length) : 0;
     const recentBoards = (s.boards || []).slice().sort((a,b)=>String(b.createdAt||b.updatedAt||'').localeCompare(String(a.createdAt||a.updatedAt||''))).slice(0, 3);
-    const teamXpByDay = (() => {
+    const teamXpPack = (() => {
       const map = {};
-      pastSorted.slice(-14).forEach(tr => {
-        const d = tr.date || '';
-        if (!d) return;
-        let xp = 0;
-        const att = tr.attendance || {};
-        Object.keys(att).forEach(pid => {
-          const a = att[pid];
-          const mark = (typeof PlayerProgress !== 'undefined' && PlayerProgress.attendanceMark) ? PlayerProgress.attendanceMark(a) : (a && a.present === true ? true : false);
-          if (mark === true) xp += 18; else if (mark === false) xp += -6;
+      let total = 0;
+      (s.players || []).forEach(p => {
+        if (!p || p.id == null || typeof PlayerProgress === 'undefined' || !PlayerProgress.compute) return;
+        let pr = null;
+        try { pr = PlayerProgress.compute(p.id); } catch (_) { pr = null; }
+        if (!pr) return;
+        total += Number(pr.xp) || 0;
+        (pr.history || []).forEach(h => {
+          if (!h || !h.date) return;
+          map[h.date] = (map[h.date] || 0) + (Number(h.delta) || 0);
         });
-        map[d] = (map[d] || 0) + Math.max(0, xp);
       });
-      return Object.keys(map).sort().map(k => map[k]);
+      const series = Object.keys(map).sort().slice(-14).map(k => Math.max(0, map[k]));
+      return { total, series };
     })();
+    const teamXpByDay = teamXpPack.series;
     const startersCount = (s.players||[]).filter(p => {
       const g = String(p.group||p.squadRole||'').toLowerCase();
       return !(g === 'reserve' || g === 'bench') && p.status !== 'injured' && p.status !== 'rehab';
@@ -580,14 +582,14 @@ const Views = {
             <span class="cp-stat-ic">📊</span>
             <span class="cp-stat-val">${weekLoad || 0}</span>
             <span class="cp-stat-lb">Тижневе навантаження</span>
-            <span class="cp-stat-sub">сер. 3 сесії: ${avg3} · LOAD = хв × RPE</span>
+            <span class="cp-stat-sub">сер. 3 сесії: ${avg3} · тренування і матчі</span>
             <div class="cp-stat-spark">${this._sparkline(loadBySession, { color: '#3d7eff', fill: 'rgba(61,126,255,.12)' })}</div>
           </div>
           <div class="cp-stat cp-stat-chart">
             <span class="cp-stat-ic">✨</span>
-            <span class="cp-stat-val">${teamXpByDay.length ? teamXpByDay[teamXpByDay.length-1] : 0}</span>
+            <span class="cp-stat-val">${teamXpPack.total || 0}</span>
             <span class="cp-stat-lb">XP команди</span>
-            <span class="cp-stat-sub">за останні дні</span>
+            <span class="cp-stat-sub">у гравців, разом із матчами</span>
             <div class="cp-stat-spark">${this._sparkline(teamXpByDay, { color: '#f5c542', fill: 'rgba(245,197,66,.15)' })}</div>
           </div>
           <div class="cp-stat cp-stat-wide cp-stat-match">
@@ -2670,6 +2672,35 @@ trainings() {
       (rows || '<div class="es">Немає матчів. Тренер додає суперника, склад і підготовку.</div>');
   },
 
+  _matchSubsHtml(m, players, byId, canEdit) {
+    const subs = Array.isArray(m.subs) ? m.subs : [];
+    const nameOf = (id) => {
+      const p = id != null ? byId[String(id)] : null;
+      return p ? (p.lastName || p.firstName || ('#' + (p.number || ''))) : 'гравець';
+    };
+    const rows = subs.map(sub => {
+      if (!sub) return '';
+      return '<div class="match-sub-row"><b>' + sanitize(String(sub.minute || '—')) + '′</b><span>' +
+        sanitize(nameOf(sub.offId)) + ' → ' + sanitize(nameOf(sub.onId)) + '</span>' +
+        (canEdit ? '<button type="button" class="btn btn-s btn-sm" data-action="match-sub-remove" data-sub-id="' + sanitize(sub.id || '') + '">Прибрати</button>' : '') +
+        '</div>';
+    }).join('');
+    const xiIds = (m.xi || []).filter(id => id != null && id !== '' && byId[String(id)]);
+    const onIds = (players || []).filter(p => p && !xiIds.some(id => String(id) === String(p.id)));
+    const opt = (p) => '<option value="' + sanitize(p.id) + '">#' + sanitize(p.number || '—') + ' ' + sanitize(p.lastName || p.firstName || '') + '</option>';
+    const form = canEdit
+      ? '<div class="match-sub-add">' +
+          '<input id="mpSubMin" type="number" min="1" max="120" value="60" aria-label="Хвилина">' +
+          '<select id="mpSubOff" aria-label="Кого зняти">' + xiIds.map(id => opt(byId[String(id)])).join('') + '</select>' +
+          '<select id="mpSubOn" aria-label="Кого випустити">' + onIds.map(opt).join('') + '</select>' +
+          '<button type="button" class="btn btn-p btn-sm" data-action="match-sub-add">Заміна</button>' +
+        '</div>'
+      : '';
+    return '<div class="match-block-label">Заміни</div>' +
+      (rows || '<p class="note-sm">Замін ще немає. Хвилина, кого зняти з основи і кого випустити.</p>') +
+      form;
+  },
+
   _matchPlan(m) {
     const s = Store.get();
     const canEdit = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
@@ -2814,6 +2845,7 @@ trainings() {
         })() +
         '<div class="match-block-label">Основа</div><div class="match-chips">' + xiHtml + '</div>' +
         '<div class="match-block-label">Лавка</div><div class="match-chips">' + benchHtml + '</div>' +
+        this._matchSubsHtml(m, players, byId, canEdit) +
         '<div class="match-block-label">Поза заявкою</div><div class="match-chips">' + outHtml + '</div>' +
       '</section>' +
       '<section class="card glass"><div class="ct">План</div>' +
@@ -2987,7 +3019,17 @@ trainings() {
       card('Навантаження сесій', 'Тривалість × RPE', bars(sessionStats.map(x => x.load), '#3b82f6')) +
       card('Відвідуваність гравців', 'Хто тримає ритм сезону', hbars(names.map(n => ({ label: n.label, value: n.st.attPct || 0, text: (n.st.attPct != null ? n.st.attPct + '%' : '—'), color: n.color })), r => r.color)) +
       card('RPE гравців', 'Середнє відчуття навантаження', hbars(names.map(n => ({ label: n.label, value: n.st.avgRpe || 0, text: n.st.avgRpe != null ? n.st.avgRpe : '—', color: n.color })), r => r.color)) +
-      card('Навантаження 28 днів', 'Сумарний load', hbars(names.map(n => ({ label: n.label, value: n.st.load28 || 0, color: n.color })), r => r.color)) +
+      card('Навантаження 28 днів', 'Тренування і матчі: хв × RPE, матч — 90 хв × оцінка', hbars(names.map(n => ({ label: n.label, value: n.st.load28 || 0, color: n.color })), r => r.color)) +
+      card('XP гравців', 'Тренування, матчі, голи й оцінка', hbars(names.map(n => {
+        let xp = 0;
+        try { xp = (typeof PlayerProgress !== 'undefined' && PlayerProgress.compute) ? ((PlayerProgress.compute(n.p.id) || {}).xp || 0) : 0; } catch (_) {}
+        return { label: n.label, value: xp, color: n.color };
+      }), r => r.color)) +
+      card('Навантаження матчів', 'Хто виходив: 90 хв × оцінка тренера', hbars(names.map(n => {
+        let load = 0;
+        try { load = (typeof LoadModel !== 'undefined' && LoadModel.matchLoadFor) ? LoadModel.matchLoadFor(n.p.id, 365) : 0; } catch (_) {}
+        return { label: n.label, value: load, text: load ? String(load) : '—', color: n.color };
+      }), r => r.color)) +
       card('Подарунки', 'Скільки артефактів у кожного', hbars(names.map(n => ({ label: n.label, value: (s.gifts || []).filter(g => g && g.playerId === n.p.id).length, color: n.color })), r => r.color)) +
       card('Готовність', 'Стан з анкети гравця', readyRows.length ? hbars(readyRows, r => r.color) : '<div class="an-empty">Готовність ще не заповнена</div>') +
       card('Амплуа', 'Розподіл складу', donut(['GK', 'DEF', 'MID', 'ATT', 'IN'].filter(k => posMap[k]).map(k => ({ label: posLabels[k], value: posMap[k], color: posColor[k] })))) +
