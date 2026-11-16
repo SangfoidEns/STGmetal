@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z101',
+  APP_BUILD: 'z102',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -17,8 +17,8 @@ const Views = {
     return this.VERSION_LETTERS[idx] || 'А';
   },
 
-  _buildLine() {
-    return '<div class="app-build-tag">Оновлено ' + this.APP_UPDATED + ' · ' + this.versionLetter() + '</div>';
+  versionLabel() {
+    return String(this.APP_BUILD || '').replace(/^z/i, '');
   },
 
   _pitchBar() {
@@ -503,7 +503,6 @@ const Views = {
     const coachXp = (typeof CoachTools !== 'undefined' && CoachTools.coachProgress) ? CoachTools.coachProgress() : null;
     return `
       <div class="club-profile">
-        ${this._buildLine()}
         ${this._pitchBar()}
 
         <!-- Telegram-style profile card (coach/player) -->
@@ -1185,7 +1184,6 @@ const Views = {
 
     return `
       <div class="player-home">
-      ${this._buildLine()}
       ${this._pitchBar()}
       <div class="st player-cab-head">${t('my_cabinet')} · <span class="cp-brand-a">МЕТАЛІСТ</span> <span class="cp-brand-b">ШТУТТГАРТ</span>
         <button type="button" class="btn btn-s btn-sm" data-io="import" data-action="import-trigger">Імпорт JSON</button>
@@ -1462,7 +1460,6 @@ const Views = {
     const next = this._nextPlanned(s.trainings);
 
     return '<div class="club-public">' +
-      this._buildLine() +
       '<div class="club-hero">' +
         '<button type="button" class="club-crest-btn" data-action="open-photo" data-photo="' + this.clubMark() + '" data-photo-save="1" data-photo-name="Metalist-Shtuttgart.png" title="Емблема на весь екран">' +
         '<img class="club-crest" src="' + this.clubMark() + '" alt="Емблема Металіст Штуттгарт"/></button>' +
@@ -3396,7 +3393,7 @@ trainings() {
           <button type="button" class="btn btn-s" data-action="lang-de">Deutsch</button>
         </div>
       </div>
-      <p class="note-sm">Оновлено ${this.APP_UPDATED} · збірка ${this.APP_BUILD}</p>
+      <p class="note-sm">Версія ${this.versionLabel()}</p>
     `;
   },
 

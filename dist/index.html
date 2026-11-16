@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#0b0d0c">
+<meta name="ms-build" content="102">
 <meta name="description" content="METALIST STUTTGART — професійна цифрова платформа футбольного тренера: тактична дошка, тренування, вправи, команда та аналітика.">
 <meta name="application-name" content="Metalist Coach">
 <link rel="manifest" href="./manifest.webmanifest">
@@ -16,7 +17,7 @@
   .tg-hdr-pill { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   #mobileNav { display: flex; }
 </style>
-<link rel="stylesheet" href="./src/styles/app.css?v=20261116z101">
+<link rel="stylesheet" href="./src/styles/app.css?v=20261116z102">
 <script async src="https://telegram.org/js/telegram-web-app.js" onload="window.__msTgReady && window.__msTgReady()"></script>
 </head>
 <body>
@@ -39,7 +40,7 @@
       </button>
       <div class="tg-hdr-titles">
         <div class="brand-title" id="clubName">METALIST <em>STUTTGART</em></div>
-        <div class="brand-build" id="appBuild">Е › 08.11.2026</div>
+        <div class="brand-coach" id="authBadge">—</div>
         <button type="button" class="tg-clock-mini" id="clockBtn" data-action="open-stopwatch" title="Секундомір">
           <span id="clock"><strong>—</strong></span>
         </button>
@@ -177,36 +178,36 @@
 <div class="tc2" id="toasts" aria-live="polite"></div>
 
 
-  <script src="./src/core/utils.js?v=20261116z101"></script>
-  <script src="./src/telegram/TelegramManager.js?v=20261116z101"></script>
-  <script src="./src/core/toast.js?v=20261116z101"></script>
-  <script src="./src/data/demo.js?v=20261116z101"></script>
-  <script src="./src/data/schemes.js?v=20261116z101"></script>
-  <script src="./src/core/store.js?v=20261116z101"></script>
-  <script src="./src/core/i18n.js?v=20261116z101"></script>
-  <script src="./src/core/auth.js?v=20261116z101"></script>
-  <script src="./src/core/clubMerge.js?v=20261116z101"></script>
-  <script src="./src/core/storage.js?v=20261116z101"></script>
-  <script src="./src/board/TimerEngine.js?v=20261116z101"></script>
-  <script src="./src/board/BoardEngine.js?v=20261116z101"></script>
-  <script src="./src/core/modal.js?v=20261116z101"></script>
-  <script src="./src/core/loadModel.js?v=20261116z101"></script>
-  <script src="./src/core/coachTools.js?v=20261116z101"></script>
-  <script src="./src/core/boardLink.js?v=20261116z101"></script>
-  <script src="./src/core/clickGuard.js?v=20261116z101"></script>
-  <script src="./src/core/sessionPlay.js?v=20261116z101"></script>
-  <script src="./src/core/playerUpdate.js?v=20261116z101"></script>
-  <script src="./src/ui/views.js?v=20261116z101"></script>
-  <script src="./src/ui/ai.js?v=20261116z101"></script>
-  <script src="./src/ui/app.js?v=20261116z101"></script>
-  <script src="./src/ui/actions.js?v=20261116z101"></script>
+  <script src="./src/core/utils.js?v=20261116z102"></script>
+  <script src="./src/telegram/TelegramManager.js?v=20261116z102"></script>
+  <script src="./src/core/toast.js?v=20261116z102"></script>
+  <script src="./src/data/demo.js?v=20261116z102"></script>
+  <script src="./src/data/schemes.js?v=20261116z102"></script>
+  <script src="./src/core/store.js?v=20261116z102"></script>
+  <script src="./src/core/i18n.js?v=20261116z102"></script>
+  <script src="./src/core/auth.js?v=20261116z102"></script>
+  <script src="./src/core/clubMerge.js?v=20261116z102"></script>
+  <script src="./src/core/storage.js?v=20261116z102"></script>
+  <script src="./src/board/TimerEngine.js?v=20261116z102"></script>
+  <script src="./src/board/BoardEngine.js?v=20261116z102"></script>
+  <script src="./src/core/modal.js?v=20261116z102"></script>
+  <script src="./src/core/loadModel.js?v=20261116z102"></script>
+  <script src="./src/core/coachTools.js?v=20261116z102"></script>
+  <script src="./src/core/boardLink.js?v=20261116z102"></script>
+  <script src="./src/core/clickGuard.js?v=20261116z102"></script>
+  <script src="./src/core/sessionPlay.js?v=20261116z102"></script>
+  <script src="./src/core/playerUpdate.js?v=20261116z102"></script>
+  <script src="./src/ui/views.js?v=20261116z102"></script>
+  <script src="./src/ui/ai.js?v=20261116z102"></script>
+  <script src="./src/ui/app.js?v=20261116z102"></script>
+  <script src="./src/ui/actions.js?v=20261116z102"></script>
 <script>
 (function () {
   try {
-    var shown = (document.getElementById('appBuild') || {}).textContent || '';
-    shown = String(shown).trim();
+    var meta = document.querySelector('meta[name="ms-build"]');
+    var shown = meta ? String(meta.getAttribute('content') || '').trim() : '';
     fetch('./index.html', { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (html) {
-      var m = String(html || '').match(/id="appBuild">([^<]+)/);
+      var m = String(html || '').match(/name="ms-build" content="([^"]+)"/);
       var remote = m ? m[1].trim() : '';
       if (!shown || !remote || shown === remote) return;
       try {

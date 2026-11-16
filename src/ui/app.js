@@ -834,12 +834,6 @@ const App = {
         : 'assets/metalist-crest.png';
       logo.innerHTML = '<img src="' + crest + '" alt="Металіст Штуттгарт">';
     }
-    const build = document.getElementById('appBuild');
-    if (build) {
-      const letter = (typeof Views !== 'undefined' && Views.versionLetter) ? Views.versionLetter() : 'А';
-      const when = (typeof Views !== 'undefined' && Views.APP_UPDATED) || '07.11.2026';
-      build.textContent = letter + ' › ' + when;
-    }
     const parts = (s.clubName || 'МЕТАЛІСТ ШТУТТГАРТ').split(' ');
     const cn = document.getElementById('clubName');
     if (cn) {
