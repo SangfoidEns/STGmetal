@@ -5,13 +5,15 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { pathToFileURL } = require('url');
 
 let mainWindow = null;
 let api = null;
 
 async function loadApi() {
   if (api) return api;
-  api = await import(path.join(__dirname, 'server.mjs'));
+  // file:// URL required on Windows — bare drive paths break Node ESM import()
+  api = await import(pathToFileURL(path.join(__dirname, 'server.mjs')).href);
   return api;
 }
 
