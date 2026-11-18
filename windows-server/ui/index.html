@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>STGmetal — Локальний сервер</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <div>
+        <p class="brand">STGmetal</p>
+        <h1>Локальний сервер клубу</h1>
+      </div>
+      <div id="badge" class="badge off">вимкнено</div>
+    </header>
+
+    <section class="card">
+      <h2>Сервер</h2>
+      <div class="grid">
+        <div>
+          <span class="lbl">Статус</span>
+          <strong id="statusText">—</strong>
+        </div>
+        <div>
+          <span class="lbl">Адреса / URL</span>
+          <code id="urlText">http://127.0.0.1:8787</code>
+        </div>
+        <div>
+          <span class="lbl">Порт</span>
+          <input id="portInput" type="number" min="1024" max="65535" value="8787" />
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn primary" id="btnStart">▶ Старт</button>
+        <button type="button" class="btn" id="btnStop">■ Стоп</button>
+        <button type="button" class="btn ghost" id="btnCopy">Копіювати URL</button>
+      </div>
+      <p class="hint">Клієнт: <strong>SangfoidEns/STGmetal</strong>. У браузері/Telegram задайте
+        <code>window.METALIST_API = 'http://127.0.0.1:8787'</code> (або ваш LAN IP).</p>
+    </section>
+
+    <section class="card">
+      <h2>JSON клубу (тренер / гравець)</h2>
+      <p id="clubMeta" class="meta">файлу ще немає</p>
+      <div class="actions">
+        <button type="button" class="btn primary" id="btnImport">⬆ Завантажити JSON на сервер</button>
+        <button type="button" class="btn" id="btnExport">⬇ Зберегти JSON з сервера</button>
+      </div>
+      <p class="hint">Тренер викладає повний snapshot; гравці читають через STGmetal
+        (<code>GET/POST /api/club-data</code>). Можна також просто передати файл вручну.</p>
+    </section>
+
+    <p id="msg" class="msg" role="status"></p>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>

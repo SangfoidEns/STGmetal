@@ -1,7 +1,10 @@
 node_modules/
-data/
+/data/
+windows-server/data/*.json
+windows-server/data/*.tmp
 .env
 .env.*
 !.env.example
 .DS_Store
 *.log
+
