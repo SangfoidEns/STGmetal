@@ -64,7 +64,7 @@ Stored file: `windows-server/data/club-data.json`.
 | Setting | Default | Notes |
 |---------|---------|--------|
 | `HOST` | `127.0.0.1` | Not `0.0.0.0` |
-| `CORS_ORIGIN` | loopback Origin only | Never defaults to `*` |
+| `CORS_ORIGIN` | loopback Origin only | Never defaults to `*` (including `/api/club-data`) |
 | LAN bind (`0.0.0.0`) | **blocked** unless `CLUB_WRITE_SECRET` or `TELEGRAM_BOT_TOKEN` | Bot on LAN also needs `BOT_API_SECRET` |
 | Club POST | STGmetal `clubWriteAllowed` | `X-Club-Key` / Telegram `initData` / open only on loopback without secrets |
 

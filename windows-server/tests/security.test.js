@@ -90,6 +90,29 @@ describe('windows-server security', () => {
     assert.notEqual(r.headers['access-control-allow-origin'], '*');
   });
 
+  it('club-data GET rejects foreign Origin (no *)', async () => {
+    await startServer({ port: 18790, host: '127.0.0.1' });
+    await req(18790, 'POST', '/api/club-data', {
+      updatedAt: '2026-11-18T12:00:00.000Z',
+      updatedBy: 'coach',
+      payload: { players: [{ id: 'p1', phone: 'secret' }], trainings: [] }
+    });
+
+    const evil = await req(18790, 'GET', '/api/club-data', null, { Origin: 'https://evil.example' });
+    assert.equal(evil.status, 200);
+    assert.notEqual(evil.headers['access-control-allow-origin'], 'https://evil.example');
+    assert.notEqual(evil.headers['access-control-allow-origin'], '*');
+    assert.equal(evil.headers['access-control-allow-origin'], 'null');
+
+    const local = await req(18790, 'GET', '/api/club-data', null, { Origin: 'http://127.0.0.1:43127' });
+    assert.equal(local.status, 200);
+    assert.equal(local.headers['access-control-allow-origin'], 'http://127.0.0.1:43127');
+
+    process.env.CORS_ORIGIN = 'https://mini.example';
+    const configured = await req(18790, 'GET', '/api/club-data', null, { Origin: 'https://mini.example' });
+    assert.equal(configured.headers['access-control-allow-origin'], 'https://mini.example');
+  });
+
   it('desktop importClubFile stores payload', () => {
     const saved = importClubFile({
       updatedAt: '2026-11-18T13:00:00.000Z',

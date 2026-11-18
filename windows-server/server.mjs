@@ -19,7 +19,7 @@ import {
   clubWriteAllowed,
   readClub,
   writeClub,
-  isLoopbackHost
+  resolveCorsOrigin
 } from './lib/clubData.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -45,19 +45,6 @@ const pollSent = new Map();
 function isLoopbackBind(host) {
   const h = String(host || '').toLowerCase();
   return h === '127.0.0.1' || h === 'localhost' || h === '::1';
-}
-
-function resolveCorsOrigin(req) {
-  const configured = String(process.env.CORS_ORIGIN || '').trim();
-  if (configured && configured !== '*') return configured;
-  const origin = String((req && req.headers && req.headers.origin) || '');
-  if (!origin) return 'http://127.0.0.1';
-  try {
-    const host = new URL(origin).hostname;
-    if (isLoopbackHost(host)) return origin;
-  } catch (_) {}
-  // Do not reflect arbitrary origins when CORS_ORIGIN is unset / *
-  return 'null';
 }
 
 function send(res, status, body, req) {

@@ -123,6 +123,23 @@ export function isLoopbackHost(host) {
   return host === 'localhost' || host === '127.0.0.1' || host === '::1';
 }
 
+/**
+ * CORS allowlist shared with server.mjs.
+ * Never defaults to *. Configured CORS_ORIGIN wins; otherwise only loopback Origin
+ * is reflected so Mini App on 127.0.0.1 / localhost works without opening foreign pages.
+ */
+export function resolveCorsOrigin(req) {
+  const configured = String(process.env.CORS_ORIGIN || '').trim();
+  if (configured && configured !== '*') return configured;
+  const origin = String((req && req.headers && req.headers.origin) || '');
+  if (!origin) return 'http://127.0.0.1';
+  try {
+    const host = new URL(origin).hostname;
+    if (isLoopbackHost(host)) return origin;
+  } catch (_) {}
+  return 'null';
+}
+
 function linkedPlayer(payload, user) {
   const players = payload && Array.isArray(payload.players) ? payload.players : [];
   const id = String(user.id);
@@ -253,14 +270,15 @@ function readBody(req, limit = 8 * 1024 * 1024) {
   });
 }
 
-function sendJson(res, status, body) {
+function sendJson(req, res, status, body) {
   const json = JSON.stringify(body);
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Content-Length': Buffer.byteLength(json),
-    'Access-Control-Allow-Origin': process.env.CORS_ORIGIN || '*',
+    'Access-Control-Allow-Origin': resolveCorsOrigin(req),
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Bot-Secret, X-Club-Key',
+    'Vary': 'Origin',
     'Cache-Control': 'no-store'
   });
   res.end(json);
@@ -276,10 +294,11 @@ export async function handleClubRequest(req, res, mayWrite) {
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
-      'Access-Control-Allow-Origin': process.env.CORS_ORIGIN || '*',
+      'Access-Control-Allow-Origin': resolveCorsOrigin(req),
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Bot-Secret, X-Club-Key',
-      'Access-Control-Max-Age': '86400'
+      'Access-Control-Max-Age': '86400',
+      'Vary': 'Origin'
     });
     res.end();
     return true;
@@ -287,7 +306,7 @@ export async function handleClubRequest(req, res, mayWrite) {
 
   if (req.method === 'GET') {
     const club = readClub();
-    sendJson(res, 200, { ok: true, ...club });
+    sendJson(req, res, 200, { ok: true, ...club });
     return true;
   }
 
@@ -296,28 +315,28 @@ export async function handleClubRequest(req, res, mayWrite) {
     try {
       body = await readBody(req);
     } catch (e) {
-      sendJson(res, e.status || 400, { ok: false, error: e.message || 'bad_request' });
+      sendJson(req, res, e.status || 400, { ok: false, error: e.message || 'bad_request' });
       return true;
     }
     const allowed = await mayWrite(req, body);
     if (!allowed) {
-      sendJson(res, 403, { ok: false, error: 'coach_only', message: 'Запис лише для тренера' });
+      sendJson(req, res, 403, { ok: false, error: 'coach_only', message: 'Запис лише для тренера' });
       return true;
     }
     if (!body.payload || typeof body.payload !== 'object') {
-      sendJson(res, 400, { ok: false, error: 'payload_required' });
+      sendJson(req, res, 400, { ok: false, error: 'payload_required' });
       return true;
     }
     const incomingAt = body.updatedAt || body.payload.updatedAt || new Date().toISOString();
     const current = readClub();
     const mode = classifyClubWrite(req, body, current.payload);
     if (mode === 'deny') {
-      sendJson(res, 403, { ok: false, error: 'guest_readonly', message: 'Гість лише переглядає клуб' });
+      sendJson(req, res, 403, { ok: false, error: 'guest_readonly', message: 'Гість лише переглядає клуб' });
       return true;
     }
     if (mode === 'chat') {
       if (!current.payload) {
-        sendJson(res, 403, { ok: false, error: 'coach_only', message: 'Запис клубу створює лише тренер' });
+        sendJson(req, res, 403, { ok: false, error: 'coach_only', message: 'Запис клубу створює лише тренер' });
         return true;
       }
       const payload = Object.assign({}, current.payload, {
@@ -329,11 +348,11 @@ export async function handleClubRequest(req, res, mayWrite) {
         updatedBy: body.updatedBy || 'player',
         payload
       });
-      sendJson(res, 200, { ok: true, updatedAt: saved.updatedAt, updatedBy: saved.updatedBy });
+      sendJson(req, res, 200, { ok: true, updatedAt: saved.updatedAt, updatedBy: saved.updatedBy });
       return true;
     }
     if (current.updatedAt && Date.parse(incomingAt) < Date.parse(current.updatedAt)) {
-      sendJson(res, 409, { ok: false, error: 'stale', ...current });
+      sendJson(req, res, 409, { ok: false, error: 'stale', ...current });
       return true;
     }
     const payload = body.payload;
@@ -349,10 +368,10 @@ export async function handleClubRequest(req, res, mayWrite) {
       updatedBy: body.updatedBy || 'coach',
       payload
     });
-    sendJson(res, 200, { ok: true, ...saved, payload: undefined });
+    sendJson(req, res, 200, { ok: true, ...saved, payload: undefined });
     return true;
   }
 
-  sendJson(res, 405, { ok: false, error: 'method_not_allowed' });
+  sendJson(req, res, 405, { ok: false, error: 'method_not_allowed' });
   return true;
 }
