@@ -41,6 +41,10 @@ npm run build
 
 `npm test` ганяє модульні тести (математика дошки, координати, HMAC initData, ролі). `npm run build` копіює статику в `dist/`. Перегляд збірки: `npm run preview` (той самий порт).
 
+## Windows-сервер (локальний додаток)
+
+Для спільного JSON клубу на ПК: папка [`windows-server/`](windows-server/) — Electron-вікно (Старт/Стоп, URL, порт, імпорт/експорт JSON). Протокол той самий, що в `server/` (`/api/club-data`, порт **8787**). Запуск: `cd windows-server && npm install && start.bat`. Деталі — у [`windows-server/README.md`](windows-server/README.md).
+
 ## Клубний бот
 
 Mini App у Telegram працює без цього кроку. Окремий бот потрібен лише якщо треба слати в групу опитування відвідування і план тренування. Токен тоді лишається в `.env`, кроки — у [BOT_SETUP.md](BOT_SETUP.md).
