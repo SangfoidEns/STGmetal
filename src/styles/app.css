@@ -12900,7 +12900,7 @@ body.board-only-mode #mobileNav.glass-nav {
 .ym-shelf-head .ym-shelf-h { margin: 0; }
 .ym-sec-tools { display: flex; gap: 6px; flex: none; }
 .ym-section { margin-top: 8px; }
-.ym-row { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }
+.ym-row { display: flex; flex-wrap: wrap; gap: 12px; width: 100%; max-width: 100%; padding-bottom: 6px; }
 .ym-tile {
   flex: 0 0 132px; scroll-snap-align: start; border: 0; background: transparent; color: inherit;
   text-align: left; padding: 0; cursor: pointer;

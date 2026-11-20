@@ -2379,7 +2379,8 @@ const App = {
       }
       if (act === 'delete') {
         return Modal.confirm('Видалити схему?', function() {
-          Store.get().boards = Store.get().boards.filter(x => x.id !== bid);
+          if (typeof Actions !== 'undefined' && Actions.dropScheme) Actions.dropScheme(bid);
+          else Store.get().boards = Store.get().boards.filter(x => x.id !== bid);
           StorageManager.save();
           App.renderCurrent();
           Toast.show('Видалено');
@@ -3052,6 +3053,11 @@ const App = {
         const bid = t.dataset.boardId || (t.closest('.scheme-card') && t.closest('.scheme-card').dataset.boardId);
         return Actions.deleteScheme(bid);
       }
+      if (action === 'toggle-scheme-coach') {
+        e.preventDefault(); e.stopPropagation();
+        const bid = t.dataset.boardId || (t.closest('.scheme-card') && t.closest('.scheme-card').dataset.boardId);
+        return Actions.toggleSchemeAudience(bid);
+      }
       if (action === 'save-scheme-drawing') {
         e.preventDefault(); e.stopPropagation();
         return Actions.saveSchemeDrawing(t.dataset.boardId);
@@ -3218,6 +3224,10 @@ const App = {
             b = Views._playerVisibleBoards().find(x => String(x.id) === id);
           }
           if (!b) { Toast.show('Схему не знайдено', 'warn'); return; }
+          const coachView = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+          if (b.coachOnly && !coachView) { Toast.show('Цю схему бачить лише тренер', 'warn'); return; }
+          const dropped = (((Store.get().settings || {}).removedBoardIds) || []).map(String);
+          if (dropped.indexOf(id) >= 0) { Toast.show('Схему видалено', 'warn'); return; }
           // якщо схеми немає в boards — тимчасово кладемо
           if (!(Store.get().boards || []).some(x => String(x.id) === id)) {
             Store.get().boards = Store.get().boards || [];
@@ -4751,7 +4761,7 @@ const App = {
         Toast.show('Заготовку відкрито на дошці', 'ok');
         return;
       }
-      if (t.dataset.delBoard) return Modal.confirm('Видалити схему?', () => { Store.get().boards = Store.get().boards.filter(x => x.id !== t.dataset.delBoard); StorageManager.save(); App.renderCurrent(); });
+      if (t.dataset.delBoard) return Modal.confirm('Видалити схему?', () => { if (typeof Actions !== 'undefined' && Actions.dropScheme) Actions.dropScheme(t.dataset.delBoard); else Store.get().boards = Store.get().boards.filter(x => x.id !== t.dataset.delBoard); StorageManager.save(); App.renderCurrent(); });
       if (t.dataset.special) {
         e.preventDefault(); e.stopPropagation();
         const map = {

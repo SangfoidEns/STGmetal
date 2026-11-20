@@ -409,6 +409,14 @@ function applyStampedFields(merged, a, b) {
       });
     });
     if (gone.length) out.removedGiftIds = gone.slice(-800);
+    const droppedBoards = [];
+    [base.removedBoardIds, extra.removedBoardIds].forEach(function (list) {
+      (Array.isArray(list) ? list : []).forEach(function (id) {
+        const key = String(id || '');
+        if (key && droppedBoards.indexOf(key) < 0) droppedBoards.push(key);
+      });
+    });
+    if (droppedBoards.length) out.removedBoardIds = droppedBoards.slice(-800);
     return out;
   }
 
@@ -697,6 +705,20 @@ function collapseTrainings(payload) {
         const keys = [item.uid, item.id].map(function (k) { return String(k || ''); }).filter(Boolean);
         return !keys.some(function (k) { return gone.has(k); });
       });
+    }
+    const droppedBoards = new Set(((out.settings && out.settings.removedBoardIds) || []).map(function (id) { return String(id || ''); }));
+    if (droppedBoards.size) {
+      if (Array.isArray(out.boards)) {
+        out.boards = out.boards.filter(function (board) {
+          return !(board && droppedBoards.has(String(board.id || '')));
+        });
+      }
+      if (Array.isArray(out.schemeAlbums)) {
+        out.schemeAlbums.forEach(function (album) {
+          if (!album || !Array.isArray(album.boardIds)) return;
+          album.boardIds = album.boardIds.filter(function (id) { return !droppedBoards.has(String(id || '')); });
+        });
+      }
     }
     collapseTrainings(out);
     collapsePlayers(out);

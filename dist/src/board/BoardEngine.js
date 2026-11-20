@@ -1726,8 +1726,13 @@ const BoardEngine = {
   loadBoard(idOrBoard) {
     const s = Store.get();
     let b = null;
+    const dropped = new Set((((s.settings || {}).removedBoardIds) || []).map(function (id) { return String(id || ''); }));
     if (idOrBoard && typeof idOrBoard === 'object' && (idOrBoard.objects || idOrBoard.id)) {
       b = idOrBoard;
+      if (b.id != null && dropped.has(String(b.id))) {
+        try { Toast.show('Схему видалено', 'warn'); } catch (_) {}
+        return false;
+      }
       // ensure in store
       if (b.id && !(s.boards || []).some(x => String(x.id) === String(b.id))) {
         s.boards = s.boards || [];
@@ -1737,8 +1742,13 @@ const BoardEngine = {
       const id = idOrBoard != null ? String(idOrBoard) : '';
       b = (s.boards || []).find(x => String(x.id) === id);
     }
-    if (!b) {
-      try { Toast.show('Схему не знайдено', 'warn'); } catch (_) {}
+    if (!b || (b.id != null && dropped.has(String(b.id)))) {
+      try { Toast.show(b ? 'Схему видалено' : 'Схему не знайдено', 'warn'); } catch (_) {}
+      return false;
+    }
+    const coachNow = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+    if (b.coachOnly && !coachNow) {
+      try { Toast.show('Цю схему бачить лише тренер', 'warn'); } catch (_) {}
       return false;
     }
     if (!s.activeBoard) s.activeBoard = { objects: [], history: [], historyIdx: -1 };
@@ -1769,6 +1779,7 @@ const BoardEngine = {
           '<button type="button" class="tb" data-action="edit-scheme" data-board-id="' + id + '">Змінити</button>' +
           '<button type="button" class="tb" data-action="save-scheme-drawing" data-board-id="' + id + '">Зберегти</button>' +
           '<button type="button" class="tb" data-action="save-scheme-as-new" data-board-id="' + id + '">Копія</button>' +
+          '<button type="button" class="tb" data-action="toggle-scheme-coach" data-board-id="' + id + '">' + (b.coachOnly ? 'Показати гравцям' : 'Сховати') + '</button>' +
           '<button type="button" class="tb tb-del-opp" data-action="delete-scheme" data-board-id="' + id + '">Видалити</button>' +
         '</div>'
       : '';
@@ -1778,10 +1789,10 @@ const BoardEngine = {
   },
 
   _readySchemesHtml() {
-    const boards = (Store.get().boards || []).slice().sort((a, b) =>
+    const coach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+    const boards = (Store.get().boards || []).filter(b => coach || !(b && b.coachOnly)).slice().sort((a, b) =>
       String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))
     ).slice(0, 40);
-    const coach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
     if (!boards.length) return '<p class="note-sm">Немає збережених схем. Збережіть поточну дошку.</p>';
     if (typeof Views === 'undefined' || !Views._schemeCard) return '';
     return '<p class="note-sm">Утримуйте мініатюру — опис, редагування і видалення.</p>' +

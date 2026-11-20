@@ -171,19 +171,52 @@ const Actions = {
     }
   },
 
+  dropScheme(id) {
+    const s = Store.get();
+    const key = String(id || '');
+    if (!s || !key) return;
+    s.settings = s.settings || {};
+    if (!Array.isArray(s.settings.removedBoardIds)) s.settings.removedBoardIds = [];
+    if (s.settings.removedBoardIds.indexOf(key) < 0) s.settings.removedBoardIds.push(key);
+    if (s.settings.removedBoardIds.length > 800) s.settings.removedBoardIds = s.settings.removedBoardIds.slice(-800);
+    s.settings.updatedAt = new Date().toISOString();
+    s.boards = (s.boards || []).filter(x => String(x.id) !== key);
+    (s.schemeAlbums || []).forEach(album => {
+      if (!album || !Array.isArray(album.boardIds)) return;
+      const next = album.boardIds.filter(bid => String(bid) !== key);
+      if (next.length !== album.boardIds.length) {
+        album.boardIds = next;
+        album.updatedAt = s.settings.updatedAt;
+      }
+    });
+    if (s.activeBoard && String(s.activeBoard.sourceBoardId || '') === key) s.activeBoard.sourceBoardId = null;
+  },
+
   deleteScheme(id) {
     if (!this._schemeCoach()) {
       try { Toast.show('Видаляти схеми може лише тренер', 'warn'); } catch (_) {}
       return;
     }
     Modal.confirm('Видалити схему?', () => {
-      const s = Store.get();
-      s.boards = (s.boards || []).filter(x => String(x.id) !== String(id));
-      if (s.activeBoard && String(s.activeBoard.sourceBoardId || '') === String(id)) s.activeBoard.sourceBoardId = null;
+      Actions.dropScheme(id);
       StorageManager.save();
       try { Toast.show('Схему видалено', 'ok'); } catch (_) {}
       Actions._refreshSchemeSurfaces();
     });
+  },
+
+  toggleSchemeAudience(id) {
+    if (!this._schemeCoach()) {
+      try { Toast.show('Сховати схему може лише тренер', 'warn'); } catch (_) {}
+      return;
+    }
+    const b = (Store.get().boards || []).find(x => String(x.id) === String(id));
+    if (!b) return;
+    b.coachOnly = !b.coachOnly;
+    b.updatedAt = new Date().toISOString();
+    StorageManager.save();
+    try { Toast.show(b.coachOnly ? 'Схему бачить лише тренер' : 'Схему знову видно гравцям і гостям', 'ok'); } catch (_) {}
+    this._refreshSchemeSurfaces();
   },
 
   saveSchemeDrawing(id) {

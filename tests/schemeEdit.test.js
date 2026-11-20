@@ -106,7 +106,8 @@ describe('scheme cards', () => {
     const head = html.slice(html.indexOf('Всі альбоми'), headEnd);
     assert.match(head, /Архів/);
     assert.match(head, /ym-tile-count">1</);
-    assert.equal(head.includes('data-album-id'), false);
+    assert.match(head, /data-album-id="out"/);
+    assert.match(head, /data-album-id="ball"/);
     assert.ok(headEnd > html.indexOf('open-scheme-archive'));
     assert.match(html, /Аут/);
     const rec = html.split('Рекомендовані альбоми')[1] || '';
@@ -115,5 +116,29 @@ describe('scheme cards', () => {
     store.schemeOpens = [{ id: 'o2', who: 'p:other', albumId: 'ball', at: '2026-11-14T12:00:00.000Z' }];
     const other = ctx.Views.tactics().split('Рекомендовані альбоми')[1] || '';
     assert.equal(other.includes('Перший м’яч'), false);
+  });
+
+  it('hides a coach-only scheme from a player and a guest', () => {
+    const ctx = boot(false);
+    const store = ctx.Store.get();
+    store.boards.push({
+      id: 'secret',
+      name: 'Закрита пресинг',
+      type: 'тактика',
+      description: 'Лише для тренера',
+      coachOnly: true,
+      objects: []
+    });
+    store.schemeAlbums = [{ id: 'a1', name: 'Зони', boardIds: ['sch-1', 'secret'], createdAt: '2026-11-14T10:00:00.000Z' }];
+    store.ui.schemeArchive = true;
+    const archive = ctx.Views.tactics();
+    assert.match(archive, /Перший пас/);
+    assert.equal(archive.includes('Закрита пресинг'), false);
+    store.ui.schemeArchive = false;
+    store.ui.schemeAlbumId = 'a1';
+    const album = ctx.Views.tactics();
+    assert.match(album, /Перший пас/);
+    assert.equal(album.includes('Закрита пресинг'), false);
+    assert.match(album, />1 схем</);
   });
 });
