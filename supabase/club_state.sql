@@ -181,7 +181,6 @@ as $$
 declare
   coach_id text;
   nick text;
-  player jsonb;
 begin
   if actor is null or nullif(actor->>'id', '') is null then
     return 'deny';
@@ -196,21 +195,49 @@ begin
   if nick = 'serdiuk_artem' then
     return 'full';
   end if;
-  if payload is null or jsonb_typeof(payload->'players') <> 'array' then
-    return 'deny';
+  if private.match_player(payload->'players', actor) is not null then
+    return 'chat';
   end if;
-  for player in select value from jsonb_array_elements(payload->'players') loop
-    if player->>'telegramId' is not null and player->>'telegramId' = actor->>'id' then
-      return 'chat';
-    end if;
-    if player->>'linkedTelegramId' is not null and player->>'linkedTelegramId' = actor->>'id' then
-      return 'chat';
-    end if;
-    if nick <> '' and private.norm_nick(player->>'telegramUsername') = nick then
-      return 'chat';
+  return 'deny';
+end;
+$$;
+
+create or replace function private.match_player(players jsonb, actor jsonb)
+returns int
+language plpgsql
+stable
+as $$
+declare
+  i int;
+  item jsonb;
+  actor_id text;
+  nick text;
+begin
+  if actor is null or nullif(actor->>'id', '') is null then
+    return null;
+  end if;
+  if players is null or jsonb_typeof(players) <> 'array' then
+    return null;
+  end if;
+  actor_id := actor->>'id';
+  nick := private.norm_nick(actor->>'username');
+  for i in 0 .. jsonb_array_length(players) - 1 loop
+    item := players->i;
+    if (item->>'telegramId' is not null and item->>'telegramId' = actor_id)
+       or (item->>'linkedTelegramId' is not null and item->>'linkedTelegramId' = actor_id) then
+      return i;
     end if;
   end loop;
-  return 'deny';
+  if nick = '' then
+    return null;
+  end if;
+  for i in 0 .. jsonb_array_length(players) - 1 loop
+    item := players->i;
+    if private.norm_nick(item->>'telegramUsername') = nick then
+      return i;
+    end if;
+  end loop;
+  return null;
 end;
 $$;
 
@@ -278,8 +305,6 @@ declare
   mine jsonb;
   item jsonb;
   profile jsonb;
-  actor_id text;
-  nick text;
   mine_id text;
   birth text;
   photo text;
@@ -294,23 +319,12 @@ begin
   if jsonb_typeof(current->'players') <> 'array' or jsonb_typeof(incoming->'players') <> 'array' then
     return current;
   end if;
-  actor_id := actor->>'id';
-  nick := private.norm_nick(actor->>'username');
   players := current->'players';
-  idx := null;
-  for i in 0 .. jsonb_array_length(players) - 1 loop
-    item := players->i;
-    if (item->>'telegramId' is not null and item->>'telegramId' = actor_id)
-       or (item->>'linkedTelegramId' is not null and item->>'linkedTelegramId' = actor_id)
-       or (nick <> '' and private.norm_nick(item->>'telegramUsername') = nick) then
-      mine := item;
-      idx := i;
-      exit;
-    end if;
-  end loop;
+  idx := private.match_player(players, actor);
   if idx is null then
     return current;
   end if;
+  mine := players->idx;
   mine_id := mine->>'id';
   inc := null;
   for i in 0 .. jsonb_array_length(incoming->'players') - 1 loop
@@ -545,6 +559,7 @@ revoke all on function private.url_decode(text) from public, anon, authenticated
 revoke all on function private.club_key_ok(text) from public, anon, authenticated;
 revoke all on function private.tg_user(text) from public, anon, authenticated;
 revoke all on function private.norm_nick(text) from public, anon, authenticated;
+revoke all on function private.match_player(jsonb, jsonb) from public, anon, authenticated;
 revoke all on function private.club_role(jsonb, jsonb) from public, anon, authenticated;
 revoke all on function private.merge_chat(jsonb, jsonb, jsonb) from public, anon, authenticated;
 revoke all on function private.merge_self_profile(jsonb, jsonb, jsonb) from public, anon, authenticated;
