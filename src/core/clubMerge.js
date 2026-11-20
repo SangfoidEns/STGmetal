@@ -156,6 +156,14 @@ function applyTrainingSchedule(merged, winner, loser) {
     return out;
   }
 
+  function keepStampedList(merged, a, b, key) {
+    const ta = fieldTime(a, key);
+    const tb = fieldTime(b, key);
+    if (!ta && !tb) return;
+    const src = tb >= ta ? b : a;
+    if (Array.isArray(src && src[key])) merged[key] = src[key].slice();
+  }
+
 function mergeRecord(baseItem, extraItem) {
   const training = isTraining(baseItem) || isTraining(extraItem);
   const baseAt = training ? scheduleStamp(baseItem) : recordStamp(baseItem);
@@ -171,6 +179,7 @@ function mergeRecord(baseItem, extraItem) {
   else if (!extraWins && baseItem && baseItem.coachPresent != null) merged.coachPresent = baseItem.coachPresent;
   if (training) applyTrainingSchedule(merged, winner, loser);
   keepFilled(merged, loser, winner);
+  keepStampedList(merged, baseItem, extraItem, 'boardIds');
   keepMatchPlan(merged, loser, winner);
   keepPlayerChoice(merged, loser, winner);
   applyStampedFields(merged, baseItem, extraItem);
@@ -180,7 +189,7 @@ function mergeRecord(baseItem, extraItem) {
 
 function applyStampedFields(merged, a, b) {
   if (!merged) return;
-  ['birthDate', 'phone', 'bio', 'statusText', 'status', 'notes', 'firstName', 'lastName', 'position', 'telegramUsername'].forEach(function (field) {
+  ['birthDate', 'phone', 'bio', 'statusText', 'status', 'notes', 'firstName', 'lastName', 'position', 'telegramUsername', 'name'].forEach(function (field) {
     const ta = fieldTime(a, field);
     const tb = fieldTime(b, field);
     if (!ta && !tb) return;

@@ -68,25 +68,20 @@ describe('player match hub', () => {
       getLinkedPlayer() { return club().players[0]; }
     });
     const html = ctx.Views._matchHub({ role: 'player' });
-    assert.match(html, /Твої матчі/);
+    assert.match(html, /Матчі гравця/);
     assert.match(html, /Олег Коваль/);
     assert.match(html, /FC Freunde/);
-    assert.match(html, /Кубок/);
     assert.match(html, />20</);
     assert.match(html, />1</);
     assert.match(html, /Тримай ширину до останньої хвилини/);
     assert.match(html, /Граємо низько/);
-    assert.match(html, /Сітка/);
-    assert.match(html, /1\/2/);
-    assert.match(html, /Група A/);
-    assert.equal(html.includes('Іван Мельник'), false);
+    assert.match(html, /Склад/);
+    assert.match(html, /Іван Мельник/);
     assert.equal(html.includes('data-action="new-tournament"'), false);
-    assert.match(html, /data-action="match-bucket"/);
-    assert.match(html, /Усі/);
-    assert.match(html, /Кубок/);
+    assert.equal(html.includes('pm-buckets'), false);
   });
 
-  it('shows a player every team match and can keep only friendlies', () => {
+  it('lists the linked player and switches to another player from the rail', () => {
     const state = club();
     state.matches.push({
       id: 'm2',
@@ -106,13 +101,15 @@ describe('player match hub', () => {
       getLinkedPlayer() { return state.players[0]; }
     });
     const all = ctx.Views._matchHub({ role: 'player' });
-    assert.match(all, /FC Slop/);
-    assert.match(all, /Товариські/);
-    assert.equal(all.includes('Іван Мельник'), false);
-    state.ui.matchBucket = 'Товариські';
-    const friendly = ctx.Views._matchHub({ role: 'player' });
-    assert.match(friendly, /FC Slop/);
-    assert.equal(friendly.includes('FC Freunde'), false);
+    assert.match(all, /FC Freunde/);
+    assert.equal(all.includes('FC Slop'), false);
+    assert.match(all, /data-action="match-focus-player"/);
+    state.ui.matchFocusId = 'p2';
+    const other = ctx.Views._matchHub({ role: 'player' });
+    assert.match(other, /FC Slop/);
+    const slop = other.indexOf('FC Slop');
+    const freunde = other.indexOf('FC Freunde');
+    assert.ok(slop >= 0 && (freunde < 0 || slop < freunde));
   });
 
   it('lets a guest read the match without the coach rating', () => {

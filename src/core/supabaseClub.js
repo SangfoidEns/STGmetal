@@ -245,13 +245,28 @@ const SupabaseClub = {
           this._line(this._fail({ missing: true }));
           return false;
         }
-        let local = this._sm.buildExportPayload();
+        const live = this._sm.buildExportPayload();
+        let local = live;
         if (remote.payload && typeof ClubMerge !== 'undefined' && ClubMerge.mergePayload) {
           local = ClubMerge.mergePayload(remote.payload, local);
         }
         const off = await this.offload(local);
+        const remember = (updatedAt) => {
+          if (!stillMine() || !this._sm.applyClubPayload) return;
+          try {
+            const now = this._sm.buildExportPayload ? this._sm.buildExportPayload() : null;
+            if (now && this.same(now, off.payload)) return;
+            this._sm.applyClubPayload({
+              updatedAt: updatedAt || new Date().toISOString(),
+              updatedBy: 'supabase',
+              payload: off.payload
+            }, { force: true, quiet: true, replace: true });
+            this._sm._clubDirty = false;
+          } catch (_) {}
+        };
         if (remote.payload && this.same(remote.payload, off.payload)) {
           this.paintUrls(off.map);
+          remember(remote.updated_at);
           this._line('Клуб на сервері');
           if (stillMine()) this._sm._clubDirty = false;
           else this._again = true;
@@ -267,6 +282,7 @@ const SupabaseClub = {
         }
         this.paintUrls(off.map);
         this.releaseLocalBlobs();
+        remember(this._pendingAt);
         if (stillMine()) this._sm._clubDirty = false;
         else this._again = true;
         if (this._pendingAt) this._sm._clubUpdatedAt = this._pendingAt;

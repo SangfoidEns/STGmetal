@@ -13047,6 +13047,13 @@ body.board-only-mode #mobileNav.glass-nav {
 .pm-shelf { margin: 0 0 18px; }
 .pm-shelf-h { display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0; font-size: 18px; }
 .pm-card { margin: 0 0 12px; padding: 0; overflow: hidden; }
+.pm-card .pm-fold { display: none; padding: 0 14px 14px; }
+.pm-card.is-open .pm-fold { display: grid; gap: 10px; }
+.pm-fold-block span { display: block; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #e8c547; margin: 0 0 4px; }
+.pm-fold-block p { margin: 0; line-height: 1.45; }
+.pm-fold-row { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.06); }
+.pm-fold-mine { margin: 0; color: #e8c547; }
+.ym-swiping { transition: none; }
 .pm-open { display: block; width: 100%; text-align: left; background: transparent; padding: 14px 14px 8px; }
 .pm-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
 .pm-top span { font-size: 22px; font-weight: 800; color: #e8c547; }

@@ -262,7 +262,9 @@ const Actions = {
       const next = album.boardIds.filter(bid => String(bid) !== key);
       if (next.length !== album.boardIds.length) {
         album.boardIds = next;
-        album.updatedAt = s.settings.updatedAt;
+        album.updatedAt = s.settings.updatedAt || new Date().toISOString();
+        album.stamps = album.stamps || {};
+        album.stamps.boardIds = album.updatedAt;
       }
     });
     if (s.activeBoard && String(s.activeBoard.sourceBoardId || '') === key) s.activeBoard.sourceBoardId = null;
@@ -2046,8 +2048,11 @@ const Actions = {
     Modal.prompt('Назва альбому', album.name || '', name => {
       const title = String(name || '').trim();
       if (!title) return;
+      const now = new Date().toISOString();
       album.name = title;
-      album.updatedAt = new Date().toISOString();
+      album.updatedAt = now;
+      album.stamps = album.stamps || {};
+      album.stamps.name = now;
       StorageManager.save();
       App.renderCurrent();
     });
@@ -2105,8 +2110,11 @@ const Actions = {
     Modal.prompt('Назва розділу', sec.name || '', name => {
       const title = String(name || '').trim();
       if (!title) return;
+      const now = new Date().toISOString();
       sec.name = title;
-      sec.updatedAt = new Date().toISOString();
+      sec.updatedAt = now;
+      sec.stamps = sec.stamps || {};
+      sec.stamps.name = now;
       StorageManager.save();
       App.renderCurrent();
     });
@@ -2217,7 +2225,10 @@ const Actions = {
         if (!sec.boardIds.some(id => String(id) === String(boardId))) sec.boardIds.push(boardId);
       }
     }
-    album.updatedAt = new Date().toISOString();
+    const addedAt = new Date().toISOString();
+    album.updatedAt = addedAt;
+    album.stamps = album.stamps || {};
+    album.stamps.boardIds = addedAt;
     StorageManager.save();
     const tile = document.querySelector('#modal.show .ym-pick[data-board-id="' + String(boardId).replace(/"/g, '') + '"]');
     if (tile) {
@@ -2235,6 +2246,26 @@ const Actions = {
     App.renderCurrent();
   },
 
+  moveBoardInAlbum(albumId, boardId, dir) {
+    if (!this._coachOnly()) return;
+    const album = this._albumById(albumId);
+    if (!album || boardId == null) return;
+    const ids = (album.boardIds || []).slice();
+    const index = ids.findIndex(id => String(id) === String(boardId));
+    const next = index + (Number(dir) || 0);
+    if (index < 0 || next < 0 || next >= ids.length) return;
+    const swap = ids[index];
+    ids[index] = ids[next];
+    ids[next] = swap;
+    album.boardIds = ids;
+    const now = new Date().toISOString();
+    album.updatedAt = now;
+    album.stamps = album.stamps || {};
+    album.stamps.boardIds = now;
+    StorageManager.save();
+    App.renderCurrent();
+  },
+
   removeBoardFromAlbum(albumId, boardId) {
     if (!this._coachOnly()) return;
     const album = this._albumById(albumId);
@@ -2243,7 +2274,10 @@ const Actions = {
     (album.sections || []).forEach(sec => {
       if (sec) sec.boardIds = (sec.boardIds || []).filter(id => String(id) !== String(boardId));
     });
-    album.updatedAt = new Date().toISOString();
+    const removedAt = new Date().toISOString();
+    album.updatedAt = removedAt;
+    album.stamps = album.stamps || {};
+    album.stamps.boardIds = removedAt;
     StorageManager.save();
     App.renderCurrent();
   },

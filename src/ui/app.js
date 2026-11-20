@@ -2525,45 +2525,43 @@ const App = {
     };
 
     root.addEventListener('pointerdown', e => {
-      if (e.target.closest && e.target.closest('#teamChat, #teamChatForm, .team-chat, .team-chat-form, .scheme-card-detail, .ym-expand, #modal, .match-plan, .match-chip')) return;
+      if (e.target.closest && e.target.closest('#teamChat, #teamChatForm, .team-chat, .team-chat-form, .scheme-card-detail, .ym-expand, #modal, .match-plan, .match-chip, .tg-sheet')) return;
+      const albumTile = e.target.closest && e.target.closest('.ym-tile[data-album-id]');
+      const pmCard = e.target.closest && e.target.closest('.pm-card[data-match-id]');
+      const playerTile = e.target.closest && e.target.closest('.pl-card[data-player-id]');
       const schemeCard = e.target.closest && e.target.closest('.scheme-card[data-board-id]');
       const track = e.target.closest && e.target.closest('.ym-track[data-board-id]');
-      const matchCard = e.target.closest && e.target.closest('.match-list-card[data-match-id], .cal-ev-row.is-match[data-match-id]');
-      if (!schemeCard && !track && !matchCard && e.target.closest && e.target.closest('button:not(.coach-tools-handle), a, input, select, textarea')) return;
-      const row = track || schemeCard || matchCard || (e.target.closest && e.target.closest(
-        '.card-training[data-training-id], .tg-row[data-training-id], .pl-row[data-player-id], .scheme-row[data-board-id], .sc-next-training[data-next-training], .coach-tools-handle, .sc-tap[data-view="players"]'
+      if (!albumTile && !pmCard && !playerTile && !schemeCard && !track && e.target.closest && e.target.closest('button:not(.coach-tools-handle), a, input, select, textarea')) return;
+      const row = albumTile || pmCard || playerTile || track || schemeCard || (e.target.closest && e.target.closest(
+        '.sc-next-training[data-next-training], .coach-tools-handle, .sc-tap[data-view="players"]'
       ));
       if (!row) return;
       this._lpMoved = false;
       this._lpTarget = row;
       row.classList.add('tg-row-holding');
-      const kind = track ? 'ym-track' : schemeCard ? 'scheme-card'
-        : matchCard ? 'match'
-        : row.classList.contains('pl-row') ? 'player'
+      const kind = albumTile ? 'album' : pmCard ? 'match-fold' : playerTile ? 'player-tile'
+        : track ? 'ym-track' : schemeCard ? 'scheme-card'
         : (row.matches && row.matches('.sc-tap[data-view="players"]')) ? 'squad'
-        : row.classList.contains('scheme-row') ? 'scheme'
         : row.classList.contains('sc-next-training') ? 'next-training'
         : row.classList.contains('coach-tools-handle') ? 'coach-tools'
-        : 'training';
-      const id = (track && track.dataset.boardId) || (schemeCard && schemeCard.dataset.boardId) || (matchCard && matchCard.dataset.matchId) || row.dataset.trainingId || row.dataset.editTraining || row.dataset.playerId || row.dataset.boardId || row.dataset.nextTraining || '';
+        : '';
+      const id = (albumTile && albumTile.dataset.albumId) || (pmCard && pmCard.dataset.matchId) || (playerTile && playerTile.dataset.playerId) || (track && track.dataset.boardId) || (schemeCard && schemeCard.dataset.boardId) || row.dataset.nextTraining || '';
       this._lpTimer = setTimeout(() => {
         this._lpTimer = null;
         if (this._lpTarget && !this._lpMoved) {
           this._lpTarget.classList.remove('tg-row-holding');
-          if (kind === 'squad') this.openSquadDialog();
-          else if (kind === 'player') this.openPlayerActionSheet(id);
-          else if (kind === 'match') this.openMatchPeek(id);
+          if (kind === 'album') this.openAlbumActionSheet(id);
+          else if (kind === 'match-fold') this.expandMatchCard(id);
+          else if (kind === 'player-tile') this.openPlayerActionSheet(id);
+          else if (kind === 'squad') this.openSquadDialog();
           else if (kind === 'ym-track') this.expandSchemeTrack(id);
           else if (kind === 'scheme-card') this.expandSchemeCard(id);
-          else if (kind === 'scheme') this.openSchemeActionSheet(id);
           else if (kind === 'next-training') this.openNextTrainingPreview(id);
           else if (kind === 'coach-tools') {
             const body = document.querySelector('.coach-tools-body');
             if (body) body.removeAttribute('hidden');
             try { TelegramManager.haptic && TelegramManager.haptic('medium'); } catch (_) {}
-          } else if (row.closest && row.closest('.ym, .ym-pick, .ym-picks, #modal, .tg-sheet')) {
-            /* схема і її меню не відкривають тренування */
-          } else this.openTrainingActionSheet(id);
+          }
           this._lpTarget = null;
           this._lpSuppressClick = true;
           setTimeout(() => { this._lpSuppressClick = false; }, 400);
@@ -2585,22 +2583,23 @@ const App = {
   },
 
   bindAlbumSwipe() {
-    if (this._albumSwipeBound) return;
-    this._albumSwipeBound = true;
+    if (this._listSwipeBound) return;
+    this._listSwipeBound = true;
     let row = null;
     let sx = 0;
     let sy = 0;
     let active = false;
+    const pick = (e) => {
+      if (!e.target || !e.target.closest) return null;
+      if (e.target.closest('#teamChat, #teamChatForm, .team-chat, #modal, .tg-sheet, .ym-menu, .ym-dots, .ym-pick, .ym-picks, .match-plan, .match-chip, .ym-row, .pm-rail, .pt-tabs, .live-faces, input, textarea, select')) return null;
+      return e.target.closest('.card-training[data-training-id], .tg-row[data-training-id], .pl-row[data-player-id], .scheme-row[data-board-id], .ym-track[data-board-id], .pm-card[data-match-id], .cal-ev-row[data-match-id], .cal-ev-row[data-training-id], .cal-ev-row[data-player-id], .match-list-card[data-match-id], .card[data-edit-diary]');
+    };
     document.addEventListener('pointerdown', (e) => {
       row = null;
       active = false;
-      if (!e.target.closest) return;
-      if (e.target.closest('.ym-menu, .ym-dots, #modal, .ym-pick, .ym-picks')) return;
-      const track = e.target.closest('.ym-track[data-album-id]');
-      if (!track) return;
-      const coach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
-      if (!coach) return;
-      row = track;
+      const hit = pick(e);
+      if (!hit) return;
+      row = hit;
       sx = e.clientX;
       sy = e.clientY;
       active = true;
@@ -2609,26 +2608,24 @@ const App = {
       if (!active || !row) return;
       const dx = e.clientX - sx;
       const dy = e.clientY - sy;
-      if (dx < -10 && Math.abs(dx) > Math.abs(dy)) {
-        row.style.transform = 'translateX(' + Math.max(dx, -112) + 'px)';
+      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+        row.style.transform = 'translateX(' + Math.max(-112, Math.min(112, dx)) + 'px)';
         row.classList.add('ym-swiping');
       }
     }, { passive: true });
     const end = (e) => {
       if (!active || !row) return;
-      const track = row;
+      const hit = row;
       const dx = (e.clientX || sx) - sx;
       const dy = (e.clientY || sy) - sy;
       active = false;
       row = null;
-      track.style.transform = '';
-      track.classList.remove('ym-swiping');
-      if (dx > -64 || Math.abs(dx) < Math.abs(dy)) return;
+      hit.style.transform = '';
+      hit.classList.remove('ym-swiping');
+      if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
       this._lpSuppressClick = true;
       setTimeout(() => { this._lpSuppressClick = false; }, 500);
-      if (typeof Actions !== 'undefined' && Actions.removeBoardFromAlbum) {
-        Actions.removeBoardFromAlbum(track.dataset.albumId, track.dataset.boardId);
-      }
+      this.openSwipeMenu(hit);
     };
     document.addEventListener('pointerup', end);
     document.addEventListener('pointercancel', () => {
@@ -2638,6 +2635,121 @@ const App = {
       }
       row = null;
       active = false;
+    });
+  },
+
+  openSwipeMenu(row) {
+    if (!row) return;
+    try { TelegramManager.haptic && TelegramManager.haptic('light'); } catch (_) {}
+    if (row.classList.contains('ym-track')) return this.openSchemeRowSheet(row.dataset.boardId, row.dataset.albumId);
+    if (row.classList.contains('scheme-row')) return this.openSchemeActionSheet(row.dataset.boardId);
+    if (row.classList.contains('pl-row')) return this.openPlayerActionSheet(row.dataset.playerId);
+    if (row.classList.contains('pm-card') || row.classList.contains('match-list-card') || row.classList.contains('is-match')) {
+      return this.openMatchPeek(row.dataset.matchId);
+    }
+    if (row.classList.contains('cal-bday')) return this.openPlayerActionSheet(row.dataset.playerId);
+    if (row.dataset.editDiary && typeof Actions !== 'undefined' && Actions.editDiary) return Actions.editDiary(row.dataset.editDiary);
+    const tid = row.dataset.trainingId || row.dataset.editTraining;
+    if (tid) return this.openTrainingActionSheet(tid);
+  },
+
+  expandMatchCard(id) {
+    const card = document.querySelector('.pm-card[data-match-id="' + String(id).replace(/"/g, '') + '"]');
+    if (!card) return;
+    card.classList.toggle('is-open');
+    try { TelegramManager.haptic && TelegramManager.haptic('medium'); } catch (_) {}
+  },
+
+  openAlbumActionSheet(albumId) {
+    const album = ((Store.get().schemeAlbums) || []).find(a => a && String(a.id) === String(albumId));
+    if (!album) return;
+    const coach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+    const name = (typeof sanitize === 'function') ? sanitize(album.name || 'Альбом') : (album.name || 'Альбом');
+    const buttons = '<button type="button" class="tg-sheet-btn" data-asheet="open">Відкрити</button>' +
+      (coach
+        ? '<button type="button" class="tg-sheet-btn" data-asheet="rename">Назва</button>' +
+          '<button type="button" class="tg-sheet-btn" data-asheet="section">У розділ</button>' +
+          '<button type="button" class="tg-sheet-btn" data-asheet="hide">' + (album.coachOnly ? 'Показати гравцям' : 'Сховати від гравців') + '</button>' +
+          '<button type="button" class="tg-sheet-btn tg-sheet-danger" data-asheet="delete">Видалити</button>'
+        : '') +
+      '<button type="button" class="tg-sheet-btn tg-sheet-cancel" data-asheet="close">Закрити</button>';
+    this._sheet(name, 'Альбом', buttons, (act) => {
+      if (act === 'open') {
+        try { Actions.noteSchemeOpen({ albumId: albumId }); } catch (_) {}
+        const s = Store.get();
+        s.ui = s.ui || {};
+        s.ui.schemeAlbumId = albumId;
+        if (this._playerSchemesHome(s)) {
+          try { this.navigate('trainings'); } catch (_) { this.renderCurrent(); }
+          return;
+        }
+        s.ui.view = 'tactics';
+        try { this.renderCurrent(); } catch (_) {}
+        return;
+      }
+      if (typeof Actions === 'undefined') return;
+      if (act === 'rename') return Actions.renameSchemeAlbum(albumId);
+      if (act === 'section') return Actions.moveAlbumToSection(albumId);
+      if (act === 'hide') return Actions.toggleSchemeAlbumAudience(albumId);
+      if (act === 'delete') return Actions.deleteSchemeAlbum(albumId);
+    });
+  },
+
+  openSchemeRowSheet(boardId, albumId) {
+    const board = ((Store.get().boards) || []).find(b => b && String(b.id) === String(boardId));
+    if (!board) return;
+    const coach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+    const name = (typeof sanitize === 'function') ? sanitize(board.name || 'Схема') : (board.name || 'Схема');
+    const hidden = !!board.coachOnly;
+    const buttons = '<button type="button" class="tg-sheet-btn" data-asheet="open">На дошку</button>' +
+      (coach
+        ? '<button type="button" class="tg-sheet-btn" data-asheet="edit">Редагувати</button>' +
+          (albumId
+            ? '<button type="button" class="tg-sheet-btn" data-asheet="up">Вище</button><button type="button" class="tg-sheet-btn" data-asheet="down">Нижче</button><button type="button" class="tg-sheet-btn" data-asheet="remove">З альбому</button>'
+            : '') +
+          '<button type="button" class="tg-sheet-btn" data-asheet="hide">' + (hidden ? 'Показати гравцям' : 'Сховати від гравців') + '</button>' +
+          '<button type="button" class="tg-sheet-btn tg-sheet-danger" data-asheet="delete">Видалити</button>'
+        : '') +
+      '<button type="button" class="tg-sheet-btn tg-sheet-cancel" data-asheet="close">Закрити</button>';
+    this._sheet(name, albumId ? 'Порядок, сховати, прибрати' : 'Меню схеми', buttons, (act) => {
+      if (typeof Actions === 'undefined') return;
+      if (act === 'open') {
+        try { Actions.noteSchemeOpen({ boardId: boardId, albumId: albumId || '' }); } catch (_) {}
+        if (typeof BoardEngine !== 'undefined' && BoardEngine.loadBoard) BoardEngine.loadBoard(boardId);
+        this.allowBoardOnce('load-board');
+        this.navigate('board');
+        return;
+      }
+      if (act === 'edit') return Actions.editScheme(boardId);
+      if (act === 'up') return Actions.moveBoardInAlbum(albumId, boardId, -1);
+      if (act === 'down') return Actions.moveBoardInAlbum(albumId, boardId, 1);
+      if (act === 'remove') return Actions.removeBoardFromAlbum(albumId, boardId);
+      if (act === 'hide') return Actions.toggleSchemeAudience(boardId);
+      if (act === 'delete') return Actions.deleteScheme(boardId);
+    });
+  },
+
+  _sheet(title, sub, buttons, onAct) {
+    document.querySelectorAll('.tg-sheet-backdrop').forEach(el => el.remove());
+    const backdrop = document.createElement('div');
+    backdrop.className = 'tg-sheet-backdrop';
+    backdrop.innerHTML = '<div class="tg-sheet" role="dialog"><div class="tg-sheet-handle"></div>' +
+      '<div class="tg-sheet-title">' + title + '</div>' +
+      (sub ? '<div class="tg-sheet-sub">' + sub + '</div>' : '') +
+      buttons + '</div>';
+    document.body.appendChild(backdrop);
+    requestAnimationFrame(function () { backdrop.classList.add('show'); });
+    const close = function () { backdrop.classList.remove('show'); setTimeout(function () { backdrop.remove(); }, 220); };
+    backdrop.addEventListener('click', function (e) {
+      if (e.target === backdrop) return close();
+      const btn = e.target.closest('[data-asheet]');
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const act = btn.dataset.asheet;
+      close();
+      if (act === 'close') return;
+      onAct(act);
     });
   },
 
@@ -3151,6 +3263,7 @@ const App = {
       }
       if (action === 'open-scheme-album') {
         e.preventDefault(); e.stopPropagation();
+        if (this._lpSuppressClick) return;
         const album = ((Store.get().schemeAlbums) || []).find(a => a && String(a.id) === String(t.dataset.albumId));
         const coachView = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
         if (album && album.coachOnly && !coachView) {
@@ -3281,6 +3394,10 @@ const App = {
         e.preventDefault(); e.stopPropagation();
         return Actions.addBoardToAlbum(t.dataset.albumId, t.dataset.boardId);
       }
+      if (action === 'album-move-board') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.moveBoardInAlbum(t.dataset.albumId, t.dataset.boardId, t.dataset.dir);
+      }
       if (action === 'album-remove-board') {
         e.preventDefault(); e.stopPropagation();
         return Actions.removeBoardFromAlbum(t.dataset.albumId, t.dataset.boardId);
@@ -3358,7 +3475,7 @@ const App = {
         e.stopPropagation();
       }
       // після long-press не відкривати деталі коротким «відпусканням»
-      if (this._lpSuppressClick && e.target.closest('.card-training, .tg-row, .scheme-card')) {
+      if (this._lpSuppressClick && e.target.closest('.card-training, .tg-row, .scheme-card, .pl-row, .pm-card, .ym-track, .cal-ev-row, .match-list-card, .scheme-row')) {
         e.preventDefault();
         e.stopPropagation();
         return;
@@ -3445,6 +3562,7 @@ const App = {
       if (action === 'new-exercise') return Actions.newExercise();
       if (action === 'new-match') return Actions.newMatch();
       if (action === 'open-match' || action === 'open-next-event') {
+        if (this._lpSuppressClick) return;
         e.preventDefault();
         e.stopPropagation();
         if (action === 'open-match') return Actions.viewMatch(t.dataset.matchId || t.getAttribute('data-match-id'));
@@ -3912,6 +4030,7 @@ const App = {
 
       if (action === 'open-player-card') {
         e.preventDefault(); e.stopPropagation();
+        if (this._lpSuppressClick) return;
         const pid = (t.dataset && t.dataset.playerId) || t.getAttribute('data-player-id');
         if (!pid) return;
         try { TelegramManager.haptic && TelegramManager.haptic('light'); } catch (_) {}
@@ -4795,6 +4914,7 @@ const App = {
       }
       if (t.dataset.editDiary) {
         e.preventDefault(); e.stopPropagation();
+        if (this._lpSuppressClick) return;
         return Actions.editDiary(t.dataset.editDiary);
       }
       if (t.dataset.delDiary) {

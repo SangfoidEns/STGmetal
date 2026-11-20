@@ -625,4 +625,34 @@ describe('club snapshot merge', () => {
     assert.equal(merged.settings.presence.coach.name, 'Тренер');
     assert.equal(merged.settings.coachStats.appMs, 20);
   });
+
+  it('keeps the renamed album when the player phone is newer but still has the old name', () => {
+    const merged = mergePayload({
+      schemeAlbums: [{
+        id: 'a1', name: 'Нове', updatedAt: '2026-11-20T12:00:00.000Z',
+        stamps: { name: '2026-11-20T17:00:00.000Z' }, boardIds: ['b1']
+      }]
+    }, {
+      schemeAlbums: [{
+        id: 'a1', name: 'Старе', updatedAt: '2026-11-20T18:00:00.000Z', boardIds: ['b1']
+      }]
+    });
+    assert.equal(merged.schemeAlbums[0].name, 'Нове');
+  });
+
+  it('keeps the scheme order from the newer order stamp', () => {
+    const merged = mergePayload({
+      schemeAlbums: [{
+        id: 'a1', name: 'А', updatedAt: '2026-11-20T18:00:00.000Z',
+        boardIds: ['b2', 'b1']
+      }]
+    }, {
+      schemeAlbums: [{
+        id: 'a1', name: 'А', updatedAt: '2026-11-20T12:00:00.000Z',
+        boardIds: ['b1', 'b2'],
+        stamps: { boardIds: '2026-11-20T17:00:00.000Z' }
+      }]
+    });
+    assert.deepEqual(merged.schemeAlbums[0].boardIds, ['b1', 'b2']);
+  });
 });

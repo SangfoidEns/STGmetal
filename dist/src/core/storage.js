@@ -227,7 +227,7 @@ const StorageManager = {
     const localPresence = current.settings && current.settings.presence;
     let migrated = this.migrate(remote.payload, remote.payload.schemaVersion || 1);
     if (this._clubDirty && this._canSyncWrite() && !(opts && opts.force)) return false;
-    if (this._staticClubOnly() && typeof ClubMerge !== 'undefined' && ClubMerge.mergePayload) {
+    if (this._staticClubOnly() && typeof ClubMerge !== 'undefined' && ClubMerge.mergePayload && !(opts && opts.replace)) {
       if (!this._freshInstall) migrated = ClubMerge.mergePayload(migrated, current);
       migrated = this.migrate(migrated, migrated.schemaVersion || remote.payload.schemaVersion || 1);
     }

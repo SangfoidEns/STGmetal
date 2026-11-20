@@ -29,11 +29,11 @@ describe('calendar weekday letters', () => {
     assert.match(html, /title="Субота">Сб</);
     assert.match(html, /title="Неділя">Нд</);
     assert.equal(html.includes('>А<'), false);
-    assert.equal(context.Views.APP_BUILD, 'z116');
-    assert.equal(context.Views.versionLabel(), '116');
+    assert.equal(context.Views.APP_BUILD, 'z117');
+    assert.equal(context.Views.versionLabel(), '117');
     const settings = context.Views.settings();
-    assert.match(settings, /Версія 116/);
-    assert.equal(settings.includes('z116'), false);
+    assert.match(settings, /Версія 117/);
+    assert.equal(settings.includes('z117'), false);
     const library = context.Views.tactics();
     assert.match(library, /Всі альбоми/);
     assert.match(library, /open-scheme-archive/);
@@ -138,7 +138,8 @@ describe('calendar weekday letters', () => {
     assert.match(album, /ym-track/);
     assert.match(album, /ym-hero-art ym-tile-cover/);
     assert.match(album, /data-album-id="a1"/);
-    assert.match(album, /Свайп вліво прибирає схему з альбому/);
+    assert.match(album, /Свайп відкриває меню схеми/);
+    assert.match(album, /album-move-board/);
     const pick = context.Views._schemePickButton(store.boards[0], 'a1');
     assert.match(pick, /class="ym-pick"/);
     assert.match(pick, /ym-pick-name/);

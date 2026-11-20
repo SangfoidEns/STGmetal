@@ -167,6 +167,52 @@ describe('scheme cards', () => {
     assert.match(open, /Згорнути/);
   });
 
+  it('puts the most opened album into the first six', () => {
+    const ctx = boot(true);
+    const store = ctx.Store.get();
+    store.schemeAlbums = [1, 2, 3, 4, 5, 6, 7].map(n => ({
+      id: 'a' + n,
+      name: 'Альбом ' + n,
+      boardIds: [],
+      createdAt: '2026-11-' + String(10 + n).padStart(2, '0') + 'T10:00:00.000Z'
+    }));
+    store.schemeSections = [{ id: 'sec', name: 'Турнір', albumIds: ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7'] }];
+    store.schemeOpens = [1, 2, 3, 4].map(n => ({ id: 'o' + n, albumId: 'a1', at: n }));
+    const html = ctx.Views.tactics();
+    const all = html.slice(html.indexOf('Всі альбоми'), html.indexOf('Турнір'));
+    assert.match(all, /data-album-id="a1"/);
+    assert.equal(all.includes('data-album-id="a2"'), false);
+    const section = html.slice(html.indexOf('Турнір'), html.indexOf('Рекомендовані'));
+    assert.match(section, /data-album-id="a1"/);
+  });
+
+  it('lists the chosen player from the next match down and folds the squad', () => {
+    const ctx = boot(false);
+    const store = ctx.Store.get();
+    store.players = [
+      { id: 'p1', firstName: 'Єгор', lastName: 'Коваленко', status: 'injured' },
+      { id: 'p2', firstName: 'Іван', lastName: 'Петренко' }
+    ];
+    store.matches = [
+      { id: 'old', date: '2026-11-01', opponent: 'Старий', xi: ['p1'], bench: [], attendance: { p1: { present: true, yellow: 1 } }, subs: [{ minute: 60, offId: 'p1', onId: 'p2' }] },
+      { id: 'soon', date: '2026-11-25', opponent: 'Найближчий', xi: ['p2'], bench: ['p1'] },
+      { id: 'later', date: '2026-12-01', opponent: 'Далекий', xi: ['p1'] }
+    ];
+    store.ui.playerTrainTab = 'matches';
+    const html = ctx.Views.trainings();
+    assert.match(html, /data-action="match-focus-player"/);
+    assert.equal(html.includes('pm-buckets'), false);
+    const soon = html.indexOf('Найближчий');
+    const later = html.indexOf('Далекий');
+    const old = html.indexOf('Старий');
+    assert.ok(soon >= 0 && soon < later && later < old);
+    assert.match(html, /Склад/);
+    assert.match(html, /Заміни/);
+    assert.match(html, /Картки/);
+    assert.match(html, /Травми/);
+    assert.match(html, /pm-fold/);
+  });
+
   it('hides a coach-only album from a player', () => {
     const ctx = boot(false);
     const store = ctx.Store.get();
