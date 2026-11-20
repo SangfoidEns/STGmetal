@@ -224,10 +224,9 @@ const StorageManager = {
     const ui = current.ui;
     const localStats = current.settings && current.settings.coachStats;
     let migrated = this.migrate(remote.payload, remote.payload.schemaVersion || 1);
+    if (this._clubDirty && this._canSyncWrite() && !(opts && opts.force)) return false;
     if (this._staticClubOnly() && typeof ClubMerge !== 'undefined' && ClubMerge.mergePayload) {
       if (!this._freshInstall) migrated = ClubMerge.mergePayload(migrated, current);
-      const backup = this._readBackupPayload();
-      if (backup) migrated = ClubMerge.mergePayload(migrated, backup);
       migrated = this.migrate(migrated, migrated.schemaVersion || remote.payload.schemaVersion || 1);
     }
     migrated.updatedAt = remote.updatedAt;
@@ -474,6 +473,7 @@ const StorageManager = {
         this.scheduleClubPush();
       }
       if (this._supabaseOn() && !(opts && opts.localOnly)) {
+        this._clubRev = (this._clubRev || 0) + 1;
         this._clubDirty = true;
         try { SupabaseClub.schedulePush(this); } catch (_) {}
       }

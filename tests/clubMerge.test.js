@@ -335,6 +335,39 @@ describe('club snapshot merge', () => {
     assert.deepEqual(merged.matches[0].xi, ['gk']);
   });
 
+  it('keeps the squad the coach just changed over the older server copy', () => {
+    const merged = mergePayload({
+      matches: [{
+        id: 'm1',
+        opponent: 'Кастель',
+        xi: ['old'],
+        bench: [],
+        updatedAt: '2026-11-20T09:00:00.000Z',
+        stamps: { plan: '2026-11-20T08:00:00.000Z' }
+      }],
+      activeBoard: {
+        updatedAt: '2026-11-20T09:00:00.000Z',
+        objects: [{ id: 'a', x: 0.2 }, { id: 'b', x: 0.4 }]
+      }
+    }, {
+      matches: [{
+        id: 'm1',
+        opponent: 'Кастель',
+        xi: ['new'],
+        bench: ['old'],
+        updatedAt: '2026-11-20T10:00:00.000Z',
+        stamps: { plan: '2026-11-20T10:00:00.000Z' }
+      }],
+      activeBoard: {
+        updatedAt: '2026-11-20T10:00:00.000Z',
+        objects: [{ id: 'a', x: 0.7 }, { id: 'b', x: 0.4 }]
+      }
+    });
+    assert.deepEqual(merged.matches[0].xi, ['new']);
+    assert.deepEqual(merged.matches[0].bench, ['old']);
+    assert.equal(merged.activeBoard.objects[0].x, 0.7);
+  });
+
   it('keeps the player gift choice and the newer coach load', () => {
     const merged = mergePayload({
       players: [{

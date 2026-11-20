@@ -1715,6 +1715,7 @@ const Actions = {
     m.bench = (m.bench || []).filter(id => String(id) !== String(onId));
     if (!m.bench.some(id => String(id) === String(offId))) m.bench.push(offId);
     m.updatedAt = new Date().toISOString();
+    m.stamps = Object.assign({}, m.stamps || {}, { plan: m.updatedAt });
     try { StorageManager.save(); } catch (_) {}
     Toast.show('Заміна ' + minute + '′', 'ok');
     App.renderCurrent();
@@ -1784,6 +1785,7 @@ const Actions = {
     m.xi = squad.xi;
     m.bench = squad.bench;
     m.updatedAt = new Date().toISOString();
+    m.stamps = Object.assign({}, m.stamps || {}, { plan: m.updatedAt });
     StorageManager.save();
     Toast.show('Основа за лоадом · ' + scheme, 'ok');
     App.renderCurrent();
@@ -1827,6 +1829,7 @@ const Actions = {
     m.xi = xi;
     m.bench = bench;
     m.updatedAt = new Date().toISOString();
+    m.stamps = Object.assign({}, m.stamps || {}, { plan: m.updatedAt });
     StorageManager.save();
     App.renderCurrent();
   },

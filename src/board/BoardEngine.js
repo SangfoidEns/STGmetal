@@ -334,6 +334,7 @@ const BoardEngine = {
     b.history.push(snap);
     b.historyIdx = b.history.length - 1;
     if (b.history.length > 100) { b.history.shift(); b.historyIdx--; }
+    try { this._syncLiveBoard(); } catch (_) {}
     StorageManager.saveDebounced();
   },
 

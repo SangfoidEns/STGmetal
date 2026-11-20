@@ -208,6 +208,10 @@ const SupabaseClub = {
       return false;
     }
     this._rev = remote.rev;
+    if (this._sm._clubDirty && this._canWrite(this._sm) && !(opts && opts.force)) {
+      this.schedulePush(this._sm);
+      return false;
+    }
     if (this._sm._clubUpdatedAt && remote.updated_at && remote.updated_at === this._sm._clubUpdatedAt && !(opts && opts.force)) {
       this._line('Клуб на сервері');
       return false;
@@ -228,6 +232,8 @@ const SupabaseClub = {
       return false;
     }
     this._pushing = true;
+    const rev = this._sm._clubRev || 0;
+    const stillMine = () => (this._sm._clubRev || 0) === rev;
     try {
       for (let attempt = 0; attempt < 3; attempt++) {
         const remote = await this.fetchRemote();
@@ -247,7 +253,9 @@ const SupabaseClub = {
         if (remote.payload && this.same(remote.payload, off.payload)) {
           this.paintUrls(off.map);
           this._line('Клуб на сервері');
-          this._sm._clubDirty = false;
+          if (stillMine()) this._sm._clubDirty = false;
+          else this._again = true;
+          if (remote.updated_at) this._sm._clubUpdatedAt = remote.updated_at;
           return true;
         }
         const rev = remote.empty ? 0 : (remote.rev || 0);
@@ -259,7 +267,9 @@ const SupabaseClub = {
         }
         this.paintUrls(off.map);
         this.releaseLocalBlobs();
-        this._sm._clubDirty = false;
+        if (stillMine()) this._sm._clubDirty = false;
+        else this._again = true;
+        if (this._pendingAt) this._sm._clubUpdatedAt = this._pendingAt;
         this._line('Клуб на сервері. Фото лежать не в телефоні.');
         return true;
       }
@@ -288,6 +298,7 @@ const SupabaseClub = {
       payload: fileOk ? null : (text.length < 700000 ? payload : null)
     };
     if (!fileOk && body.payload == null) return false;
+    this._pendingAt = body.updated_at;
     if (!exists) {
       const res = await fetch(this.URL + '/rest/v1/club_state', {
         method: 'POST',

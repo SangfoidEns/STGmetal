@@ -264,28 +264,35 @@ function applyStampedFields(merged, a, b) {
       return !!(item && (item.opponent || item.xi || item.plan != null || item.warmup != null || item.opponentLogo));
     };
     if (!looks(loser) && !looks(winner)) return;
+    const squad = function (list) {
+      return Array.isArray(list) && list.some(function (id) { return id != null && id !== ''; });
+    };
     const keys = ['plan', 'plan1', 'plan2', 'tactics', 'preNotes', 'postNotes', 'warmup', 'warmupAt', 'warmupPlace', 'opponentLogo', 'meetTime', 'gatherPlace', 'kickoff', 'competition', 'scheme', 'schemeAlbumId'];
     const loserAt = fieldTime(loser, 'plan');
     const winnerAt = fieldTime(winner, 'plan');
     if (loserAt || winnerAt) {
-      const src = winnerAt > loserAt ? winner : loser;
+      const src = winnerAt > loserAt ? winner : (loserAt > winnerAt ? loser : winner);
       keys.forEach(function (key) {
         if (src && Object.prototype.hasOwnProperty.call(src, key)) merged[key] = src[key];
       });
-      if (src && src.warmupMin != null && src.warmupMin !== '') merged.warmupMin = src.warmupMin;
-      if (Array.isArray(src && src.xi)) merged.xi = src.xi;
-      if (Array.isArray(src && src.bench)) merged.bench = src.bench;
-      return;
+      keys.forEach(function (key) {
+        if (!filled(merged[key]) && filled(loser && loser[key])) merged[key] = loser[key];
+      });
+      if ((merged.warmupMin == null || merged.warmupMin === '') && loser && loser.warmupMin != null && loser.warmupMin !== '') {
+        merged.warmupMin = loser.warmupMin;
+      }
     }
+    if (winner && Array.isArray(winner.xi)) merged.xi = winner.xi;
+    else if (squad(loser && loser.xi)) merged.xi = loser.xi;
+    if (winner && Array.isArray(winner.bench)) merged.bench = winner.bench;
+    else if (squad(loser && loser.bench)) merged.bench = loser.bench;
+    if (loserAt || winnerAt) return;
     keys.forEach(function (key) {
       if (!filled(winner && winner[key]) && filled(loser && loser[key])) merged[key] = loser[key];
     });
     if ((winner == null || winner.warmupMin == null || winner.warmupMin === '') && loser && loser.warmupMin != null && loser.warmupMin !== '') {
       merged.warmupMin = loser.warmupMin;
     }
-    const squad = function (list) {
-      return Array.isArray(list) && list.some(function (id) { return id != null && id !== ''; });
-    };
     if (!squad(winner && winner.xi) && squad(loser && loser.xi)) merged.xi = loser.xi;
     if (!squad(winner && winner.bench) && squad(loser && loser.bench)) merged.bench = loser.bench;
   }
