@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z111',
+  APP_BUILD: 'z112',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -2393,6 +2393,29 @@ trainings() {
       '<div class="ym-list">' + (tracks || '<div class="es">В альбомі ще немає схем</div>') + '</div></div>';
   },
 
+  _schemeShelf(opts) {
+    const o = opts || {};
+    const list = (o.albums || []).filter(Boolean);
+    const key = String(o.key || 'all');
+    const ui = (Store.get() && Store.get().ui) || {};
+    const open = !!(ui.schemeShelves && ui.schemeShelves[key]);
+    const shown = open ? list : list.slice(0, 6);
+    const hidden = list.length - shown.length;
+    const toggle = hidden > 0
+      ? '<button type="button" class="btn btn-s btn-sm" data-action="toggle-scheme-shelf" data-shelf="' + sanitize(key) + '">Ще ' + hidden + '</button>'
+      : (open && list.length > 6
+        ? '<button type="button" class="btn btn-s btn-sm" data-action="toggle-scheme-shelf" data-shelf="' + sanitize(key) + '">Згорнути</button>'
+        : '');
+    const tools = (o.tools || '') + toggle;
+    const tiles = shown.map(a => this._albumTile(a)).join('');
+    const row = (o.lead || '') + tiles + (o.tail || '');
+    return '<section class="ym-section">' +
+      '<div class="ym-shelf-head"><div class="ym-shelf-h">' + sanitize(o.title || 'Альбоми') + '</div>' +
+        (tools ? '<span class="ym-sec-tools">' + tools + '</span>' : '') +
+      '</div>' +
+      '<div class="ym-row">' + (row || '<div class="es">' + (o.empty || 'Поки порожньо') + '</div>') + '</div></section>';
+  },
+
   tactics() {
     const s = Store.get();
     const canEdit = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
@@ -2424,20 +2447,24 @@ trainings() {
     const newAlbum = canEdit
       ? '<button type="button" class="ym-tile ym-tile-new" data-action="new-scheme-album"><span class="ym-tile-art">+</span><span class="ym-tile-name">Новий альбом</span></button>'
       : '';
+    const newest = (a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''));
     const sectionHtml = sections.map(sec => {
-      const tiles = ((sec && sec.albumIds) || []).map(id => byId[String(id)]).filter(Boolean).map(a => this._albumTile(a)).join('');
+      const own = ((sec && sec.albumIds) || []).map(id => byId[String(id)]).filter(Boolean).sort(newest);
       const tools = canEdit
-        ? '<span class="ym-sec-tools">' +
-            '<button type="button" class="btn btn-s btn-sm" data-action="rename-scheme-section" data-section-id="' + sanitize(sec.id || '') + '">Назва</button>' +
-            '<button type="button" class="btn btn-s btn-sm" data-action="delete-scheme-section" data-section-id="' + sanitize(sec.id || '') + '">Видалити</button>' +
-          '</span>'
+        ? '<button type="button" class="btn btn-s btn-sm" data-action="rename-scheme-section" data-section-id="' + sanitize(sec.id || '') + '">Назва</button>' +
+            '<button type="button" class="btn btn-s btn-sm" data-action="delete-scheme-section" data-section-id="' + sanitize(sec.id || '') + '">Видалити</button>'
         : '';
-      return '<section class="ym-section">' +
-        '<div class="ym-shelf-head"><div class="ym-shelf-h">' + sanitize((sec && sec.name) || 'Розділ') + '</div>' + tools + '</div>' +
-        '<div class="ym-row">' + tiles +
-          (canEdit ? '<button type="button" class="ym-tile ym-tile-new" data-action="new-album-in-section" data-section-id="' + sanitize(sec.id || '') + '"><span class="ym-tile-art">+</span><span class="ym-tile-name">Альбом сюди</span></button>' : '') +
-          (!tiles && !canEdit ? '<div class="es">У розділі ще немає альбомів</div>' : '') +
-        '</div></section>';
+      const add = canEdit
+        ? '<button type="button" class="ym-tile ym-tile-new" data-action="new-album-in-section" data-section-id="' + sanitize(sec.id || '') + '"><span class="ym-tile-art">+</span><span class="ym-tile-name">Альбом сюди</span></button>'
+        : '';
+      return this._schemeShelf({
+        key: String(sec.id || ''),
+        title: (sec && sec.name) || 'Розділ',
+        albums: own,
+        tools: tools,
+        tail: add,
+        empty: canEdit ? '' : 'У розділі ще немає альбомів'
+      });
     }).join('');
     const rec = this._recommendedAlbums(s);
     const recTiles = rec.albums.map(a => this._albumTile(a)).join('');
@@ -2450,15 +2477,23 @@ trainings() {
           ? '<span><button type="button" class="btn btn-s btn-sm" data-action="new-scheme-section">+ Розділ</button> <button type="button" class="btn btn-s btn-sm" data-action="new-scheme-album">+ Альбом</button> <button type="button" class="btn btn-p btn-sm" data-action="new-board">+ Схема</button></span>'
           : '') +
       '</div>' +
-      '<p class="note-sm">Перша плашка — архів усіх схем. У «Всі альбоми» кожен створений альбом, навіть якщо він уже лежить у розділі.</p>' +
-      '<div class="ym-shelf-h">Всі альбоми</div>' +
-      '<div class="ym-row">' + this._archiveTile(boards.length) + albums.map(a => a ? this._albumTile(a) : '').join('') + newAlbum + '</div>' +
+      '<p class="note-sm">Гортай розділ вліво і вправо. У рядку шість останніх альбомів. Решту відкриває «Ще».</p>' +
+      this._schemeShelf({
+        key: 'all',
+        title: 'Всі альбоми',
+        albums: albums,
+        lead: this._archiveTile(boards.length),
+        tail: newAlbum
+      }) +
       sectionHtml +
-      '<section class="ym-section">' +
-        '<div class="ym-shelf-h">Рекомендовані альбоми</div>' +
-        '<p class="note-sm">' + recNote + '</p>' +
-        '<div class="ym-row">' + (recTiles || '<div class="es">Поки порожньо</div>') + '</div>' +
-      '</section></div>';
+      '<p class="note-sm">' + recNote + '</p>' +
+      this._schemeShelf({
+        key: 'rec',
+        title: 'Рекомендовані альбоми',
+        albums: rec.albums,
+        empty: 'Поки порожньо'
+      }) +
+      '</div>';
   },
 
   _trainingCancelled(tr) {

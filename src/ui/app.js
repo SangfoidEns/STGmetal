@@ -3139,6 +3139,16 @@ const App = {
         e.preventDefault(); e.stopPropagation();
         return Actions.setAlbumSection(t.dataset.albumId, t.dataset.sectionId);
       }
+      if (action === 'toggle-scheme-shelf') {
+        e.preventDefault(); e.stopPropagation();
+        const s = Store.get();
+        s.ui = s.ui || {};
+        s.ui.schemeShelves = s.ui.schemeShelves || {};
+        const key = String(t.dataset.shelf || '');
+        if (key) s.ui.schemeShelves[key] = !s.ui.schemeShelves[key];
+        try { this.renderCurrent(); } catch (_) {}
+        return;
+      }
       if (action === 'open-scheme-archive') {
         e.preventDefault(); e.stopPropagation();
         const s = Store.get();

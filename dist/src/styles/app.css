@@ -12887,7 +12887,7 @@ body.board-only-mode #mobileNav.glass-nav {
   pointer-events: auto !important;
 }
 
-.ym { display: flex; flex-direction: column; gap: 12px; }
+.ym { display: flex; flex-direction: column; gap: 12px; min-width: 0; max-width: 100%; }
 .ym-head, .ym-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .ym h1, .ym h2 { margin: 0; font-size: 28px; letter-spacing: -0.04em; }
 .ym-kicker { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #9aa4b2; font-weight: 800; }
@@ -12899,8 +12899,11 @@ body.board-only-mode #mobileNav.glass-nav {
 .ym-shelf-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; }
 .ym-shelf-head .ym-shelf-h { margin: 0; }
 .ym-sec-tools { display: flex; gap: 6px; flex: none; }
-.ym-section { margin-top: 8px; }
-.ym-row { display: flex; flex-wrap: wrap; gap: 12px; width: 100%; max-width: 100%; padding-bottom: 6px; }
+.ym-section { margin-top: 8px; min-width: 0; max-width: 100%; }
+.ym-row {
+  display: flex; flex-wrap: nowrap; gap: 12px; width: 100%; max-width: 100%; min-width: 0;
+  overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+}
 .ym-tile {
   flex: 0 0 132px; scroll-snap-align: start; border: 0; background: transparent; color: inherit;
   text-align: left; padding: 0; cursor: pointer;

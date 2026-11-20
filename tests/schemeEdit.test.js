@@ -141,4 +141,29 @@ describe('scheme cards', () => {
     assert.equal(album.includes('Закрита пресинг'), false);
     assert.match(album, />1 схем</);
   });
+
+  it('shows six latest albums in a sideways row and the rest after the section opens', () => {
+    const ctx = boot(true);
+    const store = ctx.Store.get();
+    store.schemeAlbums = [1, 2, 3, 4, 5, 6, 7].map(n => ({
+      id: 'a' + n,
+      name: 'Альбом ' + n,
+      boardIds: [],
+      createdAt: '2026-11-' + String(10 + n).padStart(2, '0') + 'T10:00:00.000Z'
+    }));
+    store.schemeSections = [{ id: 'sec', name: 'Турнір', albumIds: ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7'] }];
+    const html = ctx.Views.tactics();
+    const all = html.slice(html.indexOf('Всі альбоми'), html.indexOf('Турнір'));
+    assert.match(all, /data-album-id="a7"/);
+    assert.equal(all.includes('data-album-id="a1"'), false);
+    assert.match(all, /data-shelf="all"/);
+    assert.match(all, /Ще 1/);
+    const section = html.slice(html.indexOf('Турнір'), html.indexOf('Рекомендовані'));
+    assert.equal(section.includes('data-album-id="a1"'), false);
+    assert.match(section, /data-shelf="sec"/);
+    store.ui.schemeShelves = { all: true, sec: true };
+    const open = ctx.Views.tactics();
+    assert.match(open, /data-album-id="a1"/);
+    assert.match(open, /Згорнути/);
+  });
 });
