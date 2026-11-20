@@ -7,7 +7,8 @@
 -- After this script, set the two secrets in the editor (do not commit them):
 --   update private.club_gate
 --   set bot_token = '<telegram bot token>',
---       club_write_key = '<long random secret, same value as in the Windows app>'
+--       club_write_key = '<long random secret, same value as in the Windows app>',
+--       coach_telegram_id = '<numeric Telegram user id of the coach>'
 --   where id = 'default';
 
 create extension if not exists pgcrypto with schema extensions;
@@ -24,8 +25,11 @@ create table if not exists public.club_state (
 create table if not exists private.club_gate (
   id text primary key,
   bot_token text not null default '',
-  club_write_key text not null default ''
+  club_write_key text not null default '',
+  coach_telegram_id text not null default ''
 );
+
+alter table private.club_gate add column if not exists coach_telegram_id text not null default '';
 
 insert into private.club_gate (id, bot_token, club_write_key)
 values ('default', '', '')
@@ -175,18 +179,15 @@ language plpgsql
 stable
 as $$
 declare
-  nick text;
+  coach_id text;
   player jsonb;
 begin
   if actor is null or actor->>'id' is null then
     return 'deny';
   end if;
-  nick := private.norm_nick(actor->>'username');
-  if nick = 'serdiuk_artem' then
+  select coach_telegram_id into coach_id from private.club_gate where id = 'default';
+  if coach_id is not null and coach_id <> '' and actor->>'id' = coach_id then
     return 'full';
-  end if;
-  if nick = 'artem_serdyuk' then
-    return 'chat';
   end if;
   if payload is null or jsonb_typeof(payload->'players') <> 'array' then
     return 'deny';
@@ -195,7 +196,7 @@ begin
     if player->>'telegramId' is not null and player->>'telegramId' = actor->>'id' then
       return 'chat';
     end if;
-    if nick <> '' and private.norm_nick(player->>'telegramUsername') = nick then
+    if player->>'linkedTelegramId' is not null and player->>'linkedTelegramId' = actor->>'id' then
       return 'chat';
     end if;
   end loop;
@@ -203,25 +204,57 @@ begin
 end;
 $$;
 
-create or replace function private.merge_chat(current jsonb, incoming jsonb)
+create or replace function private.merge_chat(current jsonb, incoming jsonb, actor jsonb default null)
 returns jsonb
-language sql
+language plpgsql
 stable
 as $$
-  select coalesce(jsonb_agg(elem order by elem->>'createdAt'), '[]'::jsonb)
-  from (
-    select elem
+declare
+  item jsonb;
+  acc jsonb := '{}'::jsonb;
+  id text;
+  existing jsonb;
+  actor_id text;
+begin
+  actor_id := nullif(actor->>'id', '');
+  for item in select value from jsonb_array_elements(coalesce(current, '[]'::jsonb)) loop
+    id := left(coalesce(item->>'id', ''), 80);
+    if id = '' or length(btrim(coalesce(item->>'text', ''))) = 0 then continue; end if;
+    acc := acc || jsonb_build_object(id, item);
+  end loop;
+  for item in select value from jsonb_array_elements(coalesce(incoming, '[]'::jsonb)) loop
+    id := left(coalesce(item->>'id', ''), 80);
+    if id = '' or length(btrim(coalesce(item->>'text', ''))) = 0 then continue; end if;
+    if actor_id is null then
+      acc := acc || jsonb_build_object(id, item);
+    else
+      existing := acc->id;
+      if existing is not null and coalesce(existing->>'telegramId', existing->>'playerId', '') is distinct from actor_id then
+        continue;
+      end if;
+      acc := acc || jsonb_build_object(id, jsonb_build_object(
+        'id', id,
+        'text', left(btrim(item->>'text'), 500),
+        'authorName', left(coalesce(actor->>'first_name', actor->>'username', 'Гравець'), 80),
+        'authorRole', 'player',
+        'playerId', actor_id,
+        'telegramId', actor_id,
+        'createdAt', coalesce(item->>'createdAt', '')
+      ));
+    end if;
+  end loop;
+  return (
+    select coalesce(jsonb_agg(value order by value->>'createdAt'), '[]'::jsonb)
     from (
-      select distinct on (elem->>'id') elem
-      from jsonb_array_elements(coalesce(current, '[]'::jsonb) || coalesce(incoming, '[]'::jsonb)) elem
-      where coalesce(elem->>'id', '') <> ''
-        and length(btrim(coalesce(elem->>'text', ''))) > 0
-      order by elem->>'id', elem->>'createdAt' desc
-    ) deduped
-    order by elem->>'createdAt' desc
-    limit 300
-  ) newest;
+      select value from jsonb_each(acc)
+      order by value->>'createdAt' desc
+      limit 300
+    ) newest
+  );
+end;
 $$;
+
+drop function if exists private.merge_chat(jsonb, jsonb);
 
 create or replace function public.club_pull(init_data text default null, club_key text default null)
 returns jsonb
@@ -305,7 +338,7 @@ begin
     next_payload := jsonb_set(
       row.payload,
       '{chat}',
-      private.merge_chat(row.payload->'chat', payload->'chat'),
+      private.merge_chat(row.payload->'chat', payload->'chat', actor),
       true
     );
     stamp := now();
@@ -333,7 +366,7 @@ revoke all on function private.club_key_ok(text) from public, anon, authenticate
 revoke all on function private.tg_user(text) from public, anon, authenticated;
 revoke all on function private.norm_nick(text) from public, anon, authenticated;
 revoke all on function private.club_role(jsonb, jsonb) from public, anon, authenticated;
-revoke all on function private.merge_chat(jsonb, jsonb) from public, anon, authenticated;
+revoke all on function private.merge_chat(jsonb, jsonb, jsonb) from public, anon, authenticated;
 
 revoke all on function public.club_pull(text, text) from public;
 revoke all on function public.club_push(jsonb, timestamptz, text, text, text) from public;
