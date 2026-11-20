@@ -166,4 +166,34 @@ describe('scheme cards', () => {
     assert.match(open, /data-album-id="a1"/);
     assert.match(open, /Згорнути/);
   });
+
+  it('hides a coach-only album from a player', () => {
+    const ctx = boot(false);
+    const store = ctx.Store.get();
+    store.schemeAlbums = [
+      { id: 'open', name: 'Відкритий', boardIds: [], createdAt: '2026-11-14T10:00:00.000Z' },
+      { id: 'shut', name: 'Закритий альбом', coachOnly: true, boardIds: [], createdAt: '2026-11-14T11:00:00.000Z' }
+    ];
+    const html = ctx.Views.tactics();
+    assert.match(html, /Відкритий/);
+    assert.equal(html.includes('Закритий альбом'), false);
+    store.ui.schemeAlbumId = 'shut';
+    assert.equal(ctx.Views.tactics().includes('Закритий альбом'), false);
+  });
+
+  it('puts the club feed on the calendar and the public chat on the team', () => {
+    const ctx = boot(true);
+    const store = ctx.Store.get();
+    store.feed = [{ id: 'n1', kind: 'gift', title: 'Кубок', text: 'Єгору', createdAt: '2026-11-20T10:00:00.000Z' }];
+    store.chat = [{ id: 'c1', text: 'Збір о 18:00', authorName: 'Тренер', authorRole: 'coach', createdAt: '2026-11-20T10:00:00.000Z' }];
+    const cal = ctx.Views.calendar();
+    assert.match(cal, /Стрічка клубу/);
+    assert.match(cal, /Кубок/);
+    assert.equal(cal.includes('teamChatInput'), false);
+    const chat = ctx.Views._teamChat();
+    assert.match(chat, /Чат команди/);
+    assert.match(chat, /Збір о 18:00/);
+    assert.match(chat, /teamChatInput/);
+    assert.equal(chat.includes('Стрічка клубу'), false);
+  });
 });

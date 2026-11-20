@@ -1900,7 +1900,7 @@ const App = {
       if (view === 'players') {
         const log = document.getElementById('teamChatLog');
         const inp = document.getElementById('teamChatInput');
-        if (log) log.scrollTop = 0;
+        if (log) log.scrollTop = (chatKeep && chatKeep.atEnd === false) ? (chatKeep.scroll || 0) : log.scrollHeight;
         if (inp && chatKeep && chatKeep.value) inp.value = chatKeep.value;
         if (inp && chatKeep && chatKeep.focused) {
           try { inp.focus({ preventScroll: true }); } catch (_) { try { inp.focus(); } catch (__) {} }
@@ -3079,8 +3079,18 @@ const App = {
         e.preventDefault(); e.stopPropagation();
         return Actions.newSchemeAlbum(t.dataset.sectionId);
       }
+      if (action === 'toggle-album-coach') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.toggleSchemeAlbumAudience(t.dataset.albumId);
+      }
       if (action === 'open-scheme-album') {
         e.preventDefault(); e.stopPropagation();
+        const album = ((Store.get().schemeAlbums) || []).find(a => a && String(a.id) === String(t.dataset.albumId));
+        const coachView = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+        if (album && album.coachOnly && !coachView) {
+          try { Toast.show('Цей альбом бачить лише тренер', 'warn'); } catch (_) {}
+          return;
+        }
         try { Actions.noteSchemeOpen({ albumId: t.dataset.albumId }); } catch (_) {}
         const s = Store.get();
         s.ui = s.ui || {};

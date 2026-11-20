@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z113',
+  APP_BUILD: 'z114',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -1828,7 +1828,7 @@ trainings() {
       '</div></div></div>';
   },
 
-  _teamChat() {
+  _clubFeed() {
     try { if (typeof ClubFeed !== 'undefined' && ClubFeed.sync) ClubFeed.sync(); } catch (_) {}
     const s = Store.get();
     const list = (s.feed || []).slice().sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))).slice(0, 40);
@@ -1862,12 +1862,59 @@ trainings() {
         '<span class="club-feed-text">' + sanitize(item.text || '') + '</span>' +
         '</div>';
     }).join('');
-    return '<section class="team-chat club-feed" id="teamChat">' +
+    return '<section class="team-chat club-feed" id="clubFeed">' +
       '<div class="ct">Стрічка клубу</div>' +
       '<p class="note-sm">Подарунки, серії 3 · 5 · 8 · 12, дні народження, статус біля імені, нове фото і рейтинг.</p>' +
-      '<div class="team-chat-log" id="teamChatLog">' +
+      '<div class="team-chat-log" id="clubFeedLog">' +
       (rows || '<div class="team-chat-empty">Поки тихо. Щойно хтось отримає подарунок, змінить статус чи збереже серію — це з’явиться тут.</div>') +
       '</div></section>';
+  },
+
+  _teamChat() {
+    const s = Store.get() || {};
+    let mineRole = '';
+    let mineId = '';
+    let guest = false;
+    try {
+      if (typeof AuthManager !== 'undefined' && AuthManager.isGuest && AuthManager.isGuest()) guest = true;
+      if (typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach()) mineRole = 'coach';
+      else if (typeof AuthManager !== 'undefined' && AuthManager.isPlayer && AuthManager.isPlayer()) {
+        mineRole = 'player';
+        const me = AuthManager.getLinkedPlayer && AuthManager.getLinkedPlayer();
+        if (me && me.id != null) mineId = String(me.id);
+      }
+    } catch (_) {}
+    const msgs = ((s.chat) || []).slice(-80);
+    const rows = msgs.map(m => {
+      if (!m) return '';
+      let time = '';
+      try {
+        const d = new Date(m.createdAt);
+        if (!isNaN(d.getTime())) {
+          time = new Intl.DateTimeFormat('uk-UA', {
+            timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit'
+          }).format(d);
+        }
+      } catch (_) {}
+      const role = m.authorRole === 'coach' ? 'тренер' : (m.authorRole === 'player' ? 'гравець' : '');
+      const mine = (mineRole === 'coach' && m.authorRole === 'coach') || (mineId && String(m.playerId || '') === mineId);
+      return '<div class="team-chat-msg' + (mine ? ' mine' : '') + '">' +
+        '<div class="team-chat-meta"><b>' + sanitize(m.authorName || 'Учасник') + '</b>' +
+        (role ? ('<span>' + role + '</span>') : '') +
+        (time ? ('<span>' + sanitize(time) + '</span>') : '') +
+        '</div><div class="team-chat-text">' + sanitize(m.text || '') + '</div></div>';
+    }).join('');
+    const form = guest
+      ? '<p class="note-sm">Писати можуть гравці і тренер.</p>'
+      : '<form class="team-chat-form" id="teamChatForm" action="#" onsubmit="return false">' +
+          '<input id="teamChatInput" type="text" maxlength="500" placeholder="Повідомлення команді" autocomplete="off">' +
+          '<button type="button" class="btn btn-p btn-sm" data-action="team-chat-send">Надіслати</button></form>';
+    return '<section class="team-chat" id="teamChat">' +
+      '<div class="ct">Чат команди</div>' +
+      '<p class="note-sm">Його бачать усі: тренер, гравці і гості.</p>' +
+      '<div class="team-chat-log" id="teamChatLog">' +
+      (rows || '<div class="team-chat-empty">Поки тихо. Напиши першим.</div>') +
+      '</div>' + form + '</section>';
   },
 
   coachPlayerDetail(playerId) {
@@ -2036,7 +2083,7 @@ trainings() {
       }).join('');
       return '<div class="st">Склад Металіст Штуттгарт</div>' +
         '<p class="note-sm">Тап по картці — акаунт. З акаунта відкривається картка гравця.</p>' +
-        '<div class="pl-cards">' + (cards || '<div class="es">Немає гравців</div>') + '</div>';
+        '<div class="pl-cards">' + (cards || '<div class="es">Немає гравців</div>') + '</div>' + this._teamChat();
     }
 
     if (!isCoach) {
@@ -2286,7 +2333,8 @@ trainings() {
     const ids = (album && album.boardIds) || [];
     const coach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
     const count = ids.filter(id => (s.boards || []).some(b => b && String(b.id) === String(id) && (coach || !b.coachOnly))).length;
-    const name = sanitize((album && album.name) || 'Альбом');
+    const hidden = !!(album && album.coachOnly);
+    const name = sanitize((album && album.name) || 'Альбом') + (hidden && coach ? ' · лише тренер' : '');
     const letter = name.replace(/[^A-Za-zА-Яа-яІіЇїЄєҐґ0-9]/g, '').slice(0, 1).toUpperCase() || 'А';
     const cover = this._albumCover(album);
     const art = cover
@@ -2374,6 +2422,7 @@ trainings() {
           '<button type="button" class="btn btn-s btn-sm" data-action="rename-scheme-album" data-album-id="' + sanitize(album.id) + '">Назва</button>' +
           '<button type="button" class="btn btn-p btn-sm" data-action="album-pick-board" data-album-id="' + sanitize(album.id) + '">+ Схема</button>' +
           '<button type="button" class="btn btn-s btn-sm" data-action="move-album-section" data-album-id="' + sanitize(album.id) + '">У розділ</button>' +
+          '<button type="button" class="btn btn-s btn-sm" data-action="toggle-album-coach" data-album-id="' + sanitize(album.id) + '">' + (album.coachOnly ? 'Показати гравцям' : 'Сховати від гравців') + '</button>' +
           '<button type="button" class="btn btn-s btn-sm" data-action="delete-scheme-album" data-album-id="' + sanitize(album.id) + '">Видалити альбом</button>' +
         '</div>'
       : '';
@@ -2385,7 +2434,7 @@ trainings() {
       '<button type="button" class="btn btn-s btn-sm" data-action="schemes-home">‹ Усі альбоми</button>' +
       '<div class="ym-hero" style="--ym:' + this._albumHue(album) + '">' +
         heroArt +
-        '<div><div class="ym-kicker">Альбом схем</div><h1>' + sanitize(album.name || 'Альбом') + '</h1>' +
+        '<div><div class="ym-kicker">Альбом схем' + (album.coachOnly ? ' · лише тренер' : '') + '</div><h1>' + sanitize(album.name || 'Альбом') + '</h1>' +
         '<p>' + visible.length + ' схем</p></div></div>' +
       tools +
       '<p class="note-sm">' + (attached.length ? ('Прикріплено: ' + sanitize(attached.join(' · '))) : 'Ще не прикріплено. Альбом можна додати до тренування, матчу або гравця.') +
@@ -2424,7 +2473,7 @@ trainings() {
     );
     const openId = s.ui && s.ui.schemeAlbumId;
     const open = albums.find(a => a && String(a.id) === String(openId));
-    if (open) return this._schemeAlbumPage(open, canEdit);
+    if (open && (canEdit || !open.coachOnly)) return this._schemeAlbumPage(open, canEdit);
     const boards = (s.boards || []).filter(b => canEdit || !(b && b.coachOnly)).slice().sort((a, b) =>
       String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))
     );
@@ -2449,7 +2498,7 @@ trainings() {
       : '';
     const newest = (a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''));
     const sectionHtml = sections.map(sec => {
-      const own = ((sec && sec.albumIds) || []).map(id => byId[String(id)]).filter(Boolean).sort(newest);
+      const own = ((sec && sec.albumIds) || []).map(id => byId[String(id)]).filter(a => a && (canEdit || !a.coachOnly)).sort(newest);
       const tools = canEdit
         ? '<button type="button" class="btn btn-s btn-sm" data-action="rename-scheme-section" data-section-id="' + sanitize(sec.id || '') + '">Назва</button>' +
             '<button type="button" class="btn btn-s btn-sm" data-action="delete-scheme-section" data-section-id="' + sanitize(sec.id || '') + '">Видалити</button>'
@@ -2467,7 +2516,8 @@ trainings() {
       });
     }).join('');
     const rec = this._recommendedAlbums(s);
-    const recTiles = rec.albums.map(a => this._albumTile(a)).join('');
+    const recShown = canEdit ? rec.albums : rec.albums.filter(a => a && !a.coachOnly);
+    const recTiles = recShown.map(a => this._albumTile(a)).join('');
     const recNote = rec.personal
       ? (recTiles ? 'Підібрано з того, що відкриваєш саме ти. В іншого гравця список інший.' : 'Ти вже відкрив альбоми поруч. Новий з’явиться тут, щойно відкриєш щось інше.')
       : 'Відкрий альбом або схему. Тут з’являться альбоми саме для тебе.';
@@ -2481,7 +2531,7 @@ trainings() {
       this._schemeShelf({
         key: 'all',
         title: 'Всі альбоми',
-        albums: albums,
+        albums: canEdit ? albums : albums.filter(a => a && !a.coachOnly),
         lead: this._archiveTile(boards.length),
         tail: newAlbum
       }) +
@@ -2490,7 +2540,7 @@ trainings() {
       this._schemeShelf({
         key: 'rec',
         title: 'Рекомендовані альбоми',
-        albums: rec.albums,
+        albums: recShown,
         empty: 'Поки порожньо'
       }) +
       '</div>';
@@ -2699,7 +2749,8 @@ trainings() {
       '<span class="cdn" title="Неділя">Нд</span></div>' +
       '<div class="cal-grid cg">' + cells + '</div></div>' +
       dayDetail +
-      '<p class="note-sm">Золота клітинка — матч. ● заплановане · ✓ проведено · ✕ скасовано · 🎂 день народження</p>';
+      '<p class="note-sm">Золота клітинка — матч. ● заплановане · ✓ проведено · ✕ скасовано · 🎂 день народження</p>' +
+      this._clubFeed();
   },
 
   matches() {

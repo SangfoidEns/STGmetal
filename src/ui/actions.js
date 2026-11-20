@@ -205,6 +205,20 @@ const Actions = {
     });
   },
 
+  toggleSchemeAlbumAudience(id) {
+    if (!this._schemeCoach()) {
+      try { Toast.show('Сховати альбом може лише тренер', 'warn'); } catch (_) {}
+      return;
+    }
+    const album = this._albumById(id);
+    if (!album) return;
+    album.coachOnly = !album.coachOnly;
+    album.updatedAt = new Date().toISOString();
+    StorageManager.save();
+    try { Toast.show(album.coachOnly ? 'Альбом бачить лише тренер' : 'Альбом знову видно гравцям і гостям', 'ok'); } catch (_) {}
+    try { App.renderCurrent(); } catch (_) {}
+  },
+
   toggleSchemeAudience(id) {
     if (!this._schemeCoach()) {
       try { Toast.show('Сховати схему може лише тренер', 'warn'); } catch (_) {}
