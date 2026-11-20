@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z106',
+  APP_BUILD: 'z107',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -1481,6 +1481,7 @@ const Views = {
         '<img class="club-crest" src="' + this.clubMark() + '" alt="Емблема Металіст Штуттгарт"/></button>' +
         '<div class="club-hero-copy"><div class="club-kicker">Одна команда</div><h1>Металіст Штуттгарт</h1>' +
         '<p>Гість бачить активність, ріст акаунтів і медіа клубу. Тап по емблемі відкриває її на весь екран — її можна зберегти.</p>' +
+        '<button type="button" class="btn btn-s btn-sm" data-action="enter-server-code">Код клубу</button>' +
         '<button type="button" class="btn btn-s btn-sm" data-io="import" data-action="import-trigger">Імпорт JSON</button></div></div>' +
       '<div class="club-kpis">' +
         '<div><b>' + players.length + '</b><span>гравців</span></div>' +
@@ -3663,8 +3664,8 @@ trainings() {
         <div class="ct">Дані клубу</div>
         <p class="note-sm">Клуб сам сходиться через сервер. JSON лишається запасом, якщо телефонам ще немає ключа.</p>
         <p class="note-sm">Анкета гравця приносить його вибір подарунка біля імені і подарунки, яких ще немає у тренера. Явку лишає тренер.</p>
-        <label class="fl"><span class="fl-label">Публічний ключ сервера (anon)</span>
-          <input id="setSbKey" class="fl-input" spellcheck="false" autocomplete="off" placeholder="eyJ…" value="${sanitize((typeof SupabaseClub !== 'undefined' && SupabaseClub._key) ? SupabaseClub._key() : '')}">
+        <label class="fl"><span class="fl-label">Код клубу (anon public)</span>
+          <input id="setSbKey" class="fl-input" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" placeholder="eyJ… або sb_publishable…" value="${sanitize((typeof SupabaseClub !== 'undefined' && SupabaseClub._key) ? SupabaseClub._key() : '')}">
         </label>
         <button type="button" class="btn btn-p btn-sm" data-action="save-supabase-key">Підключити сервер</button>
         <p class="note-sm" id="clubSyncLine">${sanitize((typeof StorageManager !== 'undefined' && StorageManager._clubSyncText) || 'Клубний обмін: підключення…')}</p>

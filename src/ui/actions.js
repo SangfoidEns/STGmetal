@@ -2185,15 +2185,34 @@ const Actions = {
     App.renderCurrent();
   },
 
+  saveServerCode(raw) {
+    if (typeof SupabaseClub === 'undefined' || !SupabaseClub.rememberKey) {
+      try { Toast.show('Сервер ще не підключений у цій версії', 'warn'); } catch (_) {}
+      return Promise.resolve(false);
+    }
+    const key = SupabaseClub.rememberKey(raw);
+    if (!key) {
+      const line = (typeof StorageManager !== 'undefined' && StorageManager._clubSyncText) || 'Встав код клубу. Це anon public, не адреса сайту.';
+      try { Toast.show(line, 'warn'); } catch (_) {}
+      return Promise.resolve(false);
+    }
+    return SupabaseClub.start(StorageManager).then(function (ok) {
+      const line = (StorageManager && StorageManager._clubSyncText) || (ok ? 'Клуб підключено' : 'Немає зв’язку з сервером');
+      try { Toast.show(line, ok ? 'ok' : 'warn'); } catch (_) {}
+      return ok;
+    }).catch(function () {
+      try { Toast.show('Немає зв’язку з сервером. Перевір інтернет.', 'warn'); } catch (_) {}
+      return false;
+    });
+  },
+
   saveSupabaseKey() {
     const el = document.getElementById('setSbKey');
-    if (!el || typeof SupabaseClub === 'undefined' || !SupabaseClub.rememberKey) {
+    if (!el) {
       try { Toast.show('Сервер ще не підключений у цій версії', 'warn'); } catch (_) {}
       return;
     }
-    const key = SupabaseClub.rememberKey(el.value.trim());
-    if (key) SupabaseClub.start(StorageManager).catch(() => {});
-    try { Toast.show(key ? 'Сервер підключено. Клуб сам піде на Supabase.' : 'Ключ прибрано', key ? 'ok' : 'warn'); } catch (_) {}
+    return Actions.saveServerCode(el.value);
   },
 
   saveSettings() {

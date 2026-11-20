@@ -60,6 +60,113 @@ const App = {
     } catch (_) {}
     try { Toast.show('МЕТАЛІСТ ШТУТТГАРТ — тренерська платформа', 'ok'); } catch (_) {}
     try { this.initSwipeNav(); } catch (_) {}
+    setTimeout(() => { try { this._offerClubCode(); } catch (_) {} }, 900);
+  },
+
+  askClubCode() {
+    const body = '<div class="soc-edit-form">' +
+      '<p class="note-sm">Введи код клубу один раз. Тоді дані приходять самі, без файлу JSON. Це anon public із Supabase, не адреса сайту.</p>' +
+      '<label class="fld"><span>Код клубу</span><input id="guestServerCode" class="inp" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" placeholder="eyJ… або sb_publishable…"></label>' +
+      '</div>';
+    return Modal.open('Код клубу', body, [
+      { label: 'Пізніше', cls: 'btn-s', action: 'cancel' },
+      { label: 'Підключити', cls: 'btn-p', action: 'ok' }
+    ]).then((r) => {
+      if (!r || r.action !== 'ok') return false;
+      const key = (r.values && r.values.guestServerCode) || '';
+      if (typeof Actions !== 'undefined' && Actions.saveServerCode) return Actions.saveServerCode(key);
+      return false;
+    });
+  },
+
+  _offerClubCode() {
+    if (typeof SupabaseClub === 'undefined' || !SupabaseClub.URL) return;
+    if (SupabaseClub.enabled && SupabaseClub.enabled()) return;
+    let role = 'guest';
+    try {
+      if (typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach()) role = 'coach';
+      else if (typeof AuthManager !== 'undefined' && AuthManager.isPlayer && AuthManager.isPlayer()) role = 'player';
+    } catch (_) {}
+    if (role === 'coach') return;
+    try { if (localStorage.getItem('ms_sb_asked') === '1') return; } catch (_) {}
+    if (role === 'player') {
+      const me = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer) ? AuthManager.getLinkedPlayer() : null;
+      if (!me) return;
+      try { localStorage.setItem('ms_sb_asked', '1'); } catch (_) {}
+      this.openSelfProfile();
+      return;
+    }
+    try { localStorage.setItem('ms_sb_asked', '1'); } catch (_) {}
+    this.askClubCode();
+  },
+
+  openSelfProfile() {
+    try {
+      const me = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer) ? AuthManager.getLinkedPlayer() : null;
+      if (!me) { Toast.show('Акаунт не прив\'язано', 'warn'); return; }
+      const pr = me.profile || {};
+      const mineGifts = ((Store.get().gifts) || []).filter(g => g && String(g.playerId) === String(me.id) && String(g.ico || g.label || g.giftId || '').trim());
+      const giftPicks = mineGifts.length
+        ? mineGifts.map(function (g) {
+          const key = g.uid || g.id || '';
+          const label = (typeof CoachTools !== 'undefined' && CoachTools.giftLabel) ? CoachTools.giftLabel(g) : (g.label || '');
+          return '<label class="pp-gift-pick"><input type="radio" name="ppFeatured" value="' + sanitize(key) + '"' + (g.featured ? ' checked' : '') + '><span>' + sanitize(g.ico || '★') + ' ' + sanitize(label || 'Подарунок') + '</span></label>';
+        }).join('')
+        : '<p class="note-sm">Поки немає подарунків, які можна поставити біля імені.</p>';
+      const currentPhoto = me.profilePhoto || me.photoUrl || '';
+      const body = '<div class="soc-edit-form player-profile-form">' +
+        '<p class="note-sm">Профіль клубу. Позицію, номер і склад змінює лише тренер.</p>' +
+        '<label class="fld"><span>Ім\'я</span><input id="ppFirst" class="inp" value="' + sanitize(me.firstName || '') + '"/></label>' +
+        '<label class="fld"><span>Прізвище</span><input id="ppLast" class="inp" value="' + sanitize(me.lastName || '') + '"/></label>' +
+        '<label class="fld"><span>Дата народження</span><input id="ppBirth" class="inp" type="date" value="' + sanitize(me.birthDate || pr.birthDate || '') + '"/></label>' +
+        '<label class="fld"><span>Телефон (необов\'язково)</span><input id="ppPhone" class="inp" value="' + sanitize(pr.phone || me.phone || '') + '"/></label>' +
+        '<label class="fld"><span>Соцмережі (посилання)</span><input id="ppSocial" class="inp" placeholder="https://…" value="' + sanitize(pr.social || '') + '"/></label>' +
+        '<label class="fld"><span>Статус</span><input id="ppStatus" class="inp" maxlength="80" value="' + sanitize(pr.status || me.statusText || '') + '"/></label>' +
+        '<label class="fld"><span>Про себе</span><textarea id="ppBio" class="inp" rows="3" maxlength="400">' + sanitize(pr.bio || me.bio || '') + '</textarea></label>' +
+        '<label class="fld"><span>Фото</span><input id="ppPhotoFile" class="inp" type="file" accept="image/*"><input id="ppPhotoPicked" type="hidden" value="">' +
+        (currentPhoto ? '<img class="pp-photo-preview" alt="" src="' + sanitize(currentPhoto) + '">' : '<img class="pp-photo-preview" alt="" hidden>') +
+        '</label>' +
+        '<div class="fld"><span>Подарунок біля імені</span><div class="pp-gift-picks">' + giftPicks + '</div></div>' +
+        '<label class="fld"><span>Код клубу</span><input id="ppServerCode" class="inp" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" placeholder="anon public, eyJ… або sb_publishable…" value="' + sanitize((typeof SupabaseClub !== 'undefined' && SupabaseClub._key) ? SupabaseClub._key() : '') + '"/></label>' +
+        '<p class="note-sm">Той самий код, що в тренера. Тоді клуб приходить сам, без JSON.</p>' +
+        '<div class="fld pp-export"><span>Передача тренеру</span>' +
+        '<p class="note-sm">У файлі буде ця анкета. Явку відмічає тренер. Він відкриває файл через Імпорт JSON.</p>' +
+        '<button type="button" class="btn btn-p" data-action="export-for-coach">Експорт для тренера</button></div>' +
+        '</div>';
+      Modal.open('Мій профіль', body, [
+        { label: 'Скасувати', cls: 'btn-s', action: 'cancel' },
+        { label: 'Зберегти', cls: 'btn-p', action: 'ok' }
+      ]).then(function (r) {
+        if (!r || r.action !== 'ok') return;
+        const s = Store.get();
+        const p = (s.players || []).find(x => x.id === me.id);
+        if (!p) return;
+        App._writeSelfProfile(p, r.values || {});
+        try { StorageManager.save(); } catch (_) {}
+        Toast.show('Профіль збережено', 'ok');
+        try { App.renderCurrent && App.renderCurrent(); } catch (_) {}
+      });
+      setTimeout(function () {
+        const file = document.getElementById('ppPhotoFile');
+        if (!file || file.dataset.bound) return;
+        file.dataset.bound = '1';
+        file.addEventListener('change', function () {
+          const chosen = file.files && file.files[0];
+          if (!chosen) return;
+          const done = (url) => {
+            const hidden = document.getElementById('ppPhotoPicked');
+            const preview = document.querySelector('#modalBody .pp-photo-preview');
+            if (hidden) hidden.value = url || '';
+            if (preview && url) { preview.src = url; preview.hidden = false; }
+          };
+          if (typeof Actions !== 'undefined' && Actions._compressImageFile) {
+            Actions._compressImageFile(chosen, 512, 0.72).then(done);
+            return;
+          }
+          done('');
+        });
+      }, 40);
+    } catch (err) { console.warn(err); }
   },
 
   _refreshIdentity() {
@@ -765,6 +872,11 @@ const App = {
     p.statusText = p.profile.status;
     p.bio = p.profile.bio;
     p.phone = p.profile.phone;
+    const serverCode = field('ppServerCode');
+    if (serverCode != null && typeof Actions !== 'undefined' && Actions.saveServerCode) {
+      const current = (typeof SupabaseClub !== 'undefined' && SupabaseClub._key) ? SupabaseClub._key() : '';
+      if (String(serverCode).trim() !== String(current || '')) Actions.saveServerCode(serverCode);
+    }
     const photo = String(field('ppPhotoPicked') || '');
     if (photo.indexOf('data:image/') === 0 && photo.length <= 400000 && photo !== String(p.profilePhoto || p.photoUrl || '')) {
       p.profilePhoto = photo;
@@ -3482,6 +3594,7 @@ const App = {
         return;
       }
       if (action === 'save-settings') return Actions.saveSettings();
+      if (action === 'enter-server-code') return this.askClubCode();
       if (action === 'save-supabase-key') return Actions.saveSupabaseKey();
       if (action === 'staff-add') {
         e.preventDefault(); e.stopPropagation();
@@ -3591,71 +3704,7 @@ const App = {
       }
       if (action === 'edit-self-player') {
         e.preventDefault(); e.stopPropagation();
-        try {
-          const me = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer) ? AuthManager.getLinkedPlayer() : null;
-          if (!me) { Toast.show('Акаунт не прив\'язано', 'warn'); return; }
-          const pr = me.profile || {};
-          const mineGifts = ((Store.get().gifts) || []).filter(g => g && String(g.playerId) === String(me.id) && String(g.ico || g.label || g.giftId || '').trim());
-          const giftPicks = mineGifts.length
-            ? mineGifts.map(function (g) {
-              const key = g.uid || g.id || '';
-              const label = (typeof CoachTools !== 'undefined' && CoachTools.giftLabel) ? CoachTools.giftLabel(g) : (g.label || '');
-              return '<label class="pp-gift-pick"><input type="radio" name="ppFeatured" value="' + sanitize(key) + '"' + (g.featured ? ' checked' : '') + '><span>' + sanitize(g.ico || '★') + ' ' + sanitize(label || 'Подарунок') + '</span></label>';
-            }).join('')
-            : '<p class="note-sm">Поки немає подарунків, які можна поставити біля імені.</p>';
-          const currentPhoto = me.profilePhoto || me.photoUrl || '';
-          const body = '<div class="soc-edit-form player-profile-form">' +
-            '<p class="note-sm">Профіль клубу. Позицію, номер і склад змінює лише тренер.</p>' +
-            '<label class="fld"><span>Ім\'я</span><input id="ppFirst" class="inp" value="' + sanitize(me.firstName || '') + '"/></label>' +
-            '<label class="fld"><span>Прізвище</span><input id="ppLast" class="inp" value="' + sanitize(me.lastName || '') + '"/></label>' +
-            '<label class="fld"><span>Дата народження</span><input id="ppBirth" class="inp" type="date" value="' + sanitize(me.birthDate || pr.birthDate || '') + '"/></label>' +
-            '<label class="fld"><span>Телефон (необов\'язково)</span><input id="ppPhone" class="inp" value="' + sanitize(pr.phone || me.phone || '') + '"/></label>' +
-            '<label class="fld"><span>Соцмережі (посилання)</span><input id="ppSocial" class="inp" placeholder="https://…" value="' + sanitize(pr.social || '') + '"/></label>' +
-            '<label class="fld"><span>Статус</span><input id="ppStatus" class="inp" maxlength="80" value="' + sanitize(pr.status || me.statusText || '') + '"/></label>' +
-            '<label class="fld"><span>Про себе</span><textarea id="ppBio" class="inp" rows="3" maxlength="400">' + sanitize(pr.bio || me.bio || '') + '</textarea></label>' +
-            '<label class="fld"><span>Фото</span><input id="ppPhotoFile" class="inp" type="file" accept="image/*"><input id="ppPhotoPicked" type="hidden" value="">' +
-            (currentPhoto ? '<img class="pp-photo-preview" alt="" src="' + sanitize(currentPhoto) + '">' : '<img class="pp-photo-preview" alt="" hidden>') +
-            '</label>' +
-            '<div class="fld"><span>Подарунок біля імені</span><div class="pp-gift-picks">' + giftPicks + '</div></div>' +
-            '<div class="fld pp-export"><span>Передача тренеру</span>' +
-            '<p class="note-sm">У файлі буде ця анкета. Явку відмічає тренер. Він відкриває файл через Імпорт JSON.</p>' +
-            '<button type="button" class="btn btn-p" data-action="export-for-coach">Експорт для тренера</button></div>' +
-            '</div>';
-          Modal.open('Мій профіль', body, [
-            { label: 'Скасувати', cls: 'btn-s', action: 'cancel' },
-            { label: 'Зберегти', cls: 'btn-p', action: 'ok' }
-          ]).then(function (r) {
-            if (!r || r.action !== 'ok') return;
-            const s = Store.get();
-            const p = (s.players || []).find(x => x.id === me.id);
-            if (!p) return;
-            App._writeSelfProfile(p, r.values || {});
-            try { StorageManager.save(); } catch (_) {}
-            Toast.show('Профіль збережено', 'ok');
-            try { App.renderCurrent && App.renderCurrent(); } catch (_) {}
-          });
-          setTimeout(function () {
-            const file = document.getElementById('ppPhotoFile');
-            if (!file || file.dataset.bound) return;
-            file.dataset.bound = '1';
-            file.addEventListener('change', function () {
-              const chosen = file.files && file.files[0];
-              if (!chosen) return;
-              const done = (url) => {
-                const hidden = document.getElementById('ppPhotoPicked');
-                const preview = document.querySelector('#modalBody .pp-photo-preview');
-                if (hidden) hidden.value = url || '';
-                if (preview && url) { preview.src = url; preview.hidden = false; }
-              };
-              if (typeof Actions !== 'undefined' && Actions._compressImageFile) {
-                Actions._compressImageFile(chosen, 512, 0.72).then(done);
-                return;
-              }
-              done('');
-            });
-          }, 40);
-        } catch (err) { console.warn(err); }
-        return;
+        return this.openSelfProfile();
       }
       
       if (action === 'upload-club-logo' || action === 'upload-coach-photo') {

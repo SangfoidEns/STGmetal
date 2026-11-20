@@ -14,8 +14,24 @@ const SupabaseClub = {
     try { return String(localStorage.getItem('ms_sb_anon') || '').trim(); } catch (_) { return ''; }
   },
 
+  cleanKey(raw) {
+    const text = String(raw || '').trim();
+    const jwt = text.match(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
+    if (jwt) return jwt[0];
+    const pub = text.match(/sb_(?:publishable|secret)_[A-Za-z0-9_-]+/);
+    if (pub) return pub[0];
+    const one = text.replace(/^bearer\s+/i, '').replace(/^["']|["']$/g, '').trim();
+    if (/^https?:\/\//i.test(one)) return '';
+    return (one.split(/\s+/)[0] || '');
+  },
+
   rememberKey(key) {
-    const clean = String(key || '').trim();
+    const raw = String(key || '').trim();
+    if (/^https?:\/\//i.test(raw) && raw.indexOf('eyJ') < 0 && raw.indexOf('sb_') < 0) {
+      this._line('Це адреса сервера, а не код. Потрібен anon public.');
+      return '';
+    }
+    const clean = this.cleanKey(raw);
     this.KEY_RUNTIME = clean;
     try {
       if (clean) localStorage.setItem('ms_sb_anon', clean);
@@ -24,14 +40,26 @@ const SupabaseClub = {
     return clean;
   },
 
-  headers(extra) {
+  headers(extra, opts) {
     const key = this._key();
-    return Object.assign({
+    const base = {
       apikey: key,
       Authorization: 'Bearer ' + key,
-      'Content-Type': 'application/json',
       Accept: 'application/json'
-    }, extra || {});
+    };
+    if (!opts || opts.json !== false) base['Content-Type'] = 'application/json';
+    return Object.assign(base, extra || {});
+  },
+
+  _fail(remote) {
+    const status = remote && remote.status;
+    const code = String((remote && remote.code) || '');
+    const message = String((remote && remote.message) || '');
+    if (code === 'PGRST205' || (remote && remote.missing)) return 'Сервер відповідає. У Supabase ще немає таблиці клубу. Виконай SQL ще раз.';
+    if (code === '42501' || /permission denied/i.test(message)) return 'Ключ є, але таблиця не пускає. Виконай SQL клубу ще раз.';
+    if (status === 401 || status === 403 || /Invalid API key|JWT/i.test(message)) return 'Ключ не підходить. Потрібен anon public, не адреса сайту і не service_role.';
+    if (status) return 'Немає зв’язку з сервером (' + status + ').';
+    return 'Немає зв’язку з сервером. Перевір інтернет.';
   },
 
   _canWrite(sm) {
@@ -60,14 +88,24 @@ const SupabaseClub = {
     this._starting = true;
     this._ready = false;
     try {
-      await this.pull({ quiet: true });
+      const remote = await this.fetchRemote();
+      if (!remote || remote.error) {
+        this._line(this._fail(remote));
+        return false;
+      }
+      if (remote.missing) {
+        this._line(this._fail({ missing: true }));
+        return false;
+      }
       this._ready = true;
-      if (this._canWrite(sm)) await this.push();
+      await this.pull({ quiet: true, known: remote });
+      let sent = true;
+      if (this._canWrite(sm)) sent = await this.push();
       this._armPoll();
-      return true;
+      return sent !== false;
     } catch (err) {
       console.warn('[supabase]', err);
-      this._line('Немає зв’язку з сервером');
+      this._line(this._fail(null));
       return false;
     } finally {
       this._starting = false;
@@ -95,13 +133,19 @@ const SupabaseClub = {
 
   async fetchRemote() {
     const res = await fetch(this.URL + '/rest/v1/club_state?id=eq.metalist&select=id,updated_at,updated_by,rev,path,payload', {
-      headers: this.headers(),
+      headers: this.headers(null, { json: false }),
       cache: 'no-store'
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      const missing = res.status === 404 || err.code === 'PGRST205' || /club_state/.test(String(err.message || ''));
-      return missing ? { missing: true } : { error: true, status: res.status };
+      const missing = res.status === 404 || err.code === 'PGRST205';
+      return {
+        missing: missing,
+        error: !missing,
+        status: res.status,
+        code: err.code || '',
+        message: err.message || err.hint || ''
+      };
     }
     const rows = await res.json();
     if (!Array.isArray(rows) || !rows.length) return { empty: true, rev: 0 };
@@ -145,17 +189,20 @@ const SupabaseClub = {
 
   async pull(opts) {
     if (!this.enabled() || !this._sm) return false;
-    const remote = await this.fetchRemote();
+    const remote = (opts && opts.known) || await this.fetchRemote();
     if (!remote || remote.error) {
-      this._line('Немає зв’язку з сервером');
+      this._line(this._fail(remote));
       return false;
     }
     if (remote.missing) {
-      this._line('Сервер відповідає. У Supabase ще немає таблиці клубу.');
+      this._line(this._fail({ missing: true }));
       return false;
     }
     if (remote.empty || !remote.payload) {
-      this._line('Сервер порожній. Цей телефон викладе клуб, щойно є ключ і зміни тренера.');
+      const writer = this._canWrite(this._sm);
+      this._line(writer
+        ? 'Код прийнято. Сервер порожній — цей телефон зараз викладе клуб.'
+        : 'Код прийнято. Сервер ще порожній, клуб з’явиться після тренера.');
       this._rev = 0;
       return false;
     }
@@ -184,11 +231,11 @@ const SupabaseClub = {
       for (let attempt = 0; attempt < 3; attempt++) {
         const remote = await this.fetchRemote();
         if (!remote || remote.error) {
-          this._line('Немає зв’язку з сервером');
+          this._line(this._fail(remote));
           return false;
         }
         if (remote.missing) {
-          this._line('Сервер відповідає. У Supabase ще немає таблиці клубу.');
+          this._line(this._fail({ missing: true }));
           return false;
         }
         let local = this._sm.buildExportPayload();

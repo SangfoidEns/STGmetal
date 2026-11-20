@@ -10,6 +10,7 @@ create table if not exists public.club_state (
   payload jsonb
 );
 
+grant usage on schema public to anon, authenticated;
 grant select, insert, update on public.club_state to anon, authenticated;
 
 alter table public.club_state enable row level security;
@@ -39,3 +40,5 @@ create policy club_media_insert on storage.objects
   for insert to anon, authenticated with check (bucket_id = 'club-media');
 create policy club_media_update on storage.objects
   for update to anon, authenticated using (bucket_id = 'club-media') with check (bucket_id = 'club-media');
+
+notify pgrst, 'reload schema';

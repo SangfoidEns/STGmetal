@@ -54,6 +54,19 @@ describe('supabase club sync', () => {
     ctx.SupabaseClub.rememberKey('anon-public');
     assert.equal(ctx.SupabaseClub.enabled(), true);
     assert.equal(ctx.localStorage.getItem('ms_sb_anon'), 'anon-public');
+    assert.equal(ctx.SupabaseClub.cleanKey('код eyJaaa.bbb.ccc зайве'), 'eyJaaa.bbb.ccc');
+    assert.equal(ctx.SupabaseClub.rememberKey('https://zloluzqzswdwaimlqlqx.supabase.co'), '');
+  });
+
+  it('says the key is wrong when the server rejects it', async () => {
+    const ctx = boot();
+    const lines = [];
+    const sm = { _setClubSyncLine(text) { lines.push(text); }, _canSyncWrite() { return true; } };
+    ctx.SupabaseClub.rememberKey('eyJaaa.bbb.ccc');
+    ctx.fetch.next.push(jsonRes(401, { message: 'Invalid API key', code: '401' }));
+    const ok = await ctx.SupabaseClub.start(sm);
+    assert.equal(ok, false);
+    assert.match(lines.join('\n'), /Ключ не підходить/);
   });
 
   it('uploads a photo outside the phone and writes the club once', async () => {
