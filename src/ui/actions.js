@@ -1967,17 +1967,33 @@ const Actions = {
     });
   },
 
+  dropSchemeAlbum(id) {
+    const s = Store.get();
+    const key = String(id || '');
+    if (!s || !key) return;
+    s.settings = s.settings || {};
+    if (!Array.isArray(s.settings.removedAlbumIds)) s.settings.removedAlbumIds = [];
+    if (s.settings.removedAlbumIds.indexOf(key) < 0) s.settings.removedAlbumIds.push(key);
+    if (s.settings.removedAlbumIds.length > 800) s.settings.removedAlbumIds = s.settings.removedAlbumIds.slice(-800);
+    s.settings.updatedAt = new Date().toISOString();
+    s.schemeAlbums = (s.schemeAlbums || []).filter(a => String(a.id) !== key);
+    (s.schemeSections || []).forEach(sec => {
+      if (!sec || !Array.isArray(sec.albumIds)) return;
+      const next = sec.albumIds.filter(aid => String(aid) !== key);
+      if (next.length !== sec.albumIds.length) {
+        sec.albumIds = next;
+        sec.updatedAt = s.settings.updatedAt;
+      }
+    });
+    if (s.ui && String(s.ui.schemeAlbumId) === key) s.ui.schemeAlbumId = null;
+  },
+
   deleteSchemeAlbum(id) {
     if (!this._coachOnly()) return;
     const album = this._albumById(id);
     if (!album) return;
     Modal.confirm('Видалити альбом «' + (album.name || '') + '»? Схеми залишаться.', () => {
-      const s = Store.get();
-      s.schemeAlbums = (s.schemeAlbums || []).filter(a => String(a.id) !== String(id));
-      (s.schemeSections || []).forEach(sec => {
-        if (sec) sec.albumIds = (sec.albumIds || []).filter(aid => String(aid) !== String(id));
-      });
-      if (s.ui && String(s.ui.schemeAlbumId) === String(id)) s.ui.schemeAlbumId = null;
+      Actions.dropSchemeAlbum(id);
       StorageManager.save();
       Toast.show('Альбом видалено', 'ok');
       App.renderCurrent();

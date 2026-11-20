@@ -138,6 +138,23 @@ describe('club snapshot merge', () => {
     assert.ok(merged.settings.removedBoardIds.indexOf('old') >= 0);
   });
 
+  it('does not bring back an album the coach deleted', () => {
+    const server = {
+      settings: { removedAlbumIds: ['a-old'], updatedAt: '2026-11-20T09:00:00.000Z' },
+      schemeAlbums: [],
+      schemeSections: [{ id: 'sec', name: 'Турнір', albumIds: [], updatedAt: '2026-11-20T09:00:00.000Z' }]
+    };
+    const phone = {
+      settings: { updatedAt: '2026-11-20T10:00:00.000Z' },
+      schemeAlbums: [{ id: 'a-old', name: 'Старий', boardIds: ['b1'], updatedAt: '2026-11-20T10:00:00.000Z' }],
+      schemeSections: [{ id: 'sec', name: 'Турнір', albumIds: ['a-old'], updatedAt: '2026-11-20T10:00:00.000Z' }]
+    };
+    const merged = mergePayload(phone, server);
+    assert.equal(merged.schemeAlbums.length, 0);
+    assert.deepEqual(merged.schemeSections[0].albumIds, []);
+    assert.ok(merged.settings.removedAlbumIds.indexOf('a-old') >= 0);
+  });
+
   it('keeps a draft a draft when the phone still has an old cancel stamp', () => {
     const phone = {
       trainings: [{

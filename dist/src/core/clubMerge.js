@@ -417,6 +417,14 @@ function applyStampedFields(merged, a, b) {
       });
     });
     if (droppedBoards.length) out.removedBoardIds = droppedBoards.slice(-800);
+    const droppedAlbums = [];
+    [base.removedAlbumIds, extra.removedAlbumIds].forEach(function (list) {
+      (Array.isArray(list) ? list : []).forEach(function (id) {
+        const key = String(id || '');
+        if (key && droppedAlbums.indexOf(key) < 0) droppedAlbums.push(key);
+      });
+    });
+    if (droppedAlbums.length) out.removedAlbumIds = droppedAlbums.slice(-800);
     return out;
   }
 
@@ -717,6 +725,20 @@ function collapseTrainings(payload) {
         out.schemeAlbums.forEach(function (album) {
           if (!album || !Array.isArray(album.boardIds)) return;
           album.boardIds = album.boardIds.filter(function (id) { return !droppedBoards.has(String(id || '')); });
+        });
+      }
+    }
+    const droppedAlbums = new Set(((out.settings && out.settings.removedAlbumIds) || []).map(function (id) { return String(id || ''); }));
+    if (droppedAlbums.size) {
+      if (Array.isArray(out.schemeAlbums)) {
+        out.schemeAlbums = out.schemeAlbums.filter(function (album) {
+          return !(album && droppedAlbums.has(String(album.id || '')));
+        });
+      }
+      if (Array.isArray(out.schemeSections)) {
+        out.schemeSections.forEach(function (section) {
+          if (!section || !Array.isArray(section.albumIds)) return;
+          section.albumIds = section.albumIds.filter(function (id) { return !droppedAlbums.has(String(id || '')); });
         });
       }
     }
