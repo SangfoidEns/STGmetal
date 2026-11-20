@@ -1,7 +1,8 @@
 /**
  * Злиття двох знімків клубу без дублів.
  * Однаковий id лишається один раз. Новіший updatedAt перемагає.
- * Відвідуваність зливається по гравцю. Час тренера береться більший.
+ * Відвідуваність зливається по гравцю. Час тренера і гравця береться більший.
+ * Онлайн береться за свіжішою позначкою.
  */
 (function (root) {
   const LISTS = ['players', 'trainings', 'exercises', 'boards', 'schemeAlbums', 'schemeSections', 'schemeOpens', 'calendar', 'matches', 'tournaments', 'diary', 'myExercises', 'animations', 'gifts', 'moments', 'chat', 'feed'];
@@ -388,6 +389,56 @@ function applyStampedFields(merged, a, b) {
     return { appMs: appMs, boardMs: boardMs, updatedAt: updatedAt };
   }
 
+  function mergePlayerUsage(baseMap, extraMap) {
+    const out = {};
+    [baseMap, extraMap].forEach(function (map) {
+      if (!map || typeof map !== 'object') return;
+      Object.keys(map).forEach(function (key) {
+        const row = map[key];
+        if (!row || typeof row !== 'object') return;
+        const prev = out[key] || { appMs: 0, boardMs: 0, updatedAt: null };
+        out[key] = {
+          appMs: Math.max(Number(prev.appMs) || 0, Number(row.appMs) || 0),
+          boardMs: Math.max(Number(prev.boardMs) || 0, Number(row.boardMs) || 0),
+          updatedAt: stamp(row.updatedAt) >= stamp(prev.updatedAt)
+            ? (row.updatedAt || prev.updatedAt || null)
+            : (prev.updatedAt || null)
+        };
+      });
+    });
+    return out;
+  }
+
+  function mergePresence(baseMap, extraMap) {
+    const out = {};
+    [baseMap, extraMap].forEach(function (map) {
+      if (!map || typeof map !== 'object') return;
+      Object.keys(map).forEach(function (key) {
+        const row = map[key];
+        if (!row || typeof row !== 'object') return;
+        const prev = out[key];
+        if (prev && stamp(prev.at) > stamp(row.at)) return;
+        out[key] = {
+          at: row.at || '',
+          name: row.name || (prev && prev.name) || '',
+          role: row.role || (prev && prev.role) || '',
+          playerId: row.playerId != null && row.playerId !== ''
+            ? String(row.playerId)
+            : ((prev && prev.playerId) || '')
+        };
+      });
+    });
+    let newest = Date.now();
+    Object.keys(out).forEach(function (key) { newest = Math.max(newest, stamp(out[key].at)); });
+    const cutoff = newest - 36 * 3600 * 1000;
+    Object.keys(out).forEach(function (key) {
+      if (stamp(out[key].at) < cutoff) delete out[key];
+    });
+    const keys = Object.keys(out).sort(function (a, b) { return stamp(out[b].at) - stamp(out[a].at); });
+    keys.slice(48).forEach(function (key) { delete out[key]; });
+    return out;
+  }
+
   function mergeSettings(baseSettings, extraSettings) {
     const base = baseSettings || {};
     const extra = extraSettings || {};
@@ -398,6 +449,8 @@ function applyStampedFields(merged, a, b) {
     const loser = extraWins ? base : extra;
     const out = Object.assign({}, loser, winner);
     out.coachStats = mergeCoachStats(base.coachStats, extra.coachStats);
+    out.playerUsage = mergePlayerUsage(base.playerUsage, extra.playerUsage);
+    out.presence = mergePresence(base.presence, extra.presence);
     if (!out.coachPhoto) out.coachPhoto = (loser.coachPhoto || winner.coachPhoto || '');
     if (!out.logoData) out.logoData = (loser.logoData || winner.logoData || '');
     if (!out.coachName) out.coachName = (loser.coachName || winner.coachName || '');
@@ -806,6 +859,8 @@ function collapseTrainings(payload) {
     mergePayload: mergePayload,
     mergeAttendance: mergeAttendance,
     mergeCoachStats: mergeCoachStats,
+    mergePlayerUsage: mergePlayerUsage,
+    mergePresence: mergePresence,
     recordStamp: recordStamp,
     collapseTrainings: collapseTrainings,
     collapsePlayers: collapsePlayers,

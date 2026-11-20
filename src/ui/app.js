@@ -1721,31 +1721,95 @@ const App = {
       try { TelegramManager.haptic && TelegramManager.haptic('success'); } catch (_) {}
     } catch (_) {}
   },
-  /* ── Облік часу в додатку / на дошці (для картки тренера) ── */
+  /* ── Облік часу і хто зараз у додатку ── */
   _usageTimer: null,
+  _paintLiveClub() {
+    try {
+      if (typeof document === 'undefined' || typeof Views === 'undefined' || !Views._liveClub) return;
+      const html = Views._liveClub();
+      document.querySelectorAll('#liveClub').forEach(function (node) { node.outerHTML = html; });
+    } catch (_) {}
+  },
   startUsageTracker() {
     if (this._usageTimer) return;
-    const tick = () => {
+    const beat = (addMs) => {
       try {
         if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
         const s = Store.get();
         if (!s) return;
         s.settings = s.settings || {};
-        const st = s.settings.coachStats || { appMs: 0, boardMs: 0 };
-        st.appMs = (st.appMs || 0) + 15000;
+        const now = new Date().toISOString();
         const view = (s.ui && s.ui.view) || '';
-        if (view === 'board') st.boardMs = (st.boardMs || 0) + 15000;
-        st.updatedAt = new Date().toISOString();
-        s.settings.coachStats = st;
-        // тихе збереження раз на ~2 хв
-        if (!this._usageSaveAt || Date.now() - this._usageSaveAt > 120000) {
+        const onBoard = view === 'board';
+        let role = 'guest';
+        let playerId = '';
+        let name = '';
+        let key = '';
+        try {
+          if (typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach()) {
+            role = 'coach';
+            name = (s.settings.coachName && String(s.settings.coachName).trim())
+              || (AuthManager.displayName && AuthManager.displayName())
+              || 'Тренер';
+            key = 'coach';
+          } else if (typeof AuthManager !== 'undefined' && AuthManager.isPlayer && AuthManager.isPlayer()) {
+            role = 'player';
+            const me = AuthManager.getLinkedPlayer && AuthManager.getLinkedPlayer();
+            if (me && me.id != null) {
+              playerId = String(me.id);
+              name = [me.firstName, me.lastName].filter(Boolean).join(' ') || me.name || 'Гравець';
+              key = 'p:' + playerId;
+            }
+          }
+        } catch (_) {}
+        if (!key) {
+          try {
+            const u = (typeof TelegramManager !== 'undefined' && TelegramManager.getUser) ? TelegramManager.getUser() : null;
+            if (u && u.id != null) {
+              role = 'guest';
+              playerId = String(u.id);
+              name = [u.first_name, u.last_name].filter(Boolean).join(' ') || 'Гість';
+              key = 'g:' + playerId;
+            }
+          } catch (_) {}
+        }
+        if (addMs && role === 'coach') {
+          const st = s.settings.coachStats || { appMs: 0, boardMs: 0 };
+          st.appMs = (Number(st.appMs) || 0) + addMs;
+          if (onBoard) st.boardMs = (Number(st.boardMs) || 0) + addMs;
+          st.updatedAt = now;
+          s.settings.coachStats = st;
+        }
+        if (addMs && role === 'player' && playerId) {
+          const bag = s.settings.playerUsage || {};
+          const st = bag[playerId] || { appMs: 0, boardMs: 0 };
+          st.appMs = (Number(st.appMs) || 0) + addMs;
+          if (onBoard) st.boardMs = (Number(st.boardMs) || 0) + addMs;
+          st.updatedAt = now;
+          bag[playerId] = st;
+          s.settings.playerUsage = bag;
+        }
+        if (key) {
+          const presence = s.settings.presence || {};
+          presence[key] = { at: now, name: name || 'Учасник', role: role, playerId: role === 'player' ? playerId : '' };
+          const cutoff = Date.now() - 36 * 3600 * 1000;
+          Object.keys(presence).forEach(function (id) {
+            const at = Date.parse(presence[id] && presence[id].at || '');
+            if (!at || at < cutoff) delete presence[id];
+          });
+          s.settings.presence = presence;
+        }
+        this._paintLiveClub();
+        const clubReady = !!((s.players && s.players.length) || (s.trainings && s.trainings.length) || (s.settings && s.settings.clubName));
+        const due = !this._usageSaveAt || Date.now() - this._usageSaveAt > 60000;
+        if (key && clubReady && due) {
           this._usageSaveAt = Date.now();
-          try { StorageManager.save({ localOnly: true }); } catch (_) {}
+          try { StorageManager.save(); } catch (_) {}
         }
       } catch (_) {}
     };
-    this._usageTimer = setInterval(tick, 15000);
-    // first soft tick after 15s
+    setTimeout(function () { beat(0); }, 4000);
+    this._usageTimer = setInterval(function () { beat(15000); }, 15000);
   },
   formatDurationMs(ms) {
     ms = Math.max(0, Number(ms) || 0);

@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z115',
+  APP_BUILD: 'z116',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -1161,6 +1161,7 @@ const Views = {
       try { AuthManager._resolveRole(); me = AuthManager.getLinkedPlayer(); } catch (_) {}
     }
     const stats = me ? this._playerStats(me.id) : { attPct: 0, avgRpe: 0, load28: 0, cancelled: 0 };
+    const mineUsage = me ? this._playerUsage(me.id) : { appMs: 0, boardMs: 0 };
     const next = this._nextPlanned(s.trainings);
     const todayStr = today();
     const monthPrefix = todayStr.slice(0, 7);
@@ -1224,9 +1225,11 @@ const Views = {
           ${this._accountProgress(me.id)}
           ${bio ? '<p class="player-bio-home">' + sanitize(bio) + '</p>' : ''}
           <div class="cp-status"><span class="cp-dot"></span>${(typeof I18n!=='undefined'?I18n.t('attendance','Відвідуваність'):'Відвідуваність')} ${Math.round(stats.attPct || 0)}% · тап по фото — на весь екран</div>
+          ${this._timeChips(mineUsage.appMs, mineUsage.boardMs)}
           ${this._loadPanel(me, true)}
         </div>` : this._noPlayerLink()}
 
+      ${this._liveClub()}
       ${this._clubForgeHtml()}
 
       <div class="cp-pills player-quick">
@@ -1630,8 +1633,10 @@ trainings() {
     const _tabsHtml = _isPlayerRole ? (
       '<div class="pt-tabs glass">' +
         '<button type="button" class="pt-tab' + (_tab === 'trainings' ? ' on' : '') + '" data-action="player-train-tab" data-tab="trainings">📅 Тренування</button>' +
-        '<button type="button" class="pt-tab' + (_tab === 'schemes' ? ' on' : '') + '" data-action="player-train-tab" data-tab="schemes">📐 Схеми</button>' +
         '<button type="button" class="pt-tab' + (_tab === 'matches' ? ' on' : '') + '" data-action="player-train-tab" data-tab="matches">⚽ Матчі</button>' +
+        '<button type="button" class="pt-tab' + (_tab === 'schemes' ? ' on' : '') + '" data-action="player-train-tab" data-tab="schemes">📐 Схеми</button>' +
+        '<button type="button" class="pt-tab' + (_tab === 'calendar' ? ' on' : '') + '" data-action="player-train-tab" data-tab="calendar">🗓️ Календар</button>' +
+        '<button type="button" class="pt-tab' + (_tab === 'stats' ? ' on' : '') + '" data-action="player-train-tab" data-tab="stats">📊 Статистика</button>' +
       '</div>'
     ) : '';
     if (_isPlayerRole && _tab === 'schemes') {
@@ -1639,6 +1644,12 @@ trainings() {
     }
     if (_isPlayerRole && _tab === 'matches') {
       return _tabsHtml + this._matchHub({ role: 'player' });
+    }
+    if (_isPlayerRole && _tab === 'calendar') {
+      return _tabsHtml + this.calendar();
+    }
+    if (_isPlayerRole && _tab === 'stats') {
+      return _tabsHtml + this._playerTrainStats();
     }
 
     const statusLabel = (tr) => {
@@ -1815,8 +1826,9 @@ trainings() {
     } catch (_) {}
     const meCls = mineId && String(p.id) === mineId ? ' is-me' : '';
     const num = (p.number != null && String(p.number) !== '') ? ('#' + p.number + ' · ') : '';
+    const usage = this._playerUsage(p.id);
     return '<div class="pl-card glass pl-card-tint pl-acc ' + bd.className + meCls + '" data-player-id="' + p.id + '" data-action="open-player-card" role="button" tabindex="0" style="' + this._accAttr(p) + ';' + bd.style + '">' +
-      '<div class="pl-card-av-wrap">' + (photo
+      '<div class="pl-card-av-wrap">' + this._onlinePip('p:' + p.id) + (photo
         ? ('<button type="button" class="pl-card-av" data-action="open-fifa-card" data-player-id="' + p.id + '">' + ph + '</button>')
         : ('<div class="pl-card-av">' + ph + '</div>')) +
       '</div>' +
@@ -1825,7 +1837,140 @@ trainings() {
       '<div class="pl-card-meta">' + num + sanitize(p.position || '') + (roleText ? (' · ' + roleText) : '') + '</div>' +
       '<div class="pl-card-att">Відвідуваність ' + att + '% · ' + xp + ' XP' +
       (this._loadScore(p) != null ? (' · лоад ' + this._fmtLoad(this._loadScore(p))) : '') +
-      '</div></div></div>';
+      '</div>' + this._timeChips(usage.appMs, usage.boardMs) + '</div></div>';
+  },
+
+  _fmtShort(ms) {
+    const m = Math.round((Number(ms) || 0) / 60000);
+    if (m < 60) return m + 'хв';
+    return (Math.round(m / 6) / 10) + 'г';
+  },
+
+  _playerUsage(id) {
+    const s = Store.get() || {};
+    const bag = (s.settings && s.settings.playerUsage) || {};
+    const row = bag[String(id)] || {};
+    return { appMs: Number(row.appMs) || 0, boardMs: Number(row.boardMs) || 0 };
+  },
+
+  _timeChips(appMs, boardMs) {
+    return '<div class="coach-mini-stats player-time-line">' +
+      '<span title="У додатку">📱 ' + this._fmtShort(appMs) + '</span>' +
+      '<span title="На дошці">⚽ ' + this._fmtShort(boardMs) + '</span></div>';
+  },
+
+  _personFace(p, cls) {
+    const name = p ? ([p.firstName, p.lastName].filter(Boolean).join(' ') || p.name || '') : '';
+    const initials = this._initials(name || '?');
+    const photo = (p && p.id != null && this._resolvePlayerAvatar) ? this._resolvePlayerAvatar(p) : '';
+    const inner = photo
+      ? this._photoTag([photo], initials)
+      : '<span class="cp-avatar-ph">' + sanitize(initials) + '</span>';
+    const ring = (p && p.position) ? this._accountAccent(p).ring : '#c8a84b';
+    return '<span class="' + (cls || 'mini-face') + '" style="--acc-ring:' + ring + '">' + inner + '</span>';
+  },
+
+  _coachFace(cls) {
+    const sources = this._coachPhotoSources ? this._coachPhotoSources() : [];
+    const set = (Store.get() && Store.get().settings) || {};
+    const initials = this._initials(set.coachName || 'Тренер');
+    return '<span class="' + (cls || 'mini-face') + ' is-coach" style="--acc-ring:#f0c14b">' + this._photoTag(sources, initials) + '</span>';
+  },
+
+  _presenceRows() {
+    const s = Store.get() || {};
+    const map = (s.settings && s.settings.presence) || {};
+    const now = Date.now();
+    return Object.keys(map).map(key => {
+      const row = map[key] || {};
+      const at = Date.parse(row.at || '');
+      if (!at) return null;
+      const age = now - at;
+      if (age > 20 * 60 * 1000 || age < -60000) return null;
+      return {
+        key: key,
+        name: row.name || 'Учасник',
+        role: row.role || '',
+        playerId: row.playerId || '',
+        at: at,
+        online: age < 90000
+      };
+    }).filter(Boolean).sort((a, b) => Number(b.online) - Number(a.online) || b.at - a.at);
+  },
+
+  _onlinePip(key) {
+    const hit = this._presenceRows().find(r => r.key === key && r.online);
+    return hit ? '<span class="live-pip" title="Зараз у додатку"></span>' : '';
+  },
+
+  _teamAttPct() {
+    const s = Store.get() || {};
+    const todayStr = (typeof today === 'function') ? today() : new Date().toISOString().slice(0, 10);
+    const past = (s.trainings || []).filter(t => t && (t.status === 'done' || ((t.date || '') < todayStr && t.status !== 'draft' && t.status !== 'cancelled' && t.status !== 'canceled')));
+    let yes = 0;
+    let total = 0;
+    past.forEach(t => {
+      Object.values(t.attendance || {}).forEach(a => {
+        total++;
+        if (a && a.present !== false) yes++;
+      });
+    });
+    return total ? Math.round(yes / total * 100) : 0;
+  },
+
+  _liveClub() {
+    const rows = this._presenceRows();
+    const online = rows.filter(r => r.online);
+    const players = ((Store.get() || {}).players) || [];
+    const faces = rows.slice(0, 12).map(r => {
+      let face = '';
+      if (r.role === 'coach' || r.key === 'coach') face = this._coachFace('live-av');
+      else {
+        const p = r.playerId ? players.find(x => x && String(x.id) === String(r.playerId)) : null;
+        face = this._personFace(p || { name: r.name }, 'live-av');
+      }
+      const short = String(r.name || '').trim().split(/\s+/)[0] || r.name;
+      return '<span class="live-person' + (r.online ? ' is-on' : '') + '" title="' + sanitize(r.name) + '">' +
+        face + '<span class="live-name">' + sanitize(short) + '</span></span>';
+    }).join('');
+    return '<section class="live-club glass" id="liveClub">' +
+      '<div class="live-club-head"><span class="live-dot' + (online.length ? '' : ' off') + '"></span>' +
+      '<b>Зараз у клубі</b><span class="live-count">' + online.length + ' онлайн</span></div>' +
+      '<div class="live-faces">' + (faces || '<span class="live-empty">Нікого немає. Відкрий додаток — і ти з’явишся тут.</span>') + '</div>' +
+      '<div class="live-att">Відвідуваність команди ' + this._teamAttPct() + '%</div>' +
+      '</section>';
+  },
+
+  _playerTrainStats() {
+    let me = null;
+    try {
+      me = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer) ? AuthManager.getLinkedPlayer() : null;
+    } catch (_) { me = null; }
+    if (!me) {
+      return '<div class="card glass"><div class="ct">Статистика</div><p class="note-sm">Профіль ще не прив’язано. Попроси тренера вказати Telegram-нік.</p></div>';
+    }
+    const stats = this._playerStats(me.id) || {};
+    const usage = this._playerUsage(me.id);
+    const appT = (typeof App !== 'undefined' && App.formatDurationMs) ? App.formatDurationMs(usage.appMs) : this._fmtShort(usage.appMs);
+    const boardT = (typeof App !== 'undefined' && App.formatDurationMs) ? App.formatDurationMs(usage.boardMs) : this._fmtShort(usage.boardMs);
+    const att = stats.attPct != null ? Math.round(Number(stats.attPct) || 0) : 0;
+    return '<div class="card glass player-time-card" style="' + this._accAttr(me) + '">' +
+      '<div class="ct">Мій час</div>' +
+      '<div class="player-time-grid">' +
+        '<div class="sc"><div class="lb">У додатку</div><div class="vl">' + sanitize(appT) + '</div></div>' +
+        '<div class="sc"><div class="lb">На дошці</div><div class="vl">' + sanitize(boardT) + '</div></div>' +
+      '</div>' +
+      '<p class="note-sm">Рахунок іде, поки додаток відкритий. На дошці — окремо, як у тренера.</p>' +
+      '</div>' +
+      this._myStatsCharts(me, stats) +
+      '<div class="card glass">' +
+        '<div class="ct">Відвідування</div>' +
+        '<div class="dg">' +
+          '<div class="sc"><div class="lb">Був</div><div class="vl">' + (stats.present || 0) + '</div></div>' +
+          '<div class="sc"><div class="lb">Не був</div><div class="vl">' + (stats.absent || 0) + '</div></div>' +
+          '<div class="sc"><div class="lb">Скасовано</div><div class="vl">' + (stats.cancelled || 0) + '</div></div>' +
+          '<div class="sc"><div class="lb">Відвідуваність</div><div class="vl">' + att + '%</div></div>' +
+        '</div></div>';
   },
 
   _clubFeed() {
@@ -1853,10 +1998,15 @@ trainings() {
       const hue = player ? this._feedHue(player) : 42;
       const frame = frames[kind] || '#9aa4b2';
       const open = pid ? (' data-action="open-player-card" data-player-id="' + pid + '"') : '';
+      const who = player
+        ? ([player.firstName, player.lastName].filter(Boolean).join(' ') || player.name || 'Гравець')
+        : ((s.settings && s.settings.coachName) || 'Клуб');
+      const face = player ? this._personFace(player, 'club-feed-face') : this._coachFace('club-feed-face');
       return '<div role="button" tabindex="0" class="club-feed-row kind-' + kind + '" style="--feed-hue:' + hue + ';--feed-frame:' + frame + '"' + open + '>' +
         '<span class="club-feed-top">' +
+          face +
           '<span class="club-feed-ico" aria-hidden="true">' + (icons[kind] || '•') + '</span>' +
-          '<span class="club-feed-body"><b>' + sanitize(item.title || 'Новина') + '</b></span>' +
+          '<span class="club-feed-body"><b>' + sanitize(who) + '</b><span class="club-feed-kind">' + sanitize(item.title || 'Новина') + '</span></span>' +
           (time ? ('<span class="club-feed-time">' + sanitize(time) + '</span>') : '') +
         '</span>' +
         '<span class="club-feed-text">' + sanitize(item.text || '') + '</span>' +
@@ -1885,6 +2035,7 @@ trainings() {
       }
     } catch (_) {}
     const msgs = ((s.chat) || []).slice(-80);
+    const players = s.players || [];
     const rows = msgs.map(m => {
       if (!m) return '';
       let time = '';
@@ -1898,11 +2049,24 @@ trainings() {
       } catch (_) {}
       const role = m.authorRole === 'coach' ? 'тренер' : (m.authorRole === 'player' ? 'гравець' : '');
       const mine = (mineRole === 'coach' && m.authorRole === 'coach') || (mineId && String(m.playerId || '') === mineId);
-      return '<div class="team-chat-msg' + (mine ? ' mine' : '') + '">' +
-        '<div class="team-chat-meta"><b>' + sanitize(m.authorName || 'Учасник') + '</b>' +
+      const author = (m.playerId != null && m.playerId !== '')
+        ? players.find(p => p && String(p.id) === String(m.playerId))
+        : null;
+      const named = !author && m.authorName
+        ? players.find(p => p && ([p.firstName, p.lastName].filter(Boolean).join(' ') === m.authorName || p.name === m.authorName))
+        : author;
+      const person = author || named;
+      const coachMsg = m.authorRole === 'coach';
+      const face = coachMsg ? this._coachFace('team-chat-face') : this._personFace(person || { name: m.authorName || 'Гравець' }, 'team-chat-face');
+      const accent = coachMsg
+        ? '--acc-ring:#f0c14b;--acc-bg:linear-gradient(165deg,#3d2e0a,#14110a)'
+        : (person ? this._accAttr(person) : '--acc-ring:#c8a84b;--acc-bg:linear-gradient(165deg,#2a2416,#12100a)');
+      return '<div class="team-chat-msg' + (mine ? ' mine' : '') + '" style="' + accent + '">' +
+        face +
+        '<div class="team-chat-main"><div class="team-chat-meta"><b>' + sanitize(m.authorName || (person && ([person.firstName, person.lastName].filter(Boolean).join(' '))) || 'Учасник') + '</b>' +
         (role ? ('<span>' + role + '</span>') : '') +
         (time ? ('<span>' + sanitize(time) + '</span>') : '') +
-        '</div><div class="team-chat-text">' + sanitize(m.text || '') + '</div></div>';
+        '</div><div class="team-chat-text">' + sanitize(m.text || '') + '</div></div></div>';
     }).join('');
     const form = guest
       ? '<p class="note-sm">Писати можуть гравці і тренер.</p>'
@@ -1944,7 +2108,9 @@ trainings() {
         '<span class="gab-label">' + sanitize(g.label || g.id) + '</span>' +
         '</button>';
     }).join('');
+    const usage = this._playerUsage(p.id);
     return fifa +
+      '<div class="card glass player-time-card" style="' + this._accAttr(p) + '">' + this._timeChips(usage.appMs, usage.boardMs) + '</div>' +
       '<div class="coach-gift-panel card glass" style="' + this._accAttr(p) + '">' +
       '<div class="ct">Подарувати</div>' +
       '<p class="note-sm">Артефакт від тренера стає кольором картки цього гравця.</p>' +
@@ -2058,7 +2224,7 @@ trainings() {
     } catch (_) {}
 
     if (isPlayerRole && mePlayer && typeof this._playerSocialHub === 'function') {
-      return this._playerSocialHub(mePlayer, list, attPct) + this._teamChat();
+      return this._liveClub() + this._playerSocialHub(mePlayer, list, attPct) + this._teamChat();
     }
     if (isPlayerRole) {
       const meId = mePlayer ? String(mePlayer.id) : '';
@@ -2072,7 +2238,7 @@ trainings() {
         return xpOf(b) - xpOf(a) || ((a.number || 0) - (b.number || 0));
       });
       const cards = list.map(p => this._squadPlaque(p, attPct(p.id), roleLabel(p))).join('');
-      return '<div class="st">Команда</div><div class="pl-cards">' + (cards || '<div class="es">Немає гравців</div>') + '</div>' + this._teamChat();
+      return this._liveClub() + '<div class="st">Команда</div><div class="pl-cards">' + (cards || '<div class="es">Немає гравців</div>') + '</div>' + this._teamChat();
     }
 
     if (typeof AuthManager !== 'undefined' && AuthManager.isGuest && AuthManager.isGuest()) {
@@ -2081,14 +2247,14 @@ trainings() {
         try { lv = PlayerProgress.compute(p.id).level; } catch (_) {}
         return this._squadPlaque(p, attPct(p.id), roleLabel(p) + ' · LVL ' + lv);
       }).join('');
-      return '<div class="st">Склад Металіст Штуттгарт</div>' +
+      return this._liveClub() + '<div class="st">Склад Металіст Штуттгарт</div>' +
         '<p class="note-sm">Тап по картці — акаунт. З акаунта відкривається картка гравця.</p>' +
         '<div class="pl-cards">' + (cards || '<div class="es">Немає гравців</div>') + '</div>' + this._teamChat();
     }
 
     if (!isCoach) {
       const cards = list.map(p => this._squadPlaque(p, attPct(p.id), roleLabel(p))).join('');
-      return '<div class="st">Склад <span class="note-sm">перегляд</span></div><div class="pl-cards">' +
+      return this._liveClub() + '<div class="st">Склад <span class="note-sm">перегляд</span></div><div class="pl-cards">' +
         (typeof this._coachSquadCard === 'function' ? this._coachSquadCard() : '') +
         (cards || '<div class="es">Немає гравців</div>') + '</div>' + this._teamChat();
     }
@@ -2127,11 +2293,12 @@ trainings() {
       if (!arr.length) return '';
       const rows = arr.map(p => {
         const att = attPct(p.id);
+        const usage = this._playerUsage(p.id);
         return '<div class="pl-row tg-row ' + cls + '" data-player-id="' + p.id + '" data-action="open-player-card" role="button">' +
           '<span class="pl-num">#' + (p.number || '—') + '</span>' +
-          '<span class="pl-name">' + sanitize(p.lastName || '') + ' ' + sanitize((p.firstName || '')[0] || '') + '.' + this.appointmentHtml(p) + '</span>' +
+          '<span class="pl-name">' + this._onlinePip('p:' + p.id) + sanitize(p.lastName || '') + ' ' + sanitize((p.firstName || '')[0] || '') + '.' + this.appointmentHtml(p) + '</span>' +
           '<span class="pl-pos">' + sanitize(p.position || '') + '</span>' +
-          '<span class="pl-att">' + att + '%</span></div>';
+          '<span class="pl-att">' + att + '%<small>' + this._fmtShort(usage.appMs) + '</small></span></div>';
       }).join('');
       return '<div class="pl-section ' + cls + '"><div class="pl-section-h">' + title + ' · ' + arr.length + '</div>' + rows + '</div>';
     };
@@ -2165,11 +2332,11 @@ trainings() {
       '</div>';
 
     if (viewMode === 'match') {
-      return header + this._squadMatch(s);
+      return this._liveClub() + header + this._squadMatch(s);
     }
 
     if (viewMode === 'cards') {
-      return header + strip +
+      return this._liveClub() + header + strip +
         '<p class="note-sm">Тап — акаунт. З акаунта — картка гравця. Перемикач Список / Картки зверху.</p>' +
         '<div class="pl-cards">' +
         (typeof this._coachSquadCard === 'function' ? this._coachSquadCard() : '') +
@@ -2177,7 +2344,7 @@ trainings() {
         '</div>' + this._teamChat();
     }
 
-    return header + strip +
+    return this._liveClub() + header + strip +
       '<p class="note-sm">' + (matchOrder ? 'Список як у найближчому або останньому матчі: основа, лавка, решта.' : 'Тап — акаунт. З акаунта — картка гравця.') + '</p>' +
       sectionList(starterTitle, starters, 'pl-starters') +
       sectionList(reserveTitle, reserves, 'pl-reserve') +
@@ -2750,6 +2917,7 @@ trainings() {
       '<div class="cal-grid cg">' + cells + '</div></div>' +
       dayDetail +
       '<p class="note-sm">Золота клітинка — матч. ● заплановане · ✓ проведено · ✕ скасовано · 🎂 день народження</p>' +
+      this._liveClub() +
       this._clubFeed();
   },
 

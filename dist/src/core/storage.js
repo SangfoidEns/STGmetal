@@ -223,6 +223,8 @@ const StorageManager = {
     const current = Store.get() || {};
     const ui = current.ui;
     const localStats = current.settings && current.settings.coachStats;
+    const localUsage = current.settings && current.settings.playerUsage;
+    const localPresence = current.settings && current.settings.presence;
     let migrated = this.migrate(remote.payload, remote.payload.schemaVersion || 1);
     if (this._clubDirty && this._canSyncWrite() && !(opts && opts.force)) return false;
     if (this._staticClubOnly() && typeof ClubMerge !== 'undefined' && ClubMerge.mergePayload) {
@@ -238,6 +240,14 @@ const StorageManager = {
         boardMs: Math.max(remoteStats.boardMs || 0, localStats.boardMs || 0),
         updatedAt: localStats.updatedAt || remoteStats.updatedAt || null
       };
+    }
+    if (migrated.settings && typeof ClubMerge !== 'undefined') {
+      if (ClubMerge.mergePlayerUsage) {
+        migrated.settings.playerUsage = ClubMerge.mergePlayerUsage(migrated.settings.playerUsage, localUsage);
+      }
+      if (ClubMerge.mergePresence) {
+        migrated.settings.presence = ClubMerge.mergePresence(migrated.settings.presence, localPresence);
+      }
     }
     if (migrated.settings) delete migrated.settings.lang;
     this.restoreCoachPhoto(migrated);

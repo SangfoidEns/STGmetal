@@ -9769,20 +9769,27 @@ body.tg-mini-app .main, body.tg-mini-app #main {
 /* pt-tabs-fifa-20261028z2 */
 .pt-tabs {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   padding: 6px;
   margin: 8px 0 12px;
   border-radius: 14px;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.pt-tabs::-webkit-scrollbar { display: none; }
 .pt-tab {
-  flex: 1;
+  flex: 0 0 auto;
   min-height: 44px;
+  padding: 0 12px;
   border: none;
   border-radius: 12px;
   background: transparent;
   color: var(--muted);
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
+  white-space: nowrap;
   cursor: pointer;
 }
 .pt-tab.on {
@@ -13128,3 +13135,135 @@ body:not(.tools-tray-open) #btbToolsTray {
 .card:has(.coach-tools-body:not([hidden])) {
   overflow: visible !important;
 }
+
+/* z116 live club, faces, player time */
+.pt-tabs {
+  overflow-x: auto !important;
+  flex-wrap: nowrap !important;
+}
+.pt-tab {
+  flex: 0 0 auto !important;
+  padding: 0 12px !important;
+  white-space: nowrap !important;
+}
+.live-club {
+  margin: 0 0 12px;
+  padding: 12px 12px 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(240, 193, 75, 0.28);
+  background: linear-gradient(165deg, rgba(42, 36, 16, 0.72), rgba(12, 14, 18, 0.55));
+}
+.live-club-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.live-club-head b { color: #f0c14b; }
+.live-count { margin-left: auto; color: rgba(255,255,255,0.62); font-size: 12px; }
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2ecc71;
+  box-shadow: 0 0 0 4px rgba(46, 204, 113, 0.18);
+  animation: live-pulse 1.6s ease-out infinite;
+}
+.live-dot.off { background: #6b7280; box-shadow: none; animation: none; }
+@keyframes live-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.45); }
+  100% { box-shadow: 0 0 0 8px rgba(46, 204, 113, 0); }
+}
+.live-faces {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 10px 2px 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.live-faces::-webkit-scrollbar { display: none; }
+.live-person {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 52px;
+  opacity: 0.55;
+}
+.live-person.is-on { opacity: 1; }
+.live-name {
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: rgba(255,255,255,0.82);
+}
+.live-empty { color: rgba(255,255,255,0.62); font-size: 13px; padding: 6px 0; }
+.live-att { font-size: 12px; color: rgba(240, 193, 75, 0.9); margin-top: 2px; }
+.live-av, .club-feed-face, .team-chat-face {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 36px;
+  border: 2px solid var(--acc-ring, #f0c14b);
+  background: rgba(0,0,0,0.25);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.35);
+}
+.live-person.is-on .live-av { box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.28); }
+.live-av img, .club-feed-face img, .team-chat-face img,
+.live-av .cp-avatar-ph, .club-feed-face .cp-avatar-ph, .team-chat-face .cp-avatar-ph {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+}
+.club-feed-kind { display: block; color: rgba(255,255,255,0.72); font-size: 12px; font-weight: 600; }
+.team-chat-msg {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 8px;
+}
+.team-chat-msg.mine { flex-direction: row-reverse; }
+.team-chat-msg.mine .team-chat-meta { justify-content: flex-end; }
+.team-chat-main { min-width: 0; flex: 1; }
+.live-pip {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #2ecc71;
+  border: 2px solid #10140c;
+  z-index: 3;
+  box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.25);
+}
+.pl-name .live-pip {
+  position: static;
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.pl-att small {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.62);
+}
+.player-time-card .player-time-grid,
+.player-time-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.player-time-line { margin-top: 6px; }

@@ -599,4 +599,30 @@ describe('club snapshot merge', () => {
     assert.equal(only.players.length, 1);
     assert.equal(only.players[0].birthDate, '2001-01-01');
   });
+
+  it('keeps the larger player time and the newer online stamp', () => {
+    const merged = mergePayload({
+      settings: {
+        coachStats: { appMs: 10, updatedAt: '2026-11-20T10:00:00.000Z' },
+        playerUsage: { p9: { appMs: 60000, boardMs: 15000, updatedAt: '2026-11-20T10:00:00.000Z' } },
+        presence: {
+          coach: { at: '2026-11-20T12:00:00.000Z', name: 'Тренер', role: 'coach' },
+          'p:p9': { at: '2026-11-20T11:00:00.000Z', name: 'Єгор', role: 'player', playerId: 'p9' }
+        }
+      }
+    }, {
+      settings: {
+        coachStats: { appMs: 20, updatedAt: '2026-11-20T16:00:00.000Z' },
+        playerUsage: { p9: { appMs: 30000, boardMs: 45000, updatedAt: '2026-11-20T16:00:00.000Z' } },
+        presence: {
+          'p:p9': { at: '2026-11-20T15:00:00.000Z', name: 'Єгор', role: 'player', playerId: 'p9' }
+        }
+      }
+    });
+    assert.equal(merged.settings.playerUsage.p9.appMs, 60000);
+    assert.equal(merged.settings.playerUsage.p9.boardMs, 45000);
+    assert.equal(merged.settings.presence['p:p9'].at, '2026-11-20T15:00:00.000Z');
+    assert.equal(merged.settings.presence.coach.name, 'Тренер');
+    assert.equal(merged.settings.coachStats.appMs, 20);
+  });
 });

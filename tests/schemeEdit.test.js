@@ -184,16 +184,44 @@ describe('scheme cards', () => {
   it('puts the club feed on the calendar and the public chat on the team', () => {
     const ctx = boot(true);
     const store = ctx.Store.get();
-    store.feed = [{ id: 'n1', kind: 'gift', title: 'Кубок', text: 'Єгору', createdAt: '2026-11-20T10:00:00.000Z' }];
-    store.chat = [{ id: 'c1', text: 'Збір о 18:00', authorName: 'Тренер', authorRole: 'coach', createdAt: '2026-11-20T10:00:00.000Z' }];
+    store.players = [{ id: 'p9', firstName: 'Єгор', lastName: 'Коваленко', position: 'ST', profilePhoto: 'https://example.com/yehor.jpg' }];
+    store.feed = [{ id: 'n1', kind: 'gift', title: 'Кубок', text: 'Єгору', playerId: 'p9', createdAt: '2026-11-20T10:00:00.000Z' }];
+    store.chat = [
+      { id: 'c1', text: 'Збір о 18:00', authorName: 'Тренер', authorRole: 'coach', createdAt: '2026-11-20T10:00:00.000Z' },
+      { id: 'c2', text: 'Я буду', authorName: 'Єгор Коваленко', authorRole: 'player', playerId: 'p9', createdAt: '2026-11-20T10:01:00.000Z' }
+    ];
     const cal = ctx.Views.calendar();
     assert.match(cal, /Стрічка клубу/);
     assert.match(cal, /Кубок/);
+    assert.match(cal, /club-feed-face/);
+    assert.match(cal, /Єгор Коваленко/);
+    assert.match(cal, /yehor\.jpg/);
+    assert.match(cal, /Зараз у клубі/);
     assert.equal(cal.includes('teamChatInput'), false);
     const chat = ctx.Views._teamChat();
     assert.match(chat, /Чат команди/);
     assert.match(chat, /Збір о 18:00/);
     assert.match(chat, /teamChatInput/);
+    assert.match(chat, /team-chat-face/);
+    assert.match(chat, /--acc-ring:#e74c3c/);
     assert.equal(chat.includes('Стрічка клубу'), false);
+  });
+
+  it('opens calendar and statistics inside the player training section', () => {
+    const ctx = boot(false);
+    const html = ctx.Views.trainings();
+    assert.match(html, /data-tab="trainings"/);
+    assert.match(html, /data-tab="matches"/);
+    assert.match(html, /data-tab="schemes"/);
+    assert.match(html, /data-tab="calendar"/);
+    assert.match(html, /data-tab="stats"/);
+    ctx.Store.get().ui.playerTrainTab = 'calendar';
+    const cal = ctx.Views.trainings();
+    assert.match(cal, /Стрічка клубу/);
+    assert.match(cal, /class="pt-tab on"[^>]*data-tab="calendar"|data-tab="calendar"[^>]*class="pt-tab on"/);
+    ctx.Store.get().ui.playerTrainTab = 'stats';
+    const stats = ctx.Views.trainings();
+    assert.match(stats, /Статистика/);
+    assert.match(stats, /data-tab="stats"/);
   });
 });
