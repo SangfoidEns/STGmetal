@@ -105,8 +105,14 @@ const StorageManager = {
     return '';
   },
 
+  _supabaseOn() {
+    try { return typeof SupabaseClub !== 'undefined' && SupabaseClub.enabled(); }
+    catch (_) { return false; }
+  },
+
   _staticClubOnly() {
     try {
+      if (this._supabaseOn()) return false;
       return !(typeof window !== 'undefined' && window.METALIST_API);
     } catch (_) { return true; }
   },
@@ -140,6 +146,7 @@ const StorageManager = {
   },
 
   async fetchClub() {
+    if (this._supabaseOn()) return SupabaseClub.fetchClub();
     if (this._staticClubOnly()) return { empty: true };
     try {
       const res = await fetch(this._clubApi('/api/club-data'), { cache: 'no-store' });
@@ -164,16 +171,19 @@ const StorageManager = {
     if (!s) return false;
     const payload = this.buildExportPayload();
     payload.updatedAt = s.updatedAt || new Date().toISOString();
-    const res = await fetch(this._clubApi('/api/club-data'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        updatedAt: payload.updatedAt,
-        updatedBy: (typeof AuthManager !== 'undefined' && AuthManager.displayName) ? AuthManager.displayName() : 'coach',
-        initData: this._clubInitData(),
-        payload
-      })
-    });
+    const record = {
+      updatedAt: payload.updatedAt,
+      updatedBy: (typeof AuthManager !== 'undefined' && AuthManager.displayName) ? AuthManager.displayName() : 'coach',
+      initData: this._clubInitData(),
+      payload
+    };
+    const res = this._supabaseOn()
+      ? await SupabaseClub.pushRecord(record)
+      : await fetch(this._clubApi('/api/club-data'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(record)
+      });
     if (res.status === 409) {
       const remote = await res.json().catch(() => null);
       if (remote && remote.payload) this.applyClubPayload(remote, { quiet: true });
