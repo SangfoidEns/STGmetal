@@ -47,6 +47,8 @@ describe('supabase club conflict', () => {
     assert.match(sql, /errcode = 'PT409'/);
     assert.match(sql, /private\.norm_nick\(player->>'telegramUsername'\)/);
     assert.match(sql, /nick = 'serdiuk_artem'/);
+    assert.match(sql, /actor->>'id' = coach_id/);
+    assert.doesNotMatch(sql, /rbac/);
     assert.match(sql, /private\.merge_chat\(row\.payload->'chat', payload->'chat', null\)/);
     assert.match(sql, /private\.merge_self_profile\(next_payload, payload, actor\)/);
   });

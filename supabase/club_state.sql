@@ -181,39 +181,19 @@ as $$
 declare
   coach_id text;
   nick text;
-  coach text;
-  coaches jsonb;
   player jsonb;
-  is_coach boolean := false;
 begin
   if actor is null or nullif(actor->>'id', '') is null then
     return 'deny';
   end if;
   nick := private.norm_nick(actor->>'username');
+  -- Numeric id matches with or without a Telegram username.
+  -- Assistant nicks stored on the club payload never get a full write.
   select coach_telegram_id into coach_id from private.club_gate where id = 'default';
   if coach_id is not null and coach_id <> '' and actor->>'id' = coach_id then
-    is_coach := true;
+    return 'full';
   end if;
-  -- Same nicks as the Mini App, and only after HMAC (actor is already tg_user).
-  -- @Artem_Serdyuk is a player and never the coach.
-  if nick <> '' and nick not in ('artem_serdyuk', 'artem_serdiuk') then
-    if nick = 'serdiuk_artem' then
-      is_coach := true;
-    end if;
-    coaches := payload #> '{settings,rbac,coaches}';
-    if coaches is null or jsonb_typeof(coaches) <> 'array' then
-      coaches := '[]'::jsonb;
-    end if;
-    for coach in select value from jsonb_array_elements_text(coaches) loop
-      if private.norm_nick(coach) in ('artem_serdyuk', 'artem_serdiuk') then
-        continue;
-      end if;
-      if private.norm_nick(coach) = actor->>'id' or private.norm_nick(coach) = nick then
-        is_coach := true;
-      end if;
-    end loop;
-  end if;
-  if is_coach then
+  if nick = 'serdiuk_artem' then
     return 'full';
   end if;
   if payload is null or jsonb_typeof(payload->'players') <> 'array' then
