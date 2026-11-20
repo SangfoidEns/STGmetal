@@ -176,6 +176,19 @@ const CoachTools = {
     }
   },
 
+  saveSupabaseKey() {
+    const el = document.getElementById('sbAnonKey');
+    const key = el && el.value ? el.value.trim() : '';
+    if (!key || key.length < 20 || typeof SupabaseClub === 'undefined') {
+      try { if (typeof Toast !== 'undefined') Toast.show('Встав anon key з Supabase → API', 'warn'); } catch (_) {}
+      return;
+    }
+    SupabaseClub.saveKey(key);
+    if (el) el.value = '';
+    try { if (typeof Toast !== 'undefined') Toast.show('Supabase підключено. Дані клубу синхронізуються самі.', 'ok'); } catch (_) {}
+    try { if (typeof StorageManager !== 'undefined') StorageManager.bootstrapClubSync(); } catch (_) {}
+  },
+
   async exportAndShare() {
     try {
       if (typeof StorageManager !== 'undefined' && StorageManager.exportJSON) {
@@ -204,6 +217,8 @@ const CoachTools = {
           <button type="button" class="btn btn-s coach-tool" data-coach-tool="sync-pull">☁ Завантажити з Cloud</button>
           <button type="button" class="btn btn-s coach-tool" data-coach-tool="migrate-roster">🔄 Міграція ВСІХ даних (Telegram)</button>
           <button type="button" class="btn btn-s coach-tool" data-coach-tool="export">📦 Експорт / Share JSON</button>
+          <input id="sbAnonKey" type="password" placeholder="Supabase anon key" style="min-height:44px;width:100%;margin-top:8px" />
+          <button type="button" class="btn btn-p coach-tool" data-coach-tool="supabase-save">☁ Синхронізувати через Supabase</button>
           <button type="button" class="btn btn-s coach-tool" data-coach-tool="board">⛶ Тактична дошка</button>
         </div>
       </div>
@@ -220,6 +235,7 @@ const CoachTools = {
       case 'sync-pull': return this.pullCloudNow();
       case 'migrate-roster': return this.migrateRoster();
       case 'export': return this.exportAndShare();
+      case 'supabase-save': return this.saveSupabaseKey();
       case 'board':
         try {
           if (typeof App !== 'undefined') {
