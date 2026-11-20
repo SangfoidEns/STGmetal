@@ -77,5 +77,19 @@ const SupabaseClub = {
       init_data: record.initData || this.initData(),
       club_key: null
     });
+  },
+
+  /** Local 409 body, or PostgREST PT409 whose `details` is the remote snapshot. */
+  conflictRecord(body) {
+    if (!body || typeof body !== 'object') return null;
+    if (body.payload && typeof body.payload === 'object') return body;
+    const raw = body.details || body.detail;
+    if (!raw) return null;
+    try {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      return parsed && parsed.payload ? parsed : null;
+    } catch (_) {
+      return null;
+    }
   }
 };

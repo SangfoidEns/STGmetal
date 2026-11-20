@@ -186,7 +186,10 @@ const StorageManager = {
       });
     if (res.status === 409) {
       const remote = await res.json().catch(() => null);
-      if (remote && remote.payload) this.applyClubPayload(remote, { quiet: true });
+      const snapshot = (typeof SupabaseClub !== 'undefined' && SupabaseClub.conflictRecord)
+        ? SupabaseClub.conflictRecord(remote)
+        : (remote && remote.payload ? remote : null);
+      if (snapshot && snapshot.payload) this.applyClubPayload(snapshot, { quiet: true });
       this._clubDirty = false;
       return false;
     }
