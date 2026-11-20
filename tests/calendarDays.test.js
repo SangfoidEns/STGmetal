@@ -29,11 +29,11 @@ describe('calendar weekday letters', () => {
     assert.match(html, /title="Субота">Сб</);
     assert.match(html, /title="Неділя">Нд</);
     assert.equal(html.includes('>А<'), false);
-    assert.equal(context.Views.APP_BUILD, 'z118');
-    assert.equal(context.Views.versionLabel(), '118');
+    assert.equal(context.Views.APP_BUILD, 'z119');
+    assert.equal(context.Views.versionLabel(), '119');
     const settings = context.Views.settings();
-    assert.match(settings, /Версія 118/);
-    assert.equal(settings.includes('z118'), false);
+    assert.match(settings, /Версія 119/);
+    assert.equal(settings.includes('z119'), false);
     const library = context.Views.tactics();
     assert.match(library, /Всі альбоми/);
     assert.match(library, /open-scheme-archive/);
@@ -145,5 +145,41 @@ describe('calendar weekday letters', () => {
     assert.match(pick, /ym-pick-name/);
     assert.match(pick, /scheme-thumb-svg/);
     assert.match(pick, /Кутовий/);
+  });
+
+  it('settings has one save button and the squad row hides its swipe actions', () => {
+    const store = {
+      ui: {}, settings: { clubName: 'МЕТАЛІСТ ШТУТТГАРТ', clubShort: 'МШ', staff: {} },
+      players: [], trainings: [], matches: [], boards: [], calendar: [], gifts: [], chat: []
+    };
+    const context = {
+      console, setTimeout, clearTimeout,
+      sanitize(v) { return String(v == null ? '' : v); },
+      today() { return '2026-11-20'; },
+      Store: { get() { return store; } },
+      AuthManager: {
+        isCoach() { return true; },
+        isPlayer() { return false; },
+        isGuest() { return false; },
+        isAssistant() { return false; },
+        _canWriteClub() { return true; }
+      },
+      localStorage: { getItem() { return null; }, setItem() {}, removeItem() {} },
+      document: { documentElement: { setAttribute() {} }, querySelectorAll() { return []; }, getElementById() { return null; } }
+    };
+    context.window = context;
+    context.globalThis = context;
+    vm.createContext(context);
+    vm.runInContext(readFileSync(new URL('../src/ui/views.js', import.meta.url), 'utf8') + '\nthis.Views = Views;', context);
+    const settings = context.Views.settings();
+    assert.equal((settings.match(/data-action="save-settings"/g) || []).length, 1);
+    assert.match(settings, /id="setClubName"/);
+    assert.match(settings, /id="setClubShort"/);
+    assert.equal(settings.includes('Зберегти склад'), false);
+    const row = context.Views._squadSwipeRow({ id: 'p1', firstName: 'Іван', lastName: 'Мельник', number: 9, position: 'FW' }, { bucket: 'xi', matchId: 'm1' });
+    assert.match(row, /class="sq-row"/);
+    assert.match(row, /sq-face/);
+    assert.match(row, /data-sq="nudge"/);
+    assert.match(row, /У резерв/);
   });
 });

@@ -227,6 +227,7 @@ const AuthManager = {
   },
 
   isCoach() { return this.role === 'coach'; },
+  isAssistant() { return this.isCoach() && !this._canWriteClub(); },
   isPlayer() { return this.role === 'player'; },
   isGuest() { return this.role === 'guest'; },
 
@@ -314,11 +315,11 @@ const AuthManager = {
   roleLabel() {
     const r = this.role || 'guest';
     if (typeof I18n !== 'undefined' && I18n.t) {
-      if (r === 'coach') return I18n.t('role_coach', 'Тренер');
+      if (r === 'coach') return this.isAssistant() ? 'Помічник' : I18n.t('role_coach', 'Тренер');
       if (r === 'player') return I18n.t('role_player', 'Гравець');
       return I18n.t('role_guest', 'Гість');
     }
-    if (r === 'coach') return 'Тренер';
+    if (r === 'coach') return this.isAssistant() ? 'Помічник' : 'Тренер';
     if (r === 'player') return 'Гравець';
     return 'Гість';
   },

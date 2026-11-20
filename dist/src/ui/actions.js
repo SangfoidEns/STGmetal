@@ -1784,32 +1784,45 @@ const Actions = {
     const m = this._matchByUi();
     if (!m) return;
     this.flushMatchPlan();
-    try { if (typeof StorageManager !== 'undefined' && StorageManager.beginIoLock) StorageManager.beginIoLock(4000); } catch (_) {}
+    const matchId = m.id;
+    try { if (typeof StorageManager !== 'undefined') StorageManager._holdRemote = true; } catch (_) {}
+    const release = () => { try { if (typeof StorageManager !== 'undefined') StorageManager._holdRemote = false; } catch (_) {} };
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
+    input.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;opacity:0';
+    const done = (url) => {
+      release();
+      try { input.remove(); } catch (_) {}
+      if (!url) { Toast.show('Не вдалося прочитати логотип', 'warn'); return; }
+      const live = ((Store.get().matches) || []).find(item => item && String(item.id) === String(matchId)) || m;
+      const now = new Date().toISOString();
+      live.opponentLogo = url;
+      live.updatedAt = now;
+      live.stamps = Object.assign({}, live.stamps || {}, { plan: now, opponentLogo: now });
+      try { StorageManager.rememberOpponentLogos && StorageManager.rememberOpponentLogos(); } catch (_) {}
+      try { StorageManager.save(); } catch (_) {}
+      Toast.show('Логотип суперника збережено', 'ok');
+      App.renderCurrent();
+    };
     input.onchange = () => {
       const file = input.files && input.files[0];
-      if (!file) return;
-      const done = (url) => {
-        if (!url) { Toast.show('Не вдалося прочитати логотип', 'warn'); return; }
-        this.flushMatchPlan();
-        m.opponentLogo = url;
-        m.updatedAt = new Date().toISOString();
-        m.stamps = Object.assign({}, m.stamps || {}, { plan: m.updatedAt });
-        try { StorageManager.save(); } catch (_) {}
-        Toast.show('Логотип суперника збережено', 'ok');
-        App.renderCurrent();
-      };
+      if (!file) { release(); return; }
       if (this._compressImageFile) {
-        this._compressImageFile(file, 192, 0.82).then(done).catch(() => done(''));
+        this._compressImageFile(file, 256, 0.82).then(done).catch(() => done(''));
         return;
       }
       const reader = new FileReader();
       reader.onload = () => done(reader.result || '');
+      reader.onerror = () => done('');
       reader.readAsDataURL(file);
     };
+    document.body.appendChild(input);
     input.click();
+    setTimeout(release, 60000);
+    window.addEventListener('focus', () => {
+      setTimeout(() => { if (!input.files || !input.files.length) release(); }, 700);
+    }, { once: true });
   },
 
   clearMatchLogo() {
@@ -1817,11 +1830,60 @@ const Actions = {
     const m = this._matchByUi();
     if (!m) return;
     this.flushMatchPlan();
-    m.opponentLogo = '';
-    m.updatedAt = new Date().toISOString();
-    m.stamps = Object.assign({}, m.stamps || {}, { plan: m.updatedAt });
+    const live = ((Store.get().matches) || []).find(item => item && String(item.id) === String(m.id)) || m;
+    const now = new Date().toISOString();
+    live.opponentLogo = '';
+    live.updatedAt = now;
+    live.stamps = Object.assign({}, live.stamps || {}, { plan: now, opponentLogo: now });
+    try { StorageManager.rememberOpponentLogos && StorageManager.rememberOpponentLogos(); } catch (_) {}
     try { StorageManager.save(); } catch (_) {}
     Toast.show('Логотип прибрано', 'ok');
+    App.renderCurrent();
+  },
+
+  approveChange(id) {
+    if (typeof AuthManager === 'undefined' || !AuthManager._canWriteClub || !AuthManager._canWriteClub()) {
+      try { Toast.show('Підтверджує лише головний тренер', 'warn'); } catch (_) {}
+      return;
+    }
+    const s = Store.get();
+    const set = s.settings || (s.settings = {});
+    const list = Array.isArray(set.approvals) ? set.approvals : [];
+    const item = list.find(row => row && String(row.id) === String(id));
+    if (!item) return;
+    (item.changes || []).forEach(change => {
+      if (!change) return;
+      if (change.list === 'settings') {
+        set[change.id] = change.item;
+        set.stamps = Object.assign({}, set.stamps || {}, { [change.id]: new Date().toISOString() });
+        return;
+      }
+      const arr = Array.isArray(s[change.list]) ? s[change.list] : [];
+      const at = arr.findIndex(row => row && String(row.id) === String(change.id));
+      if (change.item == null) {
+        if (at >= 0) arr.splice(at, 1);
+      } else if (at >= 0) arr[at] = change.item;
+      else arr.push(change.item);
+      s[change.list] = arr;
+    });
+    set.approvals = list.filter(row => row && String(row.id) !== String(id));
+    set.removedApprovalIds = (set.removedApprovalIds || []).concat(String(id)).slice(-200);
+    try { StorageManager.save(); } catch (_) {}
+    Toast.show('Зміну підтверджено', 'ok');
+    App.renderCurrent();
+  },
+
+  rejectChange(id) {
+    if (typeof AuthManager === 'undefined' || !AuthManager._canWriteClub || !AuthManager._canWriteClub()) {
+      try { Toast.show('Відхиляє лише головний тренер', 'warn'); } catch (_) {}
+      return;
+    }
+    const s = Store.get();
+    const set = s.settings || (s.settings = {});
+    set.approvals = (set.approvals || []).filter(row => row && String(row.id) !== String(id));
+    set.removedApprovalIds = (set.removedApprovalIds || []).concat(String(id)).slice(-200);
+    try { StorageManager.save(); } catch (_) {}
+    Toast.show('Зміну відхилено', 'ok');
     App.renderCurrent();
   },
 
@@ -2579,16 +2641,19 @@ const Actions = {
     const shortEl = document.getElementById('setClubShort') || document.getElementById('setShort');
     const priEl = document.getElementById('setPrimary') || document.getElementById('setPri');
     const accEl = document.getElementById('setAccent') || document.getElementById('setAcc');
-    if (clubEl && clubEl.value.trim()) s.clubName = clubEl.value.trim();
-    if (shortEl && shortEl.value.trim()) s.clubShort = shortEl.value.trim();
-    if (priEl && priEl.value) s.primary = priEl.value;
-    if (accEl && accEl.value) s.accent = accEl.value;
+    const now = new Date().toISOString();
+    s.stamps = Object.assign({}, s.stamps || {});
+    s.updatedAt = now;
+    if (clubEl && clubEl.value.trim()) { s.clubName = clubEl.value.trim(); s.stamps.clubName = now; }
+    if (shortEl && shortEl.value.trim()) { s.clubShort = shortEl.value.trim(); s.stamps.clubShort = now; }
+    if (priEl && priEl.value) { s.primary = priEl.value; s.stamps.primary = now; }
+    if (accEl && accEl.value) { s.accent = accEl.value; s.stamps.accent = now; }
     const durEl = document.getElementById('setDur') || document.getElementById('setDefaultDuration');
     const intEl = document.getElementById('setInt') || document.getElementById('setDefaultIntensity');
-    if (durEl) s.defaultDuration = +durEl.value || 90;
-    if (intEl) s.defaultIntensity = +intEl.value || 6;
+    if (durEl) { s.defaultDuration = +durEl.value || 90; s.stamps.defaultDuration = now; }
+    if (intEl) { s.defaultIntensity = +intEl.value || 6; s.stamps.defaultIntensity = now; }
     const autoEl = document.getElementById('setAuto') || document.getElementById('setAutosave');
-    if (autoEl) s.autosave = autoEl.checked !== false;
+    if (autoEl) { s.autosave = autoEl.checked !== false; s.stamps.autosave = now; }
     // Social for guests
     if (!s.social) s.social = {};
     const tgCh = document.getElementById('setTgChannel')?.value?.trim();
@@ -2601,6 +2666,8 @@ const Actions = {
     if (gm != null) {
       s.guestMedia = gm.split(/\n/).map(x => x.trim()).filter(Boolean);
       s.social.media = s.guestMedia;
+      s.stamps.guestMedia = now;
+      s.stamps.social = now;
     }
 
     const capPick = document.querySelector('input[name="setCaptain"]:checked');
@@ -2616,7 +2683,10 @@ const Actions = {
     if (presPick || presNameEl || (asstBoxes && asstBoxes.length)) {
       s.staff = s.staff || {};
       if (presPick) s.staff.presidentId = presPick.value || '';
-      if (presNameEl) s.staff.presidentName = String(presNameEl.value || '').trim();
+      if (presNameEl) {
+        s.staff.presidentName = String(presNameEl.value || '').trim();
+        s.stamps.staff = now;
+      }
         if (asstBoxes && asstBoxes.length) {
         s.staff.assistants = Array.from(asstBoxes).filter(b => b.checked).map(b => b.value);
         Actions._syncAssistantCoaches();
@@ -2624,16 +2694,19 @@ const Actions = {
     }
 
     s.sound = document.getElementById('setSound')?.checked !== false;
+    s.stamps.sound = now;
     const coachNameEl = document.getElementById('setCoachName');
-    if (coachNameEl && coachNameEl.value.trim()) s.coachName = coachNameEl.value.trim();
+    if (coachNameEl && coachNameEl.value.trim()) { s.coachName = coachNameEl.value.trim(); s.stamps.coachName = now; }
     const coachPhotoUrl = document.getElementById('setCoachPhoto')?.value?.trim();
-    if (coachPhotoUrl) s.coachPhoto = coachPhotoUrl;
+    if (coachPhotoUrl) { s.coachPhoto = coachPhotoUrl; s.stamps.coachPhoto = now; }
 
     const logoFile = document.getElementById('setLogo')?.files?.[0];
     const coachFile = document.getElementById('setCoachPhotoFile')?.files?.[0];
 
     const finishSave = () => {
+      const assistant = typeof AuthManager !== 'undefined' && AuthManager.isAssistant && AuthManager.isAssistant();
       StorageManager.save();
+      if (assistant) return;
       App.applyBranding();
       Toast.show('Налаштування збережено', 'ok');
       try {
@@ -2648,7 +2721,11 @@ const Actions = {
     if (logoFile) {
       tasks.push(new Promise(res => {
         const reader = new FileReader();
-        reader.onload = ev => { s.logoData = ev.target.result; res(); };
+        reader.onload = ev => {
+          s.logoData = ev.target.result;
+          s.stamps = Object.assign({}, s.stamps || {}, { logoData: new Date().toISOString() });
+          res();
+        };
         reader.onerror = () => res();
         reader.readAsDataURL(logoFile);
       }));

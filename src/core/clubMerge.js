@@ -296,7 +296,10 @@ function applyStampedFields(merged, a, b) {
     else if (squad(loser && loser.xi)) merged.xi = loser.xi;
     if (winner && Array.isArray(winner.bench)) merged.bench = winner.bench;
     else if (squad(loser && loser.bench)) merged.bench = loser.bench;
-    if (loserAt || winnerAt) return;
+    if (loserAt || winnerAt) {
+      applyOpponentLogo(merged, loser, winner);
+      return;
+    }
     keys.forEach(function (key) {
       if (!filled(winner && winner[key]) && filled(loser && loser[key])) merged[key] = loser[key];
     });
@@ -305,6 +308,22 @@ function applyStampedFields(merged, a, b) {
     }
     if (!squad(winner && winner.xi) && squad(loser && loser.xi)) merged.xi = loser.xi;
     if (!squad(winner && winner.bench) && squad(loser && loser.bench)) merged.bench = loser.bench;
+    applyOpponentLogo(merged, loser, winner);
+  }
+
+  /** Новіша позначка логотипа сильніша за пізніший порожній план. */
+  function applyOpponentLogo(merged, loser, winner) {
+    const ta = fieldTime(loser, 'opponentLogo');
+    const tb = fieldTime(winner, 'opponentLogo');
+    if (ta || tb) {
+      const src = tb >= ta ? winner : loser;
+      if (src && Object.prototype.hasOwnProperty.call(src, 'opponentLogo')) merged.opponentLogo = src.opponentLogo;
+      return;
+    }
+    if (!filled(merged.opponentLogo)) {
+      if (filled(winner && winner.opponentLogo)) merged.opponentLogo = winner.opponentLogo;
+      else if (filled(loser && loser.opponentLogo)) merged.opponentLogo = loser.opponentLogo;
+    }
   }
 
   function isPerson(item) {
@@ -463,12 +482,48 @@ function applyStampedFields(merged, a, b) {
     if (!out.coachPhoto) out.coachPhoto = (loser.coachPhoto || winner.coachPhoto || '');
     if (!out.logoData) out.logoData = (loser.logoData || winner.logoData || '');
     if (!out.coachName) out.coachName = (loser.coachName || winner.coachName || '');
+    ['clubName', 'clubShort', 'primary', 'accent', 'coachName', 'logoData', 'defaultDuration', 'defaultIntensity', 'sound', 'autosave', 'staff', 'social', 'guestMedia'].forEach(function (field) {
+      takeStampedSetting(out, base, extra, field);
+    });
     [
       'removedGiftIds', 'removedBoardIds', 'removedAlbumIds', 'removedTrainingIds',
       'removedMatchIds', 'removedPlayerIds', 'removedSectionIds', 'removedDiaryIds',
       'removedExerciseIds', 'removedMyExerciseIds', 'removedCalendarIds'
     ].forEach(function (key) { unionIds(base, extra, key, out); });
+    unionApprovals(base, extra, out);
     return out;
+  }
+
+  function takeStampedSetting(out, base, extra, field) {
+    const left = fieldTime(base, field);
+    const right = fieldTime(extra, field);
+    if (!left && !right) return;
+    const src = right >= left ? extra : base;
+    if (!src || !Object.prototype.hasOwnProperty.call(src, field)) return;
+    if (field === 'sound' || field === 'autosave' || filled(src[field])) out[field] = src[field];
+  }
+
+  function unionApprovals(base, extra, out) {
+    const gone = [];
+    [base && base.removedApprovalIds, extra && extra.removedApprovalIds].forEach(function (list) {
+      (Array.isArray(list) ? list : []).forEach(function (id) {
+        const token = String(id || '');
+        if (token && gone.indexOf(token) < 0) gone.push(token);
+      });
+    });
+    const map = {};
+    [base && base.approvals, extra && extra.approvals].forEach(function (list) {
+      (Array.isArray(list) ? list : []).forEach(function (item) {
+        if (!item || !item.id || gone.indexOf(String(item.id)) >= 0) return;
+        const prev = map[item.id];
+        if (!prev || stamp(item.at) >= stamp(prev.at)) map[item.id] = item;
+      });
+    });
+    const ids = Object.keys(map);
+    if (ids.length || gone.length) {
+      out.approvals = ids.map(function (id) { return map[id]; }).slice(-40);
+      if (gone.length) out.removedApprovalIds = gone.slice(-200);
+    }
   }
 
   function unionIds(base, extra, key, out) {
@@ -868,6 +923,59 @@ function collapseTrainings(payload) {
     else out.activeBoard = extraBoard || baseBoard;
   }
 
+  const DIFF_LISTS = ['players', 'trainings', 'exercises', 'boards', 'schemeAlbums', 'schemeSections', 'calendar', 'matches', 'tournaments', 'diary', 'myExercises', 'animations', 'gifts'];
+  const DIFF_SETTINGS = ['clubName', 'clubShort', 'primary', 'accent', 'logoData', 'coachName', 'coachPhoto', 'defaultDuration', 'defaultIntensity', 'sound', 'autosave', 'social', 'guestMedia', 'staff', 'telegramChannel', 'instagram', 'youtube'];
+
+  function stableJson(value) {
+    try { return JSON.stringify(value == null ? null : value); } catch (_) { return ''; }
+  }
+
+  function diffClub(before, after) {
+    const changes = [];
+    const index = function (list) {
+      const map = {};
+      (Array.isArray(list) ? list : []).forEach(function (item) {
+        if (item && item.id != null) map[String(item.id)] = item;
+      });
+      return map;
+    };
+    DIFF_LISTS.forEach(function (key) {
+      const left = index(before && before[key]);
+      const right = index(after && after[key]);
+      Object.keys(right).forEach(function (id) {
+        if (stableJson(left[id]) !== stableJson(right[id])) changes.push({ list: key, id: id, item: right[id] });
+      });
+      Object.keys(left).forEach(function (id) {
+        if (!right[id]) changes.push({ list: key, id: id, item: null });
+      });
+    });
+    const baseSet = (before && before.settings) || {};
+    const extraSet = (after && after.settings) || {};
+    DIFF_SETTINGS.forEach(function (field) {
+      if (stableJson(baseSet[field]) !== stableJson(extraSet[field])) {
+        changes.push({ list: 'settings', id: field, item: extraSet[field] });
+      }
+    });
+    return changes.slice(0, 60);
+  }
+
+  function describeChanges(changes) {
+    const names = {
+      players: 'гравець', trainings: 'тренування', matches: 'матч', boards: 'схема',
+      schemeAlbums: 'альбом', schemeSections: 'розділ', calendar: 'календар', diary: 'щоденник',
+      gifts: 'нагорода', exercises: 'вправа', settings: 'налаштування'
+    };
+    const bits = [];
+    (changes || []).slice(0, 3).forEach(function (change) {
+      if (!change) return;
+      if (change.list === 'settings' && (change.id === 'clubName' || change.id === 'clubShort')) bits.push('назва клубу');
+      else bits.push(names[change.list] || 'зміна');
+    });
+    const unique = bits.filter(function (bit, index) { return bits.indexOf(bit) === index; });
+    const extra = (changes || []).length > 3 ? (' і ще ' + ((changes || []).length - 3)) : '';
+    return (unique.join(', ') || 'зміна') + extra;
+  }
+
   root.ClubMerge = {
     mergePayload: mergePayload,
     mergeAttendance: mergeAttendance,
@@ -879,6 +987,8 @@ function collapseTrainings(payload) {
     collapsePlayers: collapsePlayers,
     isSeedPlayer: isSeedPlayer,
     dropSeedPlayers: dropSeedPlayers,
-    trainingNameKey: trainingNameKey
+    trainingNameKey: trainingNameKey,
+    diffClub: diffClub,
+    describeChanges: describeChanges
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -667,4 +667,67 @@ describe('club snapshot merge', () => {
     });
     assert.deepEqual(merged.schemeAlbums[0].boardIds, ['b1', 'b2']);
   });
+
+  it('keeps a stamped club name when the other phone has a newer coach clock', () => {
+    const merged = mergePayload({
+      settings: {
+        clubName: 'СТАРА',
+        clubShort: 'СТ',
+        coachStats: { updatedAt: '2026-11-20T18:00:00.000Z' },
+        stamps: { clubName: '2026-11-01T00:00:00.000Z' }
+      }
+    }, {
+      settings: {
+        clubName: 'НОВА',
+        clubShort: 'НВ',
+        coachStats: { updatedAt: '2026-11-02T00:00:00.000Z' },
+        stamps: { clubName: '2026-11-20T12:00:00.000Z', clubShort: '2026-11-20T12:00:00.000Z' }
+      }
+    });
+    assert.equal(merged.settings.clubName, 'НОВА');
+    assert.equal(merged.settings.clubShort, 'НВ');
+  });
+
+  it('keeps the opponent logo from the newer logo stamp', () => {
+    const merged = mergePayload({
+      matches: [{
+        id: 'm1', opponent: 'FC', opponentLogo: 'data:image/png;base64,abc',
+        stamps: { plan: '2026-11-20T10:00:00.000Z', opponentLogo: '2026-11-20T10:00:00.000Z' }
+      }]
+    }, {
+      matches: [{
+        id: 'm1', opponent: 'FC', opponentLogo: '', plan: 'text',
+        stamps: { plan: '2026-11-20T12:00:00.000Z', opponentLogo: '2026-11-20T09:00:00.000Z' }
+      }]
+    });
+    assert.equal(merged.matches[0].opponentLogo, 'data:image/png;base64,abc');
+  });
+
+  it('unions assistant approvals and drops a rejected one', () => {
+    const merged = mergePayload({
+      settings: {
+        approvals: [{ id: 'a1', at: '2026-11-20T10:00:00.000Z', summary: 'назва', status: 'pending' }],
+        coachStats: { updatedAt: '2026-11-20T18:00:00.000Z' }
+      }
+    }, {
+      settings: {
+        approvals: [{ id: 'a1', at: '2026-11-20T12:00:00.000Z', summary: 'назва', status: 'approved' }],
+        removedApprovalIds: ['a1'],
+        coachStats: { updatedAt: '2026-11-20T11:00:00.000Z' }
+      }
+    });
+    assert.equal((merged.settings.approvals || []).length, 0);
+    assert.equal(merged.settings.removedApprovalIds.length, 1);
+    assert.equal(String(merged.settings.removedApprovalIds[0]), 'a1');
+  });
+
+  it('describes an assistant change without treating a clock tick as a club edit', () => {
+    const { diffClub, describeChanges } = context.ClubMerge;
+    const before = { settings: { clubName: 'СТАРА', presence: { coach: { at: 1 } } }, matches: [{ id: 'm1', opponent: 'A' }] };
+    const after = { settings: { clubName: 'НОВА', presence: { coach: { at: 2 } } }, matches: [{ id: 'm1', opponent: 'A', opponentLogo: 'data:image/png;base64,qq' }] };
+    const changes = diffClub(before, after);
+    assert.equal(changes.length, 2);
+    assert.match(describeChanges(changes), /назва клубу/);
+    assert.match(describeChanges(changes), /матч/);
+  });
 });

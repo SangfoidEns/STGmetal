@@ -300,6 +300,39 @@ const SupabaseClub = {
     }
   },
 
+  async submitApproval(approval) {
+    if (!this.enabled() || !approval || !approval.id) return false;
+    if (this._pushing) {
+      setTimeout(() => { this.submitApproval(approval).catch(() => {}); }, 800);
+      return false;
+    }
+    this._pushing = true;
+    try {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const remote = await this.fetchRemote();
+        if (!remote || remote.error || remote.missing) return false;
+        const payload = remote.payload ? JSON.parse(JSON.stringify(remote.payload)) : {};
+        if (!payload.settings || typeof payload.settings !== 'object') payload.settings = {};
+        const gone = new Set((payload.settings.removedApprovalIds || []).map(id => String(id || '')));
+        if (gone.has(String(approval.id))) return true;
+        const list = Array.isArray(payload.settings.approvals) ? payload.settings.approvals.slice() : [];
+        const at = list.findIndex(item => item && String(item.id) === String(approval.id));
+        if (at >= 0) list[at] = approval;
+        else list.push(approval);
+        payload.settings.approvals = list.slice(-40);
+        const wrote = await this.commit(payload, remote.empty ? 0 : (remote.rev || 0), !remote.empty);
+        if (wrote === 'conflict') continue;
+        if (wrote === true && this._pendingAt && this._sm) this._sm._clubUpdatedAt = this._pendingAt;
+        return wrote === true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    } finally {
+      this._pushing = false;
+    }
+  },
+
   async commit(payload, rev, exists) {
     const next = (Number(rev) || 0) + 1;
     const path = 'state/' + next + '-' + Date.now().toString(36) + '.json';

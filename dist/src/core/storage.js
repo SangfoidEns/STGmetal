@@ -37,8 +37,9 @@ const StorageManager = {
     }
     Object.keys(value).forEach(key => {
       const item = value[key];
-      if (typeof item === 'string' && item.indexOf('data:') === 0) value[key] = '';
-      else if (item && typeof item === 'object') this._stripDataUrls(item, seen);
+      if (typeof item === 'string' && item.indexOf('data:') === 0) {
+        if (key !== 'opponentLogo') value[key] = '';
+      } else if (item && typeof item === 'object') this._stripDataUrls(item, seen);
     });
     return value;
   },
@@ -58,9 +59,11 @@ const StorageManager = {
     try {
       localStorage.setItem(STORAGE_KEY, text);
       this.rememberPlayerPhotos();
+      try { this.rememberOpponentLogos(payload); } catch (_) {}
       return true;
     } catch (err) {
       try {
+        try { this.rememberOpponentLogos(payload); } catch (_) {}
         const slim = JSON.parse(text);
         const coach = slim.settings && (slim.settings.coachPhoto || slim.settings.coachPhotoUrl);
         if (typeof coach === 'string' && coach.indexOf('data:') === 0) this.rememberCoachPhoto(coach);
@@ -218,6 +221,7 @@ const StorageManager = {
   },
 
   applyClubPayload(remote, opts) {
+    if (this._holdRemote && !(opts && opts.force)) return false;
     if (typeof BoardEngine !== 'undefined' && BoardEngine.dragObj) return false;
     if (!remote || !remote.payload || !remote.updatedAt) return false;
     const current = Store.get() || {};
@@ -252,6 +256,7 @@ const StorageManager = {
     if (migrated.settings) delete migrated.settings.lang;
     this.restoreCoachPhoto(migrated);
     this.restorePlayerPhotos(migrated);
+    this.restoreOpponentLogos(migrated);
     this._suppressClubPush = true;
     try {
       Store.set(migrated, { keepStamp: true });
@@ -274,6 +279,7 @@ const StorageManager = {
       if (typeof CoachTools !== 'undefined' && CoachTools.noticeNewGifts) CoachTools.noticeNewGifts(migrated.gifts || []);
     } catch (_) {}
     this._setClubSyncLine('Клубний обмін: отримано ' + String(remote.updatedAt).slice(0, 16).replace('T', ' '));
+    this._rememberSnapshot();
     return true;
   },
 
@@ -368,6 +374,7 @@ const StorageManager = {
   },
 
   COACH_PHOTO_KEY: 'metalist_coach_photo',
+  OPP_LOGO_KEY: 'metalist_opp_logos',
   PLAYER_PHOTO_PREFIX: 'metalist_pphoto_',
 
   rememberPlayerPhotos(state) {
@@ -460,15 +467,111 @@ const StorageManager = {
     return found;
   },
 
+  rememberOpponentLogos(state) {
+    const s = state || (typeof Store !== 'undefined' && Store.get && Store.get());
+    if (!s) return;
+    let map = {};
+    try { map = JSON.parse(localStorage.getItem(this.OPP_LOGO_KEY) || '{}') || {}; } catch (_) { map = {}; }
+    (s.matches || []).forEach(m => {
+      if (!m || m.id == null) return;
+      const id = String(m.id);
+      const url = String(m.opponentLogo || '');
+      if (url.indexOf('data:') === 0) map[id] = url;
+      else if (url.indexOf('http') === 0 || (m.stamps && m.stamps.opponentLogo && !url)) delete map[id];
+    });
+    try { localStorage.setItem(this.OPP_LOGO_KEY, JSON.stringify(map)); } catch (_) {}
+  },
+
+  restoreOpponentLogos(state) {
+    const s = state || (typeof Store !== 'undefined' && Store.get && Store.get());
+    if (!s) return;
+    let map = {};
+    try { map = JSON.parse(localStorage.getItem(this.OPP_LOGO_KEY) || '{}') || {}; } catch (_) { map = {}; }
+    (s.matches || []).forEach(m => {
+      if (!m || m.id == null || m.opponentLogo) return;
+      const saved = map[String(m.id)];
+      if (saved && !(m.stamps && m.stamps.opponentLogo)) m.opponentLogo = saved;
+    });
+  },
+
+  _rememberSnapshot() {
+    try {
+      const live = Store.get();
+      if (live) this._serverSnapshot = JSON.parse(JSON.stringify(live));
+    } catch (_) {}
+  },
+
+  _assistantEditing() {
+    if (this._approvalWrite) return false;
+    try {
+      return typeof AuthManager !== 'undefined' && AuthManager.isAssistant && AuthManager.isAssistant();
+    } catch (_) { return false; }
+  },
+
+  _queueAssistantChange() {
+    const live = Store.get();
+    const base = this._serverSnapshot;
+    if (!live || !base || typeof ClubMerge === 'undefined' || !ClubMerge.diffClub) {
+      this._approvalWrite = true;
+      try { return this.save({ localOnly: true }); }
+      finally { this._approvalWrite = false; }
+    }
+    const changes = ClubMerge.diffClub(base, live);
+    if (!changes.length) {
+      this._approvalWrite = true;
+      try { return this.save({ localOnly: true }); }
+      finally { this._approvalWrite = false; }
+    }
+    const approval = {
+      id: 'ap' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      at: new Date().toISOString(),
+      by: (typeof AuthManager !== 'undefined' && AuthManager.displayName) ? AuthManager.displayName() : 'Помічник',
+      summary: ClubMerge.describeChanges ? ClubMerge.describeChanges(changes) : 'зміна',
+      status: 'pending',
+      changes: changes
+    };
+    let restored = null;
+    try { restored = JSON.parse(JSON.stringify(base)); } catch (_) { restored = null; }
+    if (!restored) {
+      try { Toast.show('Не вдалося надіслати зміну', 'err'); } catch (_) {}
+      return;
+    }
+    if (!restored.settings) restored.settings = {};
+    const pending = ((live.settings && live.settings.approvals) || []).filter(item => item && item.status === 'pending' && item.id !== approval.id);
+    const combined = (restored.settings.approvals || []).concat(pending, [approval]);
+    const seen = {};
+    restored.settings.approvals = combined.filter(item => {
+      if (!item || !item.id || seen[item.id]) return false;
+      seen[item.id] = true;
+      return true;
+    }).slice(-40);
+    ['theme', 'lang', 'presence', 'playerUsage', 'coachStats'].forEach(key => {
+      if (live.settings && live.settings[key] != null) restored.settings[key] = live.settings[key];
+    });
+    if (live.ui) restored.ui = live.ui;
+    this._approvalWrite = true;
+    try {
+      Store.set(restored, { keepStamp: true });
+      this.save({ localOnly: true });
+    } finally {
+      this._approvalWrite = false;
+    }
+    try { Toast.show('Надіслано головному тренеру', 'ok'); } catch (_) {}
+    try { if (typeof App !== 'undefined' && App.renderCurrent) App.renderCurrent(); } catch (_) {}
+    try { if (typeof SupabaseClub !== 'undefined' && SupabaseClub.submitApproval) SupabaseClub.submitApproval(approval); } catch (_) {}
+  },
+
   save(opts) {
     /* DATA INTEGRITY: never wipe keys on error */
     /* Кеш Telegram тримає останню сесію. На сайт клубний файл не викладається. */
+    if (this._assistantEditing()) return this._queueAssistantChange();
     const localOnly = !!(opts && opts.localOnly) || this._staticClubOnly();
     try {
       const s = Store.get();
       if (!s) return;
       this.restoreCoachPhoto(s);
       this.restorePlayerPhotos(s);
+      this.restoreOpponentLogos(s);
       this.rememberPlayerPhotos(s);
       s.updatedAt = new Date().toISOString();
       const payload = this._buildLocalPayload();
@@ -723,9 +826,11 @@ const StorageManager = {
       Store.set(migrated, { keepStamp: true });
       const photoAfter = this.restoreCoachPhoto();
       this.restorePlayerPhotos();
+      this.restoreOpponentLogos();
       if (folded.removed || (photoAfter && photoAfter !== photoBefore)) {
         try { this.save({ localOnly: true }); } catch (_) {}
       }
+      this._rememberSnapshot();
       return true;
     } catch (e) {
       ErrorManager.log('Storage.load', e);

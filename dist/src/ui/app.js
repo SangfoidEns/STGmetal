@@ -2688,7 +2688,7 @@ const App = {
       clearHold();
       timer = setTimeout(() => {
         timer = null;
-        if (!row) return;
+        if (!row || row.dataset.bucket === 'out') return;
         mode = 'drag';
         row.classList.add('is-pinned', 'sq-dragging');
         try { TelegramManager.haptic && TelegramManager.haptic('medium'); } catch (_) {}
@@ -2699,6 +2699,7 @@ const App = {
       const dx = e.clientX - sx;
       const dy = e.clientY - sy;
       if (mode === 'drag') {
+        if (e.cancelable) e.preventDefault();
         const list = row.closest('.sq-list');
         if (!list) return;
         const rows = Array.prototype.slice.call(list.querySelectorAll('.sq-row'));
@@ -2724,6 +2725,7 @@ const App = {
       }
       clearHold();
       mode = 'swipe';
+      if (e.cancelable) e.preventDefault();
       const shift = Math.max(-236, Math.min(188, dx));
       if (face) {
         face.style.transition = 'none';
@@ -2731,20 +2733,30 @@ const App = {
       }
       const full = Math.abs(dx) >= LONG;
       row.classList.toggle('sq-full', full);
-      row.classList.toggle('sq-peek', !full && Math.abs(dx) >= 28);
+      row.classList.toggle('sq-peek', Math.abs(dx) >= 28);
+      row.classList.toggle('is-holding-left', dx < 0);
       if (full && !row._sqTick) {
         row._sqTick = true;
         try { TelegramManager.haptic && TelegramManager.haptic('light'); } catch (_) {}
       }
       if (!full) row._sqTick = false;
-    }, { passive: true });
+    }, { passive: false });
     const finish = (e) => {
       if (!row || (e && e.pointerId != null && e.pointerId !== pid)) return;
       const hit = row;
       const dx = (e && e.clientX != null ? e.clientX : sx) - sx;
       const wasDrag = mode === 'drag';
+      const cancelled = !!(e && e.type === 'pointercancel');
       clearHold();
       if (face) face.style.transition = '';
+      if (cancelled && !wasDrag) {
+        hit.classList.remove('sq-peek', 'sq-full', 'sq-dragging', 'is-holding-left', 'is-open-left', 'is-open-right');
+        if (face) face.style.transform = '';
+        mode = '';
+        row = null;
+        face = null;
+        return;
+      }
       if (wasDrag) {
         hit.classList.remove('is-pinned', 'sq-dragging');
         const list = hit.closest('.sq-list');
@@ -2757,7 +2769,7 @@ const App = {
         if (ids.length && hit.dataset.matchId && hit.dataset.bucket !== 'out') Actions.applySquadOrder(hit.dataset.matchId, hit.dataset.bucket, ids);
         return;
       }
-      hit.classList.remove('sq-peek', 'sq-dragging');
+      hit.classList.remove('sq-peek', 'sq-dragging', 'is-holding-left');
       if (face) face.style.transform = '';
       const horizontal = Math.abs(dx) >= SHORT && Math.abs(dx) >= Math.abs((e && e.clientY != null ? e.clientY : sy) - sy);
       mode = '';
@@ -3959,6 +3971,8 @@ const App = {
         return;
       }
       if (action === 'save-settings') return Actions.saveSettings();
+      if (action === 'approve-change') return Actions.approveChange(t.dataset.approvalId);
+      if (action === 'reject-change') return Actions.rejectChange(t.dataset.approvalId);
       if (action === 'enter-server-code') return this.askClubCode();
       if (action === 'save-supabase-key') return Actions.saveSupabaseKey();
       if (action === 'staff-add') {

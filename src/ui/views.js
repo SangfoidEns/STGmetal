@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z118',
+  APP_BUILD: 'z119',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -46,7 +46,7 @@ const Views = {
   },
 
   _crestHtml(src, letters) {
-    if (src) return '<img src="' + sanitize(src) + '" alt="">';
+    if (src) return '<img src="' + sanitize(src) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block">';
     return '<span>' + sanitize(letters || '—') + '</span>';
   },
 
@@ -514,6 +514,7 @@ const Views = {
     const coachXp = (typeof CoachTools !== 'undefined' && CoachTools.coachProgress) ? CoachTools.coachProgress() : null;
     return `
       <div class="club-profile">
+        ${this._approvalsBanner()}
         ${this._pitchBar()}
 
         <!-- Telegram-style profile card (coach/player) -->
@@ -2183,9 +2184,10 @@ trainings() {
       block('Поза заявкою', out, 'out', '•');
   },
 
-  _squadUnder() {
+  _squadUnder(bucket) {
+    const nudge = bucket === 'bench' ? 'Поза заявкою' : 'У резерв';
     return '<div class="sq-under sq-under-right">' +
-      '<button type="button" class="sq-act sq-act-main" data-sq="nudge">У резерв</button>' +
+      '<button type="button" class="sq-act sq-act-main" data-sq="nudge">' + nudge + '</button>' +
       '<button type="button" class="sq-act sq-act-xi" data-sq="xi-bench"><b>Основа</b><small>запас</small></button>' +
       '<button type="button" class="sq-act sq-act-out" data-sq="bench-out"><b>Резерв</b><small>поза заявкою</small></button>' +
       '</div><div class="sq-under sq-under-left">' +
@@ -2209,7 +2211,7 @@ trainings() {
       '<span class="match-chip-name">' + name.trim() + '</span>' +
       '<span class="match-chip-meta">' + meta + '</span>');
     return '<div class="sq-row" data-player-id="' + id + '"' + match + ' data-bucket="' + bucket + '">' +
-      this._squadUnder() +
+      this._squadUnder(bucket) +
       '<div class="sq-face ' + faceCls + '" data-player-id="' + id + '" data-action="open-player-card" role="button">' +
       inner + '</div></div>';
   },
@@ -3980,8 +3982,11 @@ trainings() {
     if (!head) {
       const pres = players.find(p => p && String(p.id) === String(staff.presidentId || ''));
       const asst = assistants.map(id => players.find(p => p && String(p.id) === id)).filter(Boolean).map(nameOf);
+      const assistant = typeof AuthManager !== 'undefined' && AuthManager.isAssistant && AuthManager.isAssistant();
       return '<div class="card glass settings-card"><div class="ct">Склад тренерів</div>' + crest +
-        '<p class="note-sm">Помічників, президента і капітана призначає головний тренер.</p>' +
+        '<p class="note-sm">' + (assistant
+          ? 'Ти помічник. Бачиш додаток як тренер. Зміни чекають підтвердження головного тренера.'
+          : 'Помічників, президента і капітана призначає головний тренер.') + '</p>' +
         '<p>Президент: ' + sanitize(staff.presidentName || (pres ? nameOf(pres) : '—')) + '</p>' +
         '<p>Помічники: ' + sanitize(asst.join(', ') || '—') + '</p>' +
         '<p>Капітан: ' + sanitize(cap ? nameOf(cap) : '—') + '</p></div>';
@@ -3996,14 +4001,37 @@ trainings() {
       return p ? chip('assistant', p.id, nameOf(p)) : '';
     }).join('');
     return '<div class="card glass settings-card"><div class="ct">Склад тренерів</div>' + crest +
-      '<p class="note-sm">Головний тренер — Artem Serdiuk. Плюс відкриває вибір. Помічник з Telegram входить як тренер.</p>' +
+      '<p class="note-sm">Головний тренер — Artem Serdiuk. Помічник бачить додаток як тренер, а зміна чекає твого підтвердження.</p>' +
       cat('Помічники', 'assistant', asstChips) +
       cat('Президент', 'president', pres ? chip('president', pres.id, nameOf(pres)) : '') +
       '<label class="fl"><span class="fl-label">Президент не зі складу</span>' +
         '<input type="text" id="setPresidentName" class="fl-input" value="' + sanitize(staff.presidentName || '') + '" placeholder="Ім’я, якщо це не гравець">' +
       '</label>' +
       cat('Капітан', 'captain', cap ? chip('captain', cap.id, nameOf(cap)) : '') +
-      '<button type="button" class="btn btn-p" data-action="save-settings">Зберегти склад</button></div>';
+      '</div>';
+  },
+
+  _approvalsBanner() {
+    const s = Store.get();
+    const pending = ((s.settings && s.settings.approvals) || []).filter(item => item && item.status !== 'approved' && item.status !== 'rejected');
+    const head = this.isHeadCoach();
+    const assistant = typeof AuthManager !== 'undefined' && AuthManager.isAssistant && AuthManager.isAssistant();
+    let html = '';
+    if (assistant) {
+      html += '<div class="card glass approval-note"><p class="note-sm">Ти помічник. Екран тренера відкритий. Будь-яка зміна піде головному тренеру і з’явиться після підтвердження.</p></div>';
+    }
+    if (!pending.length) return html;
+    if (head) {
+      html += pending.map(item => '<div class="card glass approval-card"><div class="ct">Підтвердження</div><p>' +
+        sanitize((item.by || 'Помічник') + ': ' + (item.summary || 'зміна')) + '</p><div class="settings-actions">' +
+        '<button type="button" class="btn btn-p btn-sm" data-action="approve-change" data-approval-id="' + sanitize(item.id) + '">Підтвердити</button>' +
+        '<button type="button" class="btn btn-s btn-sm" data-action="reject-change" data-approval-id="' + sanitize(item.id) + '">Відхилити</button>' +
+        '</div></div>').join('');
+    } else if (assistant) {
+      html += '<div class="card glass approval-card"><p class="note-sm">Чекає підтвердження: ' +
+        sanitize(pending.map(item => item.summary || 'зміна').join(', ')) + '</p></div>';
+    }
+    return html;
   },
 
   settings() {
@@ -4069,7 +4097,7 @@ trainings() {
           </label>
           <label class="fl fl-check"><input type="checkbox" id="setAuto" ${checked(set.autosave !== false)} ${dis}> Автозбереження</label>
           <label class="fl fl-check"><input type="checkbox" id="setSound" ${checked(set.sound !== false)} ${dis}> Звук</label>
-          ${canEdit ? '<button type="button" class="btn btn-p" data-action="save-settings">Зберегти</button>' : '<p class="note-sm">Змінює лише тренер. Ваш екран підхопить їх сам.</p>'}
+          ${canEdit ? '' : '<p class="note-sm">Змінює лише тренер. Ваш екран підхопить їх сам.</p>'}
         </div>
       </div>
       <div class="card glass settings-card">
@@ -4087,9 +4115,10 @@ trainings() {
           <label class="fl"><span class="fl-label">Медіа для гостей, одне посилання на рядок</span>
             <textarea id="setGuestMedia" class="fl-input" rows="4" ${ro}>${sanitize(mediaLines)}</textarea>
           </label>
-          ${canEdit ? '<button type="button" class="btn btn-p" data-action="save-settings">Зберегти</button>' : ''}
         </div>
       </div>
+      ${canEdit ? '<div class="settings-savebar"><button type="button" class="btn btn-p" data-action="save-settings">Зберегти</button><p class="note-sm">Одна кнопка записує назву, коротку назву, кольори, логотип, тренера, президента, тренування, посилання і код сервера.</p></div>' : ''}
+      ${this._approvalsBanner()}
       <div class="card glass settings-card">
         <div class="ct">Дані клубу</div>
         <p class="note-sm">Клуб ходить тільки через сервер. Гравець і гість файл не пересилають.</p>
