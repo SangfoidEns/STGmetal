@@ -369,6 +369,8 @@ const Actions = {
       return;
     }
     Modal.close();
+    Store.get().ui = Store.get().ui || {};
+    Store.get().ui.boardContext = { type: 'diary', id: id };
     if (typeof BoardLink !== 'undefined') BoardLink.openSnapshot(d.board, 'diary-board');
     else {
       Store.get().activeBoard.objects = JSON.parse(JSON.stringify(d.board.objects || []));
@@ -384,14 +386,13 @@ const Actions = {
     }
     const t = (Store.get().trainings || []).find(x => x.id === id);
     Modal.close();
+    Store.get().ui = Store.get().ui || {};
+    Store.get().ui.boardContext = { type: 'training', id: id };
     if (t && t.board && typeof BoardLink !== 'undefined') {
       BoardLink.openSnapshot(t.board, 'training-board');
       Toast.show('Дошка тренування відкрита', 'ok');
       return;
     }
-    // немає знімка — відкрити поточну дошку і запам'ятати контекст
-    Store.get().ui = Store.get().ui || {};
-    Store.get().ui.boardContext = { type: 'training', id: id };
     App.allowBoardOnce('training-board');
     App.navigate('board');
     Toast.show('Дошка відкрита. Збережіть схему або «Прикріпити до тренування» в меню.', 'ok');

@@ -612,15 +612,15 @@ const BoardEngine = {
     const tool = s.activeBoard.tool;
     const target = e.target.closest('.pt, .ball, .eq');
 
-    /* ── IMMEDIATE DRAG: touch player → attach now ── */
-    if (target && (tool === 'select' || tool === 'player' || tool === 'opponent' || !tool)) {
+    /* Фішку завжди веде палець. Інструмент малювання лишається для порожнього поля. */
+    if (target) {
       const id = target.dataset.id;
       const obj = s.activeBoard.objects.find(o => o.id === id);
       if (obj) {
         s.activeBoard.selectedId = id;
+        if (obj.locked) return;
         this.dragObj = obj;
         this.activePointerId = e.pointerId;
-        // Offset so chip stays under finger, no jump to center
         this.dragOffset = {
           x: world.x - obj.x,
           y: world.y - obj.y
@@ -629,9 +629,7 @@ const BoardEngine = {
         this._dragMovedPx = 0;
         try { target.setPointerCapture(e.pointerId); } catch (_) {}
         try { TelegramManager.haptic('medium'); } catch (_) {}
-        target.classList.add('dragging');
-        // Visual select only — NO full app rerender, NO save
-        this.renderTokens();
+        target.classList.add('dragging', 'sel');
         return;
       }
     }
@@ -709,6 +707,7 @@ const BoardEngine = {
 
     if (['arrow', 'arrowDash', 'pass', 'run', 'dribble', 'press', 'shot', 'zone', 'circle', 'ellipse', 'freehand'].includes(tool)) {
       this.drawing = true;
+      this._boardChanged = false;
       const isShape = ['zone', 'circle', 'ellipse', 'freehand'].includes(tool);
       const snap = isShape ? { x: world.x, y: world.y, token: null } : this.snapToToken(world.x, world.y);
       this.startPos = { x: snap.x, y: snap.y };
@@ -961,6 +960,7 @@ const BoardEngine = {
         this._textGrab = null;
         this.dragObj = null;
         this.activePointerId = null;
+        this._syncLiveBoard();
         this.pushHistory();
         this.renderDrawings();
         try { StorageManager.save(); } catch (_) {}
@@ -988,14 +988,17 @@ const BoardEngine = {
           demoted = true;
         }
       } catch (_) {}
+      const movedPx = this._dragMovedPx || 0;
       this._dragOrigin = null;
       this._dragMovedPx = 0;
       this.dragObj = null;
       this.activePointerId = null;
       if (demoted) {
+        this._syncLiveBoard();
         this.demoteToBench(dragged.id);
         return;
       }
+      if (movedPx > 3) this._syncLiveBoard();
       this.pushHistory();
       try { StorageManager.save(); } catch (_) {}
       return;
@@ -1030,6 +1033,7 @@ const BoardEngine = {
           locked: false, visible: true
         });
         this.pushHistory();
+        this._boardChanged = true;
       }
     } else if (tool === 'zone') {
       const x = Math.min(this.startPos.x, world.x);
@@ -1046,6 +1050,7 @@ const BoardEngine = {
         s.activeBoard.objects.push(zone);
         s.activeBoard.selectedId = zone.id;
         this.pushHistory();
+        this._boardChanged = true;
       }
     } else if (tool === 'circle' || tool === 'ellipse') {
       const r = Math.hypot(world.x - this.startPos.x, world.y - this.startPos.y);
@@ -1061,6 +1066,7 @@ const BoardEngine = {
         s.activeBoard.objects.push(zone);
         s.activeBoard.selectedId = zone.id;
         this.pushHistory();
+        this._boardChanged = true;
       }
     } else if (tool === 'freehand' && this._freehand && this._freehand.length > 3) {
       // Close freehand into polygon zone
@@ -1075,11 +1081,16 @@ const BoardEngine = {
       s.activeBoard.selectedId = zone.id;
       this._freehand = null;
       this.pushHistory();
+      this._boardChanged = true;
     }
 
     this.drawing = false;
     this.startPos = null;
     this.activePointerId = null;
+    if (this._boardChanged) {
+      this._boardChanged = false;
+      this._syncLiveBoard();
+    }
     this.render();
   },
 
@@ -1098,6 +1109,7 @@ const BoardEngine = {
     this.polygonPoints = [];
     this.polygonMode = false;
     this.pushHistory();
+    this._syncLiveBoard();
     this.render();
     Toast.show('Polygon zone створено', 'ok');
   },
@@ -1641,6 +1653,40 @@ const BoardEngine = {
     return true;
   },
 
+  _syncLiveBoard() {
+    try {
+      const s = Store.get();
+      if (!s || !s.activeBoard) return;
+      const now = new Date().toISOString();
+      s.activeBoard.updatedAt = now;
+      const objects = JSON.parse(JSON.stringify(s.activeBoard.objects || []));
+      const linked = s.activeBoard.sourceBoardId;
+      if (linked) {
+        const board = (s.boards || []).find(x => x && String(x.id) === String(linked));
+        if (board) {
+          board.objects = objects;
+          board.fieldView = s.activeBoard.fieldView || board.fieldView || 'full';
+          board.updatedAt = now;
+        }
+      }
+      const ctx = s.ui && s.ui.boardContext;
+      if (ctx && ctx.id && ctx.type === 'training') {
+        const training = (s.trainings || []).find(x => x && String(x.id) === String(ctx.id));
+        if (training) {
+          training.board = { objects: objects, fieldView: s.activeBoard.fieldView || 'full', capturedAt: now };
+          training.updatedAt = now;
+        }
+      }
+      if (ctx && ctx.id && ctx.type === 'diary') {
+        const note = (s.diary || []).find(x => x && String(x.id) === String(ctx.id));
+        if (note) {
+          note.board = { objects: objects, fieldView: s.activeBoard.fieldView || 'full', capturedAt: now };
+          note.updatedAt = now;
+        }
+      }
+    } catch (_) {}
+  },
+
   saveBoard() {
     const linked = Store.get().activeBoard && Store.get().activeBoard.sourceBoardId;
     if (linked && typeof Actions !== 'undefined' && Actions.saveSchemeDrawing) {
@@ -2136,7 +2182,7 @@ const BoardEngine = {
       w = (c && c.clientWidth) || 320;
     }
     // ~5.2% ширини поля; clamp tighter for phones so chips stay readable but scale down
-    const player = Math.max(16, Math.min(42, Math.round(w * 0.052)));
+    const player = Math.max(28, Math.min(42, Math.round(w * 0.052)));
     const ball = Math.max(8, Math.round(player * 0.40));
     const inv = Math.max(10, Math.round(player * 0.38));
     const cone = Math.round(inv * 1.05);

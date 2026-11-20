@@ -2110,6 +2110,7 @@ const App = {
       backdrop.classList.add('show');
     });
     const close = () => {
+      this._uiQuietUntil = Date.now() + 700;
       backdrop.classList.remove('show');
       setTimeout(() => { backdrop.remove(); }, 220);
     };

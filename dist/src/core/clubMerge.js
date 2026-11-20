@@ -704,12 +704,31 @@ function collapseTrainings(payload) {
   }
 
   /** Порожня дошка в новішому файлі не стирає вже намальовану. */
+  function boardStamp(board) {
+    if (!board) return 0;
+    const raw = board.updatedAt || board.movedAt || board.capturedAt || '';
+    const n = Date.parse(raw);
+    return isNaN(n) ? 0 : n;
+  }
+
+  /** Порожня дошка не стирає намальовану. Якщо фішки на місці, бере новіший зсув. */
   function keepActiveBoard(out, base, extra) {
     const baseBoard = base && base.activeBoard;
     const extraBoard = extra && extra.activeBoard;
-    if (boardObjectCount(extraBoard) > boardObjectCount(baseBoard)) out.activeBoard = extraBoard;
-    else if (baseBoard) out.activeBoard = baseBoard;
-    else if (extraBoard) out.activeBoard = extraBoard;
+    const baseN = boardObjectCount(baseBoard);
+    const extraN = boardObjectCount(extraBoard);
+    if (!baseN && !extraN) {
+      if (extraBoard) out.activeBoard = extraBoard;
+      else if (baseBoard) out.activeBoard = baseBoard;
+      return;
+    }
+    if (baseN && !extraN) { out.activeBoard = baseBoard; return; }
+    if (extraN && !baseN) { out.activeBoard = extraBoard; return; }
+    const baseAt = boardStamp(baseBoard);
+    const extraAt = boardStamp(extraBoard);
+    if (extraAt > baseAt) out.activeBoard = extraBoard;
+    else if (baseAt > extraAt) out.activeBoard = baseBoard;
+    else out.activeBoard = extraBoard || baseBoard;
   }
 
   root.ClubMerge = {

@@ -189,6 +189,7 @@ const SupabaseClub = {
 
   async pull(opts) {
     if (!this.enabled() || !this._sm) return false;
+    if (typeof BoardEngine !== 'undefined' && BoardEngine.dragObj) return false;
     const remote = (opts && opts.known) || await this.fetchRemote();
     if (!remote || remote.error) {
       this._line(this._fail(remote));
@@ -332,8 +333,6 @@ const SupabaseClub = {
       if (url) {
         map.set(job.value, url);
         job.set(url);
-      } else {
-        job.set('');
       }
     }
     return { payload: copy, map: map };

@@ -476,6 +476,25 @@ describe('club snapshot merge', () => {
     assert.equal(back.trainings.length, 2);
   });
 
+  it('keeps the newer chip positions when both boards are drawn', () => {
+    const phone = {
+      activeBoard: {
+        updatedAt: '2026-11-20T01:00:00.000Z',
+        objects: [{ id: 'p1', x: 0.2, y: 0.4 }, { id: 'p2', x: 0.8, y: 0.6 }]
+      }
+    };
+    const server = {
+      activeBoard: {
+        updatedAt: '2026-11-20T00:10:00.000Z',
+        objects: [{ id: 'p1', x: 0.5, y: 0.5 }, { id: 'p2', x: 0.5, y: 0.7 }]
+      }
+    };
+    const merged = mergePayload(server, phone);
+    assert.equal(merged.activeBoard.objects[0].x, 0.2);
+    const olderPhone = mergePayload(phone, server);
+    assert.equal(olderPhone.activeBoard.objects[0].x, 0.2);
+  });
+
   it('drops a demo squad once a real player is in the file and keeps a lone test card', () => {
     const mixed = mergePayload({
       players: [

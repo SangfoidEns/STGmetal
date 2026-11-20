@@ -13062,3 +13062,66 @@ body.board-only-mode #mobileNav.glass-nav {
   .pm-season, .pm-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .pt-tab { font-size: 13px; padding: 0 4px; }
 }
+
+/* Шари: поле під фішками, панелі не ловлять дотик, розгортки над списком */
+#fieldStage .dl,
+#fieldStage .dl svg,
+#drawSvg,
+#drawSvg * {
+  pointer-events: none !important;
+  z-index: 1 !important;
+}
+#playersLayer {
+  z-index: 4 !important;
+  pointer-events: none !important;
+}
+#playersLayer .pt,
+#playersLayer .ball,
+#playersLayer .eq {
+  pointer-events: auto !important;
+  touch-action: none !important;
+  z-index: 5 !important;
+}
+#playersLayer .pt::after {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+}
+#v-board.on #boardToolbarTop.btb-top,
+#v-board.on #boardToolbarBottom.btb-bottom,
+body.mode-board-focus #boardToolbarBottom.btb-bottom {
+  position: relative !important;
+  inset: auto !important;
+  z-index: 40 !important;
+}
+.btb-tray:not(.open),
+body:not(.tools-tray-open) #btbToolsTray {
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+.tg-sheet-backdrop:not(.show) {
+  pointer-events: none !important;
+}
+.tg-sheet,
+.tg-sheet-btn,
+.mo.show .md,
+.mo.show .mf,
+.mo.show button {
+  pointer-events: auto !important;
+}
+.ym-track.ym-open,
+.ym-track.ym-menu-open .ym-menu,
+.coach-tools-body:not([hidden]),
+.match-plan,
+.match-chips {
+  position: relative;
+  z-index: 6;
+  pointer-events: auto;
+}
+.coach-tools-body[hidden] { display: none !important; }
+.card:has(.ym-open),
+.card:has(.match-plan),
+.card:has(.coach-tools-body:not([hidden])) {
+  overflow: visible !important;
+}

@@ -218,6 +218,7 @@ const StorageManager = {
   },
 
   applyClubPayload(remote, opts) {
+    if (typeof BoardEngine !== 'undefined' && BoardEngine.dragObj) return false;
     if (!remote || !remote.payload || !remote.updatedAt) return false;
     const current = Store.get() || {};
     const ui = current.ui;
@@ -941,7 +942,8 @@ const StorageManager = {
       activeBoard: {
         objects: clone((s.activeBoard && s.activeBoard.objects) || []) || [],
         fieldView: (s.activeBoard && s.activeBoard.fieldView) || 'full',
-        scheme: (s.activeBoard && s.activeBoard.scheme) || ''
+        scheme: (s.activeBoard && s.activeBoard.scheme) || '',
+        updatedAt: (s.activeBoard && s.activeBoard.updatedAt) || ''
       }
     };
   },
