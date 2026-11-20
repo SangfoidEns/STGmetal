@@ -155,6 +155,26 @@ describe('club snapshot merge', () => {
     assert.ok(merged.settings.removedAlbumIds.indexOf('a-old') >= 0);
   });
 
+  it('does not bring back a training the coach deleted', () => {
+    const phone = {
+      settings: { updatedAt: '2026-11-20T12:00:00.000Z' },
+      trainings: [{ id: 't-old', name: 'Тренування 20/11', date: '2026-11-20', status: 'planned', updatedAt: '2026-11-20T12:00:00.000Z' }],
+      calendar: [{ id: 'c-new', trainingId: 't-old', date: '2026-11-20', title: 'Тренування 20/11', updatedAt: '2026-11-20T12:00:00.000Z' }],
+      matches: [{ id: 'm-old', opponent: 'Старий', date: '2026-11-21', updatedAt: '2026-11-20T12:00:00.000Z' }]
+    };
+    const server = {
+      settings: { removedTrainingIds: ['t-old'], removedMatchIds: ['m-old'], updatedAt: '2026-11-20T11:00:00.000Z' },
+      trainings: [],
+      calendar: [],
+      matches: []
+    };
+    const merged = mergePayload(phone, server);
+    assert.equal(merged.trainings.length, 0);
+    assert.equal(merged.calendar.length, 0);
+    assert.equal(merged.matches.length, 0);
+    assert.ok(merged.settings.removedTrainingIds.indexOf('t-old') >= 0);
+  });
+
   it('keeps a draft a draft when the phone still has an old cancel stamp', () => {
     const phone = {
       trainings: [{

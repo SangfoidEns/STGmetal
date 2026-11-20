@@ -401,31 +401,23 @@ function applyStampedFields(merged, a, b) {
     if (!out.coachPhoto) out.coachPhoto = (loser.coachPhoto || winner.coachPhoto || '');
     if (!out.logoData) out.logoData = (loser.logoData || winner.logoData || '');
     if (!out.coachName) out.coachName = (loser.coachName || winner.coachName || '');
-    const gone = [];
-    [base.removedGiftIds, extra.removedGiftIds].forEach(function (list) {
-      (Array.isArray(list) ? list : []).forEach(function (id) {
-        const key = String(id || '');
-        if (key && gone.indexOf(key) < 0) gone.push(key);
-      });
-    });
-    if (gone.length) out.removedGiftIds = gone.slice(-800);
-    const droppedBoards = [];
-    [base.removedBoardIds, extra.removedBoardIds].forEach(function (list) {
-      (Array.isArray(list) ? list : []).forEach(function (id) {
-        const key = String(id || '');
-        if (key && droppedBoards.indexOf(key) < 0) droppedBoards.push(key);
-      });
-    });
-    if (droppedBoards.length) out.removedBoardIds = droppedBoards.slice(-800);
-    const droppedAlbums = [];
-    [base.removedAlbumIds, extra.removedAlbumIds].forEach(function (list) {
-      (Array.isArray(list) ? list : []).forEach(function (id) {
-        const key = String(id || '');
-        if (key && droppedAlbums.indexOf(key) < 0) droppedAlbums.push(key);
-      });
-    });
-    if (droppedAlbums.length) out.removedAlbumIds = droppedAlbums.slice(-800);
+    [
+      'removedGiftIds', 'removedBoardIds', 'removedAlbumIds', 'removedTrainingIds',
+      'removedMatchIds', 'removedPlayerIds', 'removedSectionIds', 'removedDiaryIds',
+      'removedExerciseIds', 'removedMyExerciseIds', 'removedCalendarIds'
+    ].forEach(function (key) { unionIds(base, extra, key, out); });
     return out;
+  }
+
+  function unionIds(base, extra, key, out) {
+    const gone = [];
+    [base && base[key], extra && extra[key]].forEach(function (list) {
+      (Array.isArray(list) ? list : []).forEach(function (id) {
+        const token = String(id || '');
+        if (token && gone.indexOf(token) < 0) gone.push(token);
+      });
+    });
+    if (gone.length) out[key] = gone.slice(-800);
   }
 
   function mergeFeedMeta(base, extra) {
@@ -741,6 +733,34 @@ function collapseTrainings(payload) {
           section.albumIds = section.albumIds.filter(function (id) { return !droppedAlbums.has(String(id || '')); });
         });
       }
+    }
+    const goneIds = function (key) {
+      return new Set(((out.settings && out.settings[key]) || []).map(function (id) { return String(id || ''); }));
+    };
+    const dropList = function (listName, set) {
+      if (!set.size || !Array.isArray(out[listName])) return;
+      out[listName] = out[listName].filter(function (item) {
+        return !(item && set.has(String(item.id || '')));
+      });
+    };
+    const goneTrain = goneIds('removedTrainingIds');
+    const goneMatch = goneIds('removedMatchIds');
+    const goneCal = goneIds('removedCalendarIds');
+    dropList('trainings', goneTrain);
+    dropList('matches', goneMatch);
+    dropList('players', goneIds('removedPlayerIds'));
+    dropList('schemeSections', goneIds('removedSectionIds'));
+    dropList('diary', goneIds('removedDiaryIds'));
+    dropList('exercises', goneIds('removedExerciseIds'));
+    dropList('myExercises', goneIds('removedMyExerciseIds'));
+    dropList('calendar', goneCal);
+    if (Array.isArray(out.calendar) && (goneTrain.size || goneMatch.size)) {
+      out.calendar = out.calendar.filter(function (ev) {
+        if (!ev) return false;
+        if (ev.trainingId && goneTrain.has(String(ev.trainingId))) return false;
+        if (ev.matchId && goneMatch.has(String(ev.matchId))) return false;
+        return true;
+      });
     }
     collapseTrainings(out);
     collapsePlayers(out);

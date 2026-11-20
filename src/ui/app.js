@@ -2147,7 +2147,8 @@ const App = {
       }
       if (act === 'delete') {
         return Modal.confirm(((typeof I18n!=='undefined'?I18n.t('confirm_del_training','Видалити тренування назавжди?'):'Видалити тренування назавжди?')), () => {
-          Store.get().trainings = Store.get().trainings.filter(x => x.id !== tid);
+          if (typeof Actions !== 'undefined' && Actions.dropTraining) Actions.dropTraining(tid);
+          else Store.get().trainings = Store.get().trainings.filter(x => x.id !== tid);
           StorageManager.save();
           App.renderCurrent();
           Toast.show('Видалено');
@@ -2250,7 +2251,8 @@ const App = {
       }
       if (act === 'delete') {
         return Modal.confirm('Видалити гравця?', function() {
-          Store.get().players = Store.get().players.filter(x => x.id !== pid);
+          if (typeof Actions !== 'undefined' && Actions.dropPlayer) Actions.dropPlayer(pid);
+          else Store.get().players = Store.get().players.filter(x => x.id !== pid);
           StorageManager.save();
           App.renderCurrent();
           Toast.show('Видалено');
@@ -4639,14 +4641,14 @@ const App = {
         App.navigate('board');
         return;
       }
-      if (t.dataset.delTraining) return Modal.confirm('Видалити тренування?', () => { Store.get().trainings = Store.get().trainings.filter(x => x.id !== t.dataset.delTraining); StorageManager.save(); App.renderCurrent(); Toast.show('Видалено'); });
+      if (t.dataset.delTraining) return Modal.confirm('Видалити тренування?', () => { if (typeof Actions !== 'undefined' && Actions.dropTraining) Actions.dropTraining(t.dataset.delTraining); else Store.get().trainings = Store.get().trainings.filter(x => x.id !== t.dataset.delTraining); StorageManager.save(); App.renderCurrent(); Toast.show('Видалено'); });
       if (t.dataset.dupTraining) return Actions.dupTraining(t.dataset.dupTraining);
       if (t.dataset.editPlayer) {
         e.preventDefault(); e.stopPropagation();
         if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
         return Actions.editPlayer(t.dataset.editPlayer);
       }
-      if (t.dataset.delPlayer) return Modal.confirm('Видалити гравця?', () => { Store.get().players = Store.get().players.filter(x => x.id !== t.dataset.delPlayer); StorageManager.save(); App.renderCurrent(); });
+      if (t.dataset.delPlayer) return Modal.confirm('Видалити гравця?', () => { if (typeof Actions !== 'undefined' && Actions.dropPlayer) Actions.dropPlayer(t.dataset.delPlayer); else Store.get().players = Store.get().players.filter(x => x.id !== t.dataset.delPlayer); StorageManager.save(); App.renderCurrent(); });
       if (t.dataset.scheme) {
         e.preventDefault(); e.stopPropagation();
         BoardEngine.applyScheme(t.dataset.scheme);
@@ -4681,7 +4683,8 @@ const App = {
       }
       if (t.dataset.delMyex) {
         Modal.confirm('Видалити вправу?', () => {
-          Store.get().myExercises = (Store.get().myExercises || []).filter(x => x.id !== t.dataset.delMyex);
+          if (typeof Actions !== 'undefined' && Actions.dropMyExercise) Actions.dropMyExercise(t.dataset.delMyex);
+          else Store.get().myExercises = (Store.get().myExercises || []).filter(x => x.id !== t.dataset.delMyex);
           StorageManager.save(); App.renderCurrent();
         });
         return;
@@ -4732,7 +4735,8 @@ const App = {
       }
       if (t.dataset.delDiary) {
         Modal.confirm('Видалити запис?', () => {
-          Store.get().diary = (Store.get().diary || []).filter(x => x.id !== t.dataset.delDiary);
+          if (typeof Actions !== 'undefined' && Actions.dropDiary) Actions.dropDiary(t.dataset.delDiary);
+          else Store.get().diary = (Store.get().diary || []).filter(x => x.id !== t.dataset.delDiary);
           StorageManager.save(); App.renderCurrent();
         });
         return;
@@ -4797,7 +4801,7 @@ const App = {
       if (t.dataset.day) { Store.get().ui.selectedDay = t.dataset.day; App.renderCurrent(); return; }
       if (t.dataset.viewExercise) return Actions.viewExercise(t.dataset.viewExercise);
       if (t.dataset.viewMatch) return Actions.viewMatch(t.dataset.viewMatch);
-      if (t.dataset.delMatch) return Modal.confirm('Видалити матч?', () => { Store.get().matches = Store.get().matches.filter(x => x.id !== t.dataset.delMatch); StorageManager.save(); App.renderCurrent(); });
+      if (t.dataset.delMatch) return Modal.confirm('Видалити матч?', () => { if (typeof Actions !== 'undefined' && Actions.dropMatch) Actions.dropMatch(t.dataset.delMatch); else Store.get().matches = Store.get().matches.filter(x => x.id !== t.dataset.delMatch); StorageManager.save(); App.renderCurrent(); });
       if (t.dataset.tpl) return Actions.applyTemplate(t.dataset.tpl);
 
       if (t.dataset.modalAction) return this.runModalAction(t, e);

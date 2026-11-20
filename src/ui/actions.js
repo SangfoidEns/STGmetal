@@ -171,15 +171,91 @@ const Actions = {
     }
   },
 
+  forget(bucket, id) {
+    const s = Store.get();
+    const token = String(id || '');
+    if (!s || !token) return;
+    s.settings = s.settings || {};
+    if (!Array.isArray(s.settings[bucket])) s.settings[bucket] = [];
+    if (s.settings[bucket].indexOf(token) < 0) s.settings[bucket].push(token);
+    if (s.settings[bucket].length > 800) s.settings[bucket] = s.settings[bucket].slice(-800);
+    s.settings.updatedAt = new Date().toISOString();
+  },
+
+  dropTraining(id) {
+    const s = Store.get();
+    const key = String(id || '');
+    if (!s || !key) return;
+    this.forget('removedTrainingIds', key);
+    (s.calendar || []).forEach(ev => {
+      if (ev && String(ev.trainingId || '') === key) this.forget('removedCalendarIds', ev.id);
+    });
+    s.trainings = (s.trainings || []).filter(x => String(x.id) !== key);
+    s.calendar = (s.calendar || []).filter(ev => !(ev && String(ev.trainingId || '') === key));
+  },
+
+  dropMatch(id) {
+    const s = Store.get();
+    const key = String(id || '');
+    if (!s || !key) return;
+    this.forget('removedMatchIds', key);
+    (s.trainings || []).forEach(training => {
+      if (training && String(training.matchId || '') === key && training.status !== 'done') this.forget('removedTrainingIds', training.id);
+    });
+    (s.calendar || []).forEach(ev => {
+      if (ev && String(ev.matchId || '') === key) this.forget('removedCalendarIds', ev.id);
+    });
+    s.matches = (s.matches || []).filter(item => String(item.id) !== key);
+    s.calendar = (s.calendar || []).filter(ev => !(ev && String(ev.matchId || '') === key));
+    s.trainings = (s.trainings || []).filter(training => !(training && String(training.matchId || '') === key && training.status !== 'done'));
+    if (s.ui && String(s.ui.matchId || '') === key) s.ui.matchId = null;
+  },
+
+  dropPlayer(id) {
+    const s = Store.get();
+    const key = String(id || '');
+    if (!s || !key) return;
+    this.forget('removedPlayerIds', key);
+    s.players = (s.players || []).filter(x => String(x.id) !== key);
+  },
+
+  dropSection(id) {
+    const s = Store.get();
+    const key = String(id || '');
+    if (!s || !key) return;
+    this.forget('removedSectionIds', key);
+    s.schemeSections = (s.schemeSections || []).filter(x => String(x.id) !== key);
+  },
+
+  dropDiary(id) {
+    const s = Store.get();
+    const key = String(id || '');
+    if (!s || !key) return;
+    this.forget('removedDiaryIds', key);
+    s.diary = (s.diary || []).filter(x => String(x.id) !== key);
+  },
+
+  dropExercise(id) {
+    const s = Store.get();
+    const key = String(id || '');
+    if (!s || !key) return;
+    this.forget('removedExerciseIds', key);
+    s.exercises = (s.exercises || []).filter(x => String(x.id) !== key);
+  },
+
+  dropMyExercise(id) {
+    const s = Store.get();
+    const key = String(id || '');
+    if (!s || !key) return;
+    this.forget('removedMyExerciseIds', key);
+    s.myExercises = (s.myExercises || []).filter(x => String(x.id) !== key);
+  },
+
   dropScheme(id) {
     const s = Store.get();
     const key = String(id || '');
     if (!s || !key) return;
-    s.settings = s.settings || {};
-    if (!Array.isArray(s.settings.removedBoardIds)) s.settings.removedBoardIds = [];
-    if (s.settings.removedBoardIds.indexOf(key) < 0) s.settings.removedBoardIds.push(key);
-    if (s.settings.removedBoardIds.length > 800) s.settings.removedBoardIds = s.settings.removedBoardIds.slice(-800);
-    s.settings.updatedAt = new Date().toISOString();
+    this.forget('removedBoardIds', key);
     s.boards = (s.boards || []).filter(x => String(x.id) !== key);
     (s.schemeAlbums || []).forEach(album => {
       if (!album || !Array.isArray(album.boardIds)) return;
@@ -1485,7 +1561,7 @@ const Actions = {
       </div>`, [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
     document.getElementById('modalBody').querySelector('[data-del-ex]')?.addEventListener('click', () => {
       Modal.confirm((typeof t==='function'?t('confirm_del_exercise'):'Видалити вправу?'), () => {
-        Store.get().exercises = Store.get().exercises.filter(x => x.id !== e.id);
+        Actions.dropExercise(e.id);
         StorageManager.save(); Modal.close(); App.renderCurrent();
       });
     });
@@ -1915,11 +1991,7 @@ const Actions = {
     const m = this._matchByUi();
     if (!m) return;
     Modal.confirm('Видалити матч і незавершені тренування його тижня?', () => {
-      const s = Store.get();
-      s.matches = (s.matches || []).filter(item => item.id !== m.id);
-      s.calendar = (s.calendar || []).filter(event => !(event && event.matchId === m.id));
-      s.trainings = (s.trainings || []).filter(training => !(training && training.matchId === m.id && training.status !== 'done'));
-      if (s.ui) s.ui.matchId = null;
+      Actions.dropMatch(m.id);
       StorageManager.save();
       Toast.show('Матч видалено', 'ok');
       App.renderCurrent();
@@ -1985,11 +2057,7 @@ const Actions = {
     const s = Store.get();
     const key = String(id || '');
     if (!s || !key) return;
-    s.settings = s.settings || {};
-    if (!Array.isArray(s.settings.removedAlbumIds)) s.settings.removedAlbumIds = [];
-    if (s.settings.removedAlbumIds.indexOf(key) < 0) s.settings.removedAlbumIds.push(key);
-    if (s.settings.removedAlbumIds.length > 800) s.settings.removedAlbumIds = s.settings.removedAlbumIds.slice(-800);
-    s.settings.updatedAt = new Date().toISOString();
+    this.forget('removedAlbumIds', key);
     s.schemeAlbums = (s.schemeAlbums || []).filter(a => String(a.id) !== key);
     (s.schemeSections || []).forEach(sec => {
       if (!sec || !Array.isArray(sec.albumIds)) return;
@@ -2050,8 +2118,7 @@ const Actions = {
     const sec = (s.schemeSections || []).find(x => x && String(x.id) === String(id));
     if (!sec) return;
     Modal.confirm('Видалити розділ «' + (sec.name || '') + '»? Альбоми залишаться.', () => {
-      const state = Store.get();
-      state.schemeSections = (state.schemeSections || []).filter(x => String(x.id) !== String(id));
+      Actions.dropSection(id);
       StorageManager.save();
       Toast.show('Розділ видалено', 'ok');
       App.renderCurrent();
