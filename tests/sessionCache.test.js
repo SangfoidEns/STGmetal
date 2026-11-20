@@ -74,7 +74,7 @@ describe('telegram session cache', () => {
     await ctx.StorageManager.pullClub();
     assert.equal(fetched, 0);
     assert.equal(applied, 0);
-    assert.equal(ctx.StorageManager._clubSyncText.indexOf('JSON') >= 0, true);
+    assert.equal(ctx.StorageManager._clubSyncText.indexOf('сервера') >= 0, true);
   });
 
   it('still saves the session when embedded photos do not fit', () => {

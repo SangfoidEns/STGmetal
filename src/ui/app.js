@@ -65,7 +65,7 @@ const App = {
 
   askClubCode() {
     const body = '<div class="soc-edit-form">' +
-      '<p class="note-sm">Введи код клубу один раз. Тоді дані приходять самі, без файлу JSON. Це anon public із Supabase, не адреса сайту.</p>' +
+      '<p class="note-sm">Введи код клубу один раз. Дані приходять із сервера. Це anon public, не адреса сайту.</p>' +
       '<label class="fld"><span>Код клубу</span><input id="guestServerCode" class="inp" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" placeholder="eyJ… або sb_publishable…"></label>' +
       '</div>';
     return Modal.open('Код клубу', body, [
@@ -128,10 +128,7 @@ const App = {
         '</label>' +
         '<div class="fld"><span>Подарунок біля імені</span><div class="pp-gift-picks">' + giftPicks + '</div></div>' +
         '<label class="fld"><span>Код клубу</span><input id="ppServerCode" class="inp" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" placeholder="anon public, eyJ… або sb_publishable…" value="' + sanitize((typeof SupabaseClub !== 'undefined' && SupabaseClub._key) ? SupabaseClub._key() : '') + '"/></label>' +
-        '<p class="note-sm">Той самий код, що в тренера. Тоді клуб приходить сам, без JSON.</p>' +
-        '<div class="fld pp-export"><span>Передача тренеру</span>' +
-        '<p class="note-sm">У файлі буде ця анкета. Явку відмічає тренер. Він відкриває файл через Імпорт JSON.</p>' +
-        '<button type="button" class="btn btn-p" data-action="export-for-coach">Експорт для тренера</button></div>' +
+        '<p class="note-sm">Той самий код, що в тренера. Клуб приходить із сервера.</p>' +
         '</div>';
       Modal.open('Мій профіль', body, [
         { label: 'Скасувати', cls: 'btn-s', action: 'cancel' },
@@ -362,16 +359,16 @@ const App = {
           if (typeof StorageManager !== 'undefined') StorageManager.beginIoLock(5000);
         } catch (_) {}
 
+        const coachOnly = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+        if (!coachOnly) {
+          Toast.show('Резервну копію робить лише тренер', 'warn');
+          return;
+        }
         if (exp) {
-          // Експорт — ТІЛЬКИ тренер @Serdiuk_Artem
-          if (typeof AuthManager !== 'undefined' && !AuthManager.isCoach()) {
-            Toast.show('Експорт JSON доступний лише тренеру', 'warn');
-            return;
-          }
           try {
             StorageManager.exportJSON();
           } catch (err) {
-            Toast.show('Експорт: ' + (err.message || err), 'err');
+            Toast.show('Копія: ' + (err.message || err), 'err');
           }
           return;
         }
@@ -380,7 +377,7 @@ const App = {
           try {
             StorageManager.pickAndImportJSON();
           } catch (err) {
-            Toast.show('Імпорт: ' + (err.message || err), 'err');
+            Toast.show('Копія: ' + (err.message || err), 'err');
           }
         }
       }, true);
@@ -1936,7 +1933,7 @@ const App = {
       console.error('[renderCurrent]', view, e);
       el.innerHTML = '<div class="card"><div class="ct">Помилка екрана</div><p class="note-sm">' +
         (typeof sanitize === 'function' ? sanitize(e.message || String(e)) : String(e)) +
-        '</p><button type="button" class="btn btn-s" data-action="import-trigger">Імпорт JSON</button></div>';
+        '</p></div>';
     }
     try { this._bindPlayerCompare(); } catch (_) {}
     try { this.bindSquadViewButtons(); } catch (_) {}
@@ -3414,31 +3411,22 @@ const App = {
       if (action === 'export-for-coach') {
         e.preventDefault();
         e.stopPropagation();
-        try {
-          const me = (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer) ? AuthManager.getLinkedPlayer() : null;
-          if (!me) { Toast.show('Анкета не привʼязана', 'warn'); return; }
-          const s = Store.get();
-          const p = (s.players || []).find(x => x.id === me.id) || me;
-          this._writeSelfProfile(p);
-          try {
-            const canWrite = AuthManager._canWriteClub && AuthManager._canWriteClub();
-            StorageManager.save({ localOnly: !canWrite });
-          } catch (_) { try { StorageManager.save(); } catch (e2) {} }
-          StorageManager.exportPlayerForCoach(p);
-        } catch (err) {
-          Toast.show('Експорт: ' + (err.message || err), 'err');
-        }
+        Toast.show('Анкета йде на сервер. Файл більше не потрібен.', 'ok');
         return;
       }
       if (action === 'export' || action === 'export-json' || action === 'import-trigger') {
         e.preventDefault();
         e.stopPropagation();
+        if (!(typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach())) {
+          Toast.show('Резервну копію робить лише тренер', 'warn');
+          return;
+        }
         try { StorageManager.beginIoLock(5000); } catch (_) {}
         try {
           if (action === 'import-trigger') StorageManager.pickAndImportJSON();
           else StorageManager.exportJSON();
         } catch (err) {
-          Toast.show((action === 'import-trigger' ? 'Імпорт: ' : 'Експорт: ') + (err.message || err), 'err');
+          Toast.show('Копія: ' + (err.message || err), 'err');
         }
         return;
       }
@@ -4538,7 +4526,13 @@ const App = {
         return;
       }
       if (action === 'microcycle') return Actions.applyMicrocycle();
-      if (action === 'export-stats') return StorageManager.exportJSON();
+      if (action === 'export-stats') {
+        if (!(typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach())) {
+          Toast.show('Резервну копію робить лише тренер', 'warn');
+          return;
+        }
+        return StorageManager.exportJSON();
+      }
 
       if (e.target.closest && e.target.closest('.ym, .ym-track, .ym-expand, .ym-pick, .ym-picks, .ym-tile, .ym-menu, .tg-sheet, .tg-sheet-backdrop')) return;
       if (action && action !== 'open-training' && action !== 'preview-next-training') return;

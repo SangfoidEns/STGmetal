@@ -1913,14 +1913,17 @@ body.role-player .sb-export {
   opacity: 0.45;
   pointer-events: none;
 }
-/* Імпорт JSON для гравця — ОБОВ'ЯЗКОВО активний */
 body.role-player [data-action="import-trigger"],
 body.role-player [data-io="import"],
+body.role-player [data-action="export-json"],
+body.role-player [data-action="export"],
+body.role-player [data-action="export-for-coach"],
 body.role-guest [data-action="import-trigger"],
-body.role-guest [data-io="import"] {
-  opacity: 1 !important;
-  pointer-events: auto !important;
-  cursor: pointer !important;
+body.role-guest [data-io="import"],
+body.role-guest [data-action="export-json"],
+body.role-guest [data-action="export"],
+body.role-guest .sb-export {
+  display: none !important;
 }
 
 /* Логотип = вхід на дошку */

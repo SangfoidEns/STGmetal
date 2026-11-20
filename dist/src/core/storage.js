@@ -323,8 +323,8 @@ const StorageManager = {
       const waitKey = typeof SupabaseClub !== 'undefined' && SupabaseClub.URL && !(SupabaseClub.enabled && SupabaseClub.enabled());
       const extra = waitKey ? ' Сервер Supabase чекає публічний ключ у налаштуваннях.' : '';
       this._setClubSyncLine((this._sessionIsCached()
-        ? 'Дані з цього пристрою. Передача лише файлом JSON.'
-        : 'Імпортуйте клубний JSON. Файл на сайті не використовується.') + extra);
+        ? 'Дані з цього пристрою. Клуб приходить із сервера, коли є код.'
+        : 'Клуб приходить із сервера. Введи код клубу.') + extra);
       return;
     }
     let remote = null;
@@ -1062,7 +1062,16 @@ const StorageManager = {
     }
   },
 
+  _coachBackupOnly() {
+    try { return typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach(); }
+    catch (_) { return false; }
+  },
+
   async exportJSON() {
+    if (!this._coachBackupOnly()) {
+      try { Toast.show('Резервну копію робить лише тренер', 'warn'); } catch (_) {}
+      return;
+    }
     this.beginIoLock(3000);
     try {
       this.createBackup();
@@ -1101,34 +1110,14 @@ const StorageManager = {
     }
   },
 
-  exportPlayerForCoach(player) {
-    this.beginIoLock(3000);
-    try {
-      const me = player || (typeof AuthManager !== 'undefined' && AuthManager.getLinkedPlayer && AuthManager.getLinkedPlayer());
-      if (!me || typeof PlayerUpdate === 'undefined') {
-        Toast.show('Анкета не привʼязана', 'warn');
-        return;
-      }
-      const packet = PlayerUpdate.build(Store.get(), me);
-      if (!packet) { Toast.show('Немає анкети для передачі', 'warn'); return; }
-      const text = JSON.stringify(packet, null, 2);
-      const day = typeof today === 'function' ? today() : new Date().toISOString().slice(0, 10);
-      const who = String(me.lastName || me.firstName || 'гравець').replace(/[^\w\u0400-\u04FF-]+/g, '_');
-      const filename = 'metalist_anketa_' + who + '_' + day + '.json';
-      this._openExportChooser(text, filename, {
-        title: 'Експорт для тренера',
-        lead: 'Анкета гравця. Явку відмічає тренер. Надішліть файл: тренер відкриє його через Імпорт JSON.'
-      });
-    } catch (e) {
-      try { ErrorManager.log('export-player', e); } catch (_) {}
-      Toast.show('Помилка експорту: ' + (e.message || e), 'err');
-    }
+  exportPlayerForCoach() {
+    try { Toast.show('Анкета йде на сервер. Файл більше не потрібен.', 'ok'); } catch (_) {}
   },
 
   _openExportChooser(text, filename, opts) {
     opts = opts || {};
     const sizeKb = Math.round(new Blob([text]).size / 1024);
-    const lead = opts.lead || ('Експорт даних МЕТАЛІСТ ШТУТТГАРТ · <strong>' + sizeKb + ' КБ</strong><br>У Telegram найнадійніше — <strong>скопіювати</strong> і зберегти в «Вибране» або надіслати собі в Saved Messages.');
+    const lead = opts.lead || ('Резервна копія тренера · <strong>' + sizeKb + ' КБ</strong>. Це не передача клубу. Зберігай файл у себе.');
     const body = `
       <p style="font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.45">
         ${lead}
@@ -1142,9 +1131,9 @@ const StorageManager = {
       <textarea id="exportJsonTa" readonly
         style="display:none;width:100%;height:160px;margin-top:12px;font-size:11px;font-family:ui-monospace,monospace;
         background:rgba(0,0,0,0.35);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px;box-sizing:border-box"></textarea>
-      <p class="note-sm" style="margin-top:10px">Після копіювання: відкрийте Saved Messages у Telegram → вставте → збережіть як файл, або вставте назад через «Імпорт JSON».</p>
+      <p class="note-sm" style="margin-top:10px">Повернути клуб можна кнопкою «Відновити з копії» в налаштуваннях тренера.</p>
     `;
-    Modal.open(opts.title || 'Експорт JSON', body, [
+    Modal.open(opts.title || 'Резервна копія', body, [
       { label: 'Закрити', cls: 'btn-s', action: 'cancel' }
     ]);
     const ta = () => document.getElementById('exportJsonTa');
@@ -1338,6 +1327,10 @@ const StorageManager = {
    * Не викликає navigate / openDefaultBoard.
    */
   pickAndImportJSON() {
+    if (!this._coachBackupOnly()) {
+      try { Toast.show('Резервну копію робить лише тренер', 'warn'); } catch (_) {}
+      return;
+    }
     this.beginIoLock(5000);
     try {
       if (!this._isMobileWebView() && typeof window.showOpenFilePicker === 'function') {
@@ -1377,6 +1370,10 @@ const StorageManager = {
   },
 
   importJSON(fileOrText) {
+    if (!this._coachBackupOnly()) {
+      try { Toast.show('Резервну копію робить лише тренер', 'warn'); } catch (_) {}
+      return Promise.resolve(false);
+    }
     const coachWriter = this._isCoachWriter();
     this._holdRemote = true;
     const publishImport = () => {
@@ -1552,7 +1549,7 @@ const StorageManager = {
             }
           }
         } catch (_) {}
-        Toast.show((coachWriter ? 'Імпорт успішний' : 'Імпорт на цьому телефоні') + roleMsg, 'ok');
+        Toast.show('Копію відновлено' + roleMsg, 'ok');
         return true;
       } catch (e) {
         try { ErrorManager.log('import', e); } catch (_) {}
