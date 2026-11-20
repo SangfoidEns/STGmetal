@@ -2591,7 +2591,7 @@ const App = {
     let active = false;
     const pick = (e) => {
       if (!e.target || !e.target.closest) return null;
-      if (e.target.closest('#teamChat, #teamChatForm, .team-chat, #modal, .tg-sheet, .ym-menu, .ym-dots, .ym-pick, .ym-picks, .match-plan, .match-chip, .ym-row, .pm-rail, .pt-tabs, .live-faces, input, textarea, select')) return null;
+      if (e.target.closest('#teamChat, #teamChatForm, .team-chat, #modal, .tg-sheet, .ym-menu, .ym-dots, .ym-pick, .ym-picks, .match-plan, .match-chip, .ym-row, .pm-rail, .pt-tabs, .live-faces, .sq-row, input, textarea, select')) return null;
       return e.target.closest('.card-training[data-training-id], .tg-row[data-training-id], .pl-row[data-player-id], .scheme-row[data-board-id], .ym-track[data-board-id], .pm-card[data-match-id], .cal-ev-row[data-match-id], .cal-ev-row[data-training-id], .cal-ev-row[data-player-id], .match-list-card[data-match-id], .card[data-edit-diary]');
     };
     document.addEventListener('pointerdown', (e) => {
@@ -2636,6 +2636,163 @@ const App = {
       row = null;
       active = false;
     });
+  },
+
+  bindSquadGestures() {
+    if (this._squadGestureBound) return;
+    this._squadGestureBound = true;
+    const SHORT = 72;
+    const LONG = 148;
+    let row = null;
+    let face = null;
+    let sx = 0;
+    let sy = 0;
+    let pid = 0;
+    let mode = '';
+    let timer = null;
+    const clearHold = () => { if (timer) { clearTimeout(timer); timer = null; } };
+    const spring = () => {
+      if (!row) return;
+      row.classList.remove('sq-peek', 'sq-full', 'sq-dragging');
+      if (face) face.style.transform = '';
+    };
+    const closeOpen = (except) => {
+      document.querySelectorAll('.sq-row.is-open-left, .sq-row.is-open-right').forEach(el => {
+        if (el !== except) el.classList.remove('is-open-left', 'is-open-right', 'sq-full', 'sq-peek');
+      });
+    };
+    const act = (name, hit) => {
+      if (!hit || typeof Actions === 'undefined') return;
+      const playerId = hit.dataset.playerId;
+      const matchId = hit.dataset.matchId || '';
+      if (name === 'nudge') return Actions.nudgeSquad(matchId, playerId);
+      if (name === 'xi-bench') return Actions.toggleSquadPair(matchId, playerId, 'xi-bench');
+      if (name === 'bench-out') return Actions.toggleSquadPair(matchId, playerId, 'bench-out');
+      if (name === 'up') return Actions.moveSquadPlayer(matchId, playerId, -1);
+      if (name === 'down') return Actions.moveSquadPlayer(matchId, playerId, 1);
+      if (name === 'edit') return Actions.editPlayer(playerId);
+      if (name === 'menu') return this.openPlayerActionSheet(playerId);
+    };
+    document.addEventListener('pointerdown', (e) => {
+      if (!e.target.closest || e.target.closest('.sq-act, #modal, .tg-sheet, input, textarea, select')) return;
+      const hit = e.target.closest('.sq-row');
+      if (!hit) return;
+      const coach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+      if (!coach) return;
+      row = hit;
+      face = hit.querySelector('.sq-face');
+      sx = e.clientX;
+      sy = e.clientY;
+      pid = e.pointerId;
+      mode = '';
+      clearHold();
+      timer = setTimeout(() => {
+        timer = null;
+        if (!row) return;
+        mode = 'drag';
+        row.classList.add('is-pinned', 'sq-dragging');
+        try { TelegramManager.haptic && TelegramManager.haptic('medium'); } catch (_) {}
+      }, 460);
+    }, { passive: true });
+    document.addEventListener('pointermove', (e) => {
+      if (!row || e.pointerId !== pid) return;
+      const dx = e.clientX - sx;
+      const dy = e.clientY - sy;
+      if (mode === 'drag') {
+        const list = row.closest('.sq-list');
+        if (!list) return;
+        const rows = Array.prototype.slice.call(list.querySelectorAll('.sq-row'));
+        const y = e.clientY;
+        const target = rows.find(other => {
+          if (other === row) return false;
+          const box = other.getBoundingClientRect();
+          return y > box.top && y < box.bottom;
+        });
+        if (!target) return;
+        const box = target.getBoundingClientRect();
+        const rowTop = row.getBoundingClientRect().top;
+        if (y < box.top + box.height / 2 && rowTop > box.top) list.insertBefore(row, target);
+        else if (y > box.top + box.height / 2 && rowTop < box.top) list.insertBefore(row, target.nextSibling);
+        return;
+      }
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      if (Math.abs(dy) > Math.abs(dx)) {
+        clearHold();
+        spring();
+        row = null;
+        return;
+      }
+      clearHold();
+      mode = 'swipe';
+      const shift = Math.max(-236, Math.min(188, dx));
+      if (face) {
+        face.style.transition = 'none';
+        face.style.transform = 'translateX(' + shift + 'px)';
+      }
+      const full = Math.abs(dx) >= LONG;
+      row.classList.toggle('sq-full', full);
+      row.classList.toggle('sq-peek', !full && Math.abs(dx) >= 28);
+      if (full && !row._sqTick) {
+        row._sqTick = true;
+        try { TelegramManager.haptic && TelegramManager.haptic('light'); } catch (_) {}
+      }
+      if (!full) row._sqTick = false;
+    }, { passive: true });
+    const finish = (e) => {
+      if (!row || (e && e.pointerId != null && e.pointerId !== pid)) return;
+      const hit = row;
+      const dx = (e && e.clientX != null ? e.clientX : sx) - sx;
+      const wasDrag = mode === 'drag';
+      clearHold();
+      if (face) face.style.transition = '';
+      if (wasDrag) {
+        hit.classList.remove('is-pinned', 'sq-dragging');
+        const list = hit.closest('.sq-list');
+        const ids = list ? Array.prototype.map.call(list.querySelectorAll('.sq-row'), el => el.dataset.playerId) : [];
+        mode = '';
+        row = null;
+        face = null;
+        this._lpSuppressClick = true;
+        setTimeout(() => { this._lpSuppressClick = false; }, 400);
+        if (ids.length && hit.dataset.matchId && hit.dataset.bucket !== 'out') Actions.applySquadOrder(hit.dataset.matchId, hit.dataset.bucket, ids);
+        return;
+      }
+      hit.classList.remove('sq-peek', 'sq-dragging');
+      if (face) face.style.transform = '';
+      const horizontal = Math.abs(dx) >= SHORT && Math.abs(dx) >= Math.abs((e && e.clientY != null ? e.clientY : sy) - sy);
+      mode = '';
+      row = null;
+      face = null;
+      if (!horizontal) return;
+      this._lpSuppressClick = true;
+      setTimeout(() => { this._lpSuppressClick = false; }, 500);
+      if (dx >= LONG) {
+        closeOpen(hit);
+        hit.classList.add('sq-full', 'is-open-right');
+        return;
+      }
+      if (dx <= -LONG) {
+        closeOpen(hit);
+        hit.classList.add('sq-full', 'is-open-left');
+        return;
+      }
+      hit.classList.remove('sq-full', 'is-open-left', 'is-open-right');
+      if (dx > 0) act('nudge', hit);
+      else act('menu', hit);
+    };
+    document.addEventListener('pointerup', finish);
+    document.addEventListener('pointercancel', finish);
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest && e.target.closest('.sq-act');
+      if (btn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const hit = btn.closest('.sq-row');
+        act(btn.dataset.sq, hit);
+        return;
+      }
+      if (!e.target.closest || !e.target.closest('.sq-row')) closeOpen(null);
+    }, true);
   },
 
   openSwipeMenu(row) {
@@ -3095,6 +3252,7 @@ const App = {
     try { this.bindEdgeSwipeDrawer(); } catch (e) { console.warn(e); }
     try { this.bindTrainingLongPress(); } catch (e) { console.warn(e); }
     try { this.bindAlbumSwipe(); } catch (e) { console.warn(e); }
+    try { this.bindSquadGestures(); } catch (e) { console.warn(e); }
 
 
 
@@ -3176,6 +3334,10 @@ const App = {
         if (!tid) { Toast.show('Тренування не знайдено', 'warn'); return; }
         if (!this._allowTrainingOpen(e, tid)) return;
         return this.openTrainingActionSheet(tid);
+      }
+      if (action === 'squad-pick-match') {
+        e.preventDefault(); e.stopPropagation();
+        return Actions.chooseSquadMatch(t.dataset.matchId);
       }
       if (action === 'match-focus-player') {
         e.preventDefault(); e.stopPropagation();

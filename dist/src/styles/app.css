@@ -13009,6 +13009,41 @@ body.board-only-mode #mobileNav.glass-nav {
   color: inherit; font-weight: 800; cursor: pointer;
 }
 .squad-match-row { width: 100%; }
+.sq-row { position: relative; overflow: hidden; margin: 4px 0; border-radius: 16px; }
+.sq-under { position: absolute; inset: 0; display: flex; align-items: stretch; }
+.sq-under-right { justify-content: flex-start; }
+.sq-under-left { justify-content: flex-end; }
+.sq-face { position: relative; z-index: 1; background: #163224; transition: transform .28s cubic-bezier(.2, .9, .2, 1); }
+.sq-row.sq-dragging .sq-face { transition: none; }
+.sq-row.is-pinned { z-index: 3; }
+.sq-row.is-pinned .sq-face { box-shadow: 0 16px 36px rgba(0, 0, 0, .38); outline: 2px solid #e8c547; }
+.sq-act {
+  border: 0; color: #142018; font: inherit; font-weight: 800; font-size: 12px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: 48px; width: 84px; overflow: hidden;
+}
+.sq-act small { font-size: 10px; font-weight: 700; opacity: .8; }
+.sq-act-main { background: #e8c547; }
+.sq-act-xi { background: #86efac; }
+.sq-act-out { background: #fb7185; color: #2a0c12; }
+.sq-act-menu { background: #7dd3fc; }
+.sq-act-up, .sq-act-down { background: #67e8f9; }
+.sq-act-edit { background: #c4b5fd; }
+.sq-under-right .sq-act-xi,
+.sq-under-right .sq-act-out,
+.sq-under-left .sq-act-up,
+.sq-under-left .sq-act-down,
+.sq-under-left .sq-act-edit { width: 0; padding: 0; opacity: 0; }
+.sq-row.sq-full .sq-act-main,
+.sq-row.sq-full .sq-act-menu { width: 0; padding: 0; opacity: 0; }
+.sq-row.sq-full .sq-under-right .sq-act-xi,
+.sq-row.sq-full .sq-under-right .sq-act-out,
+.sq-row.sq-full .sq-under-left .sq-act-up,
+.sq-row.sq-full .sq-under-left .sq-act-down,
+.sq-row.sq-full .sq-under-left .sq-act-edit { width: 78px; opacity: 1; }
+.sq-row.is-open-right .sq-face { transform: translateX(156px); }
+.sq-row.is-open-left .sq-face { transform: translateX(-234px); }
+.sq-matches { margin-bottom: 8px; }
 .fmt-bar { display: flex; gap: 6px; margin: 0 0 8px; }
 .fmt-bar button {
   min-width: 36px; height: 32px; border-radius: 8px;

@@ -107,6 +107,18 @@ describe('club snapshot merge', () => {
     assert.equal(merged.calendar[0].trainingId, 'real22');
   });
 
+  it('keeps a copy the coach made on purpose', () => {
+    const merged = mergePayload({
+      trainings: [
+        { id: 'real', name: 'Тактика', date: '2026-11-20', status: 'planned' },
+        { id: 'made', name: 'Тактика (копія)', date: '2026-11-20', status: 'planned', manualCopy: true }
+      ]
+    }, { trainings: [] });
+    assert.equal(merged.trainings.length, 2);
+    assert.equal(merged.trainings.some(t => t.id === 'made' && t.manualCopy), true);
+    assert.equal(merged.trainings.some(t => t.id === 'real'), true);
+  });
+
   it('does not restore a gift the coach already deleted', () => {
     const file = {
       settings: { coachStats: { updatedAt: '2026-11-01T00:00:00.000Z' } },

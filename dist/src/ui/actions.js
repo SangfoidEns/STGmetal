@@ -802,23 +802,29 @@ const Actions = {
   dupTraining(id) {
     const t = Store.get().trainings.find(x => x.id === id);
     if (!t) return;
-    const base = String(t.name || 'Тренування').replace(/\s*\(копія\)/gi, '').trim();
-    const exists = (Store.get().trainings || []).some(x => x && x.id !== t.id && String(x.name || '').replace(/\s*\(копія\)/gi, '').trim().toLowerCase() === base.toLowerCase() && /\(копія\)/i.test(x.name || ''));
-    if (exists) {
-      Toast.show('Копія цього тренування вже є', 'warn');
-      return;
+    const base = String(t.name || 'Тренування').replace(/\s*\(копія(?:\s*\d+)?\)/gi, '').trim();
+    const taken = new Set((Store.get().trainings || []).map(x => String((x && x.name) || '').trim().toLowerCase()));
+    let name = base + ' (копія)';
+    let n = 2;
+    while (taken.has(name.toLowerCase())) {
+      name = base + ' (копія ' + n + ')';
+      n += 1;
     }
     Modal.confirm('Зробити окрему копію «' + base + '»? У списку лишиться і оригінал.', () => {
       const c = JSON.parse(JSON.stringify(t));
+      const now = new Date().toISOString();
       c.id = uid();
-      c.name = base + ' (копія)';
-      c.status = 'draft';
+      c.name = name;
+      c.manualCopy = true;
+      c.status = 'planned';
       c.attendance = {};
+      c.createdAt = now;
+      c.updatedAt = now;
       delete c.cancelledAt;
       if (c.structure) c.structure.forEach(b => b.id = uid());
       Store.get().trainings.push(c);
       StorageManager.save();
-      Toast.show('Скопійовано', 'ok');
+      Toast.show('Копія в списку, оригінал на місці', 'ok');
       App.renderCurrent();
     });
   },
@@ -1957,6 +1963,185 @@ const Actions = {
     m.stamps = Object.assign({}, m.stamps || {}, { plan: m.updatedAt });
     StorageManager.save();
     App.renderCurrent();
+  },
+
+  _squadMatch(matchId) {
+    const s = Store.get();
+    if (matchId) return (s.matches || []).find(item => item && String(item.id) === String(matchId)) || null;
+    return this._matchByUi();
+  },
+
+  _rememberSquad(m) {
+    if (!m) return;
+    const s = Store.get();
+    s.settings = s.settings || {};
+    s.ui = s.ui || {};
+    s.ui.squadMatchId = m.id;
+    s.settings.defaultSquadMatchId = m.id;
+    m.lineupManual = true;
+  },
+
+  _squadBuckets(m, playerId) {
+    const id = String(playerId);
+    const xi = (m.xi || []).slice(0, 11);
+    while (xi.length < 11) xi.push(null);
+    const bench = (m.bench || []).map(String).filter(x => x && !xi.some(slot => slot != null && String(slot) === x));
+    return { id: id, xi: xi, bench: bench };
+  },
+
+  placeSquadPlayer(matchId, playerId, place) {
+    if (!this._coachOnly()) return;
+    const m = this._squadMatch(matchId);
+    if (!m || playerId == null || playerId === '') {
+      this._placeSquadGroup(playerId, place);
+      return;
+    }
+    const pack = this._squadBuckets(m, playerId);
+    const id = pack.id;
+    let xi = pack.xi.map(slot => (slot != null && String(slot) === id) ? null : slot);
+    let bench = pack.bench.filter(x => x !== id);
+    if (place === 'xi') {
+      const hole = xi.findIndex(slot => slot == null || slot === '');
+      if (hole < 0) {
+        bench.push(id);
+        try { Toast.show('Основа повна. Гравця лишив у резерві', 'warn'); } catch (_) {}
+      } else {
+        xi[hole] = id;
+        try { Toast.show('В основі', 'ok'); } catch (_) {}
+      }
+    } else if (place === 'bench') {
+      bench.push(id);
+      try { Toast.show('У резерві', 'ok'); } catch (_) {}
+    } else {
+      try { Toast.show('Поза заявкою', 'ok'); } catch (_) {}
+    }
+    m.xi = xi;
+    m.bench = bench;
+    const now = new Date().toISOString();
+    m.updatedAt = now;
+    m.stamps = Object.assign({}, m.stamps || {}, { plan: now });
+    this._rememberSquad(m);
+    StorageManager.save();
+    App.renderCurrent();
+  },
+
+  nudgeSquad(matchId, playerId) {
+    if (!this._coachOnly()) return;
+    const m = this._squadMatch(matchId);
+    if (!m) return this._placeSquadGroup(playerId, 'toggle');
+    const pack = this._squadBuckets(m, playerId);
+    const inXi = pack.xi.some(slot => slot != null && String(slot) === pack.id);
+    const onBench = pack.bench.some(x => x === pack.id);
+    if (inXi) return this.placeSquadPlayer(matchId, playerId, 'bench');
+    if (onBench) return this.placeSquadPlayer(matchId, playerId, 'out');
+    return this.placeSquadPlayer(matchId, playerId, 'bench');
+  },
+
+  toggleSquadPair(matchId, playerId, pair) {
+    if (!this._coachOnly()) return;
+    const m = this._squadMatch(matchId);
+    if (!m) {
+      if (pair === 'bench-out') return this._placeSquadGroup(playerId, 'out');
+      return this._placeSquadGroup(playerId, 'toggle');
+    }
+    const pack = this._squadBuckets(m, playerId);
+    const inXi = pack.xi.some(slot => slot != null && String(slot) === pack.id);
+    const onBench = pack.bench.some(x => x === pack.id);
+    if (pair === 'bench-out') return this.placeSquadPlayer(matchId, playerId, onBench || inXi ? 'out' : 'bench');
+    return this.placeSquadPlayer(matchId, playerId, inXi ? 'bench' : 'xi');
+  },
+
+  moveSquadPlayer(matchId, playerId, dir) {
+    if (!this._coachOnly()) return;
+    const m = this._squadMatch(matchId);
+    if (!m) return;
+    const step = Number(dir) < 0 ? -1 : 1;
+    const pack = this._squadBuckets(m, playerId);
+    const at = pack.xi.findIndex(slot => slot != null && String(slot) === pack.id);
+    if (at >= 0) {
+      let j = at + step;
+      while (j >= 0 && j < pack.xi.length && (pack.xi[j] == null || pack.xi[j] === '')) j += step;
+      if (j < 0 || j >= pack.xi.length) return;
+      const swap = pack.xi[at];
+      pack.xi[at] = pack.xi[j];
+      pack.xi[j] = swap;
+      m.xi = pack.xi;
+    } else {
+      const i = pack.bench.findIndex(x => x === pack.id);
+      const j = i + step;
+      if (i < 0 || j < 0 || j >= pack.bench.length) return;
+      const swap = pack.bench[i];
+      pack.bench[i] = pack.bench[j];
+      pack.bench[j] = swap;
+      m.bench = pack.bench;
+    }
+    const now = new Date().toISOString();
+    m.updatedAt = now;
+    m.stamps = Object.assign({}, m.stamps || {}, { plan: now });
+    this._rememberSquad(m);
+    StorageManager.save();
+    App.renderCurrent();
+  },
+
+  applySquadOrder(matchId, bucket, ids) {
+    if (!this._coachOnly()) return;
+    const m = this._squadMatch(matchId);
+    const order = (ids || []).map(String).filter(Boolean);
+    if (!m || !order.length || bucket === 'out') return;
+    if (bucket === 'bench' || bucket === 'reserve') {
+      const rest = (m.bench || []).map(String).filter(id => id && order.indexOf(id) < 0);
+      m.bench = order.concat(rest);
+    } else {
+      const xi = (m.xi || []).slice(0, 11);
+      while (xi.length < 11) xi.push(null);
+      const slots = [];
+      xi.forEach((id, i) => { if (id != null && id !== '') slots.push(i); });
+      order.forEach((id, n) => { if (slots[n] != null) xi[slots[n]] = id; });
+      m.xi = xi;
+    }
+    const now = new Date().toISOString();
+    m.updatedAt = now;
+    m.stamps = Object.assign({}, m.stamps || {}, { plan: now });
+    this._rememberSquad(m);
+    StorageManager.save();
+    App.renderCurrent();
+  },
+
+  chooseSquadMatch(matchId) {
+    if (!this._coachOnly()) return;
+    const m = this._squadMatch(matchId);
+    if (!m) return;
+    this._rememberSquad(m);
+    try { StorageManager.save(); } catch (_) {}
+    try { App.renderCurrent(); } catch (_) {}
+  },
+
+  _placeSquadGroup(playerId, place) {
+    const p = (Store.get().players || []).find(x => x && String(x.id) === String(playerId));
+    if (!p) return;
+    const group = String(p.group || p.squadRole || '').toLowerCase();
+    const starter = p.isStarter === true || group === 'main' || group === 'starter' || group === 'first' || group === 'basis';
+    if (place === 'out') {
+      const out = group === 'out';
+      p.group = out ? 'reserve' : 'out';
+      p.squadRole = p.group;
+      p.isStarter = false;
+    } else if (place === 'xi') {
+      p.group = 'main';
+      p.squadRole = 'starter';
+      p.isStarter = true;
+    } else if (place === 'bench') {
+      p.group = 'reserve';
+      p.squadRole = 'reserve';
+      p.isStarter = false;
+    } else {
+      p.isStarter = !starter;
+      p.group = p.isStarter ? 'main' : 'reserve';
+      p.squadRole = p.isStarter ? 'starter' : 'reserve';
+    }
+    StorageManager.save();
+    App.renderCurrent();
+    try { Toast.show(p.group === 'out' ? 'Поза заявкою' : (p.isStarter ? 'В основі' : 'У резерві'), 'ok'); } catch (_) {}
   },
 
   buildMatchWeek() {

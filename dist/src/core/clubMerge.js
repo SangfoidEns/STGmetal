@@ -691,6 +691,10 @@ function collapseTrainings(payload) {
     if (!item) return;
     const nameKey = trainingNameKey(item.name) || ('id:' + (item.id || ''));
     const copy = /\(копія\)/i.test(String(item.name || ''));
+    if (copy && item.manualCopy) {
+      groups.set('keep:' + String(item.id || (nameKey + '|' + (isoDay(item.date) || ''))), [item]);
+      return;
+    }
     if (copy) {
       if (!groups.has(nameKey)) groups.set(nameKey, []);
       groups.get(nameKey).push(item);

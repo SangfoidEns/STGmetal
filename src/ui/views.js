@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z117',
+  APP_BUILD: 'z118',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -2122,6 +2122,11 @@ trainings() {
 
   _focusMatch(s) {
     const list = (s && s.matches) || [];
+    const picked = (s && s.ui && s.ui.squadMatchId) || (s && s.settings && s.settings.defaultSquadMatchId);
+    if (picked) {
+      const chosen = list.find(m => m && String(m.id) === String(picked) && m.status !== 'cancelled' && m.status !== 'canceled');
+      if (chosen) return chosen;
+    }
     if (typeof CoachTools !== 'undefined' && CoachTools.nextMatch) {
       const next = CoachTools.nextMatch(list);
       if (next) return next;
@@ -2150,22 +2155,63 @@ trainings() {
     const used = {};
     xi.concat(bench).forEach(id => { used[String(id)] = true; });
     const out = players.filter(p => !used[String(p.id)]);
-    const row = (p, role) => '<button type="button" class="match-chip squad-match-row" data-action="match-toggle" data-match-id="' + sanitize(m.id || '') + '" data-player-id="' + sanitize(p.id) + '">' +
-      '<span class="match-chip-role">' + role + '</span>' +
-      '<span class="match-chip-name">' + sanitize((p.lastName || p.firstName || 'Гравець')) + '</span>' +
-      '<span class="match-chip-meta">#' + sanitize(p.number || '—') + (p.position ? (' · ' + sanitize(p.position)) : '') + '</span></button>';
-    const block = (title, arr, role) => '<div class="match-block-label">' + title + ' · ' + arr.length + '</div><div class="match-chips">' +
-      (arr.length ? arr.map(p => row(p, role)).join('') : '<span class="note-sm">Порожньо</span>') + '</div>';
-    return '<p class="note-sm">' + sanitize(phase) + '. Тап переводить гравця: основа → лавка → поза заявкою.</p>' +
+    const row = (p, bucket, role) => this._squadSwipeRow(p, {
+      matchId: m.id, bucket: bucket, role: role,
+      face: 'match-chip squad-match-row'
+    });
+    const block = (title, arr, bucket, role) => '<div class="match-block-label">' + title + ' · ' + arr.length + '</div><div class="match-chips sq-list" data-bucket="' + bucket + '">' +
+      (arr.length ? arr.map(p => row(p, bucket, role)).join('') : '<span class="note-sm">Порожньо</span>') + '</div>';
+    const picks = ((s.matches) || []).filter(item => item && item.status !== 'cancelled' && item.status !== 'canceled')
+      .slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 8);
+    const rail = picks.length > 1
+      ? '<div class="pm-rail sq-matches">' + picks.map(item => {
+        const on = String(item.id) === String(m.id) ? ' on' : '';
+        return '<button type="button" class="pm-chip' + on + '" data-action="squad-pick-match" data-match-id="' + sanitize(item.id || '') + '">' +
+          sanitize((item.date || '').slice(5) + ' vs ' + (item.opponent || 'матч')) + '</button>';
+      }).join('') + '</div>'
+      : '';
+    return rail +
+      '<p class="note-sm">' + sanitize(phase) + '. Цей склад стає основним, а порядок основи — розстановка цього матчу. Свайп вправо: у резерв, довгий — два вибори. Вліво: меню, довгий — вгору, вниз, редагувати. Довгий тап чіпляє гравця і тягне по списку.</p>' +
       '<div class="cp-stat cp-stat-wide cp-stat-match">' + this._matchPlaque(m, { kicker: phase }) + '</div>' +
       '<div class="match-actions">' +
         '<button type="button" class="btn btn-s btn-sm" data-action="squad-board" data-match-id="' + sanitize(m.id || '') + '">На дошку</button>' +
         '<button type="button" class="btn btn-s btn-sm" data-action="match-attendance" data-match-id="' + sanitize(m.id || '') + '">Явка, голи, картки</button>' +
         '<button type="button" class="btn btn-p btn-sm" data-action="open-match" data-match-id="' + sanitize(m.id || '') + '">План матчу</button>' +
       '</div>' +
-      block('Основа', xi.map(id => byId[String(id)]), 'ОС') +
-      block('Лавка', bench.map(id => byId[String(id)]), 'Л') +
-      block('Поза заявкою', out, '•');
+      block('Основа', xi.map(id => byId[String(id)]), 'xi', 'ОС') +
+      block('Лавка', bench.map(id => byId[String(id)]), 'bench', 'Л') +
+      block('Поза заявкою', out, 'out', '•');
+  },
+
+  _squadUnder() {
+    return '<div class="sq-under sq-under-right">' +
+      '<button type="button" class="sq-act sq-act-main" data-sq="nudge">У резерв</button>' +
+      '<button type="button" class="sq-act sq-act-xi" data-sq="xi-bench"><b>Основа</b><small>запас</small></button>' +
+      '<button type="button" class="sq-act sq-act-out" data-sq="bench-out"><b>Резерв</b><small>поза заявкою</small></button>' +
+      '</div><div class="sq-under sq-under-left">' +
+      '<button type="button" class="sq-act sq-act-menu" data-sq="menu">Меню</button>' +
+      '<button type="button" class="sq-act sq-act-up" data-sq="up">Вгору</button>' +
+      '<button type="button" class="sq-act sq-act-down" data-sq="down">Вниз</button>' +
+      '<button type="button" class="sq-act sq-act-edit" data-sq="edit">Змінити</button>' +
+      '</div>';
+  },
+
+  _squadSwipeRow(p, opts) {
+    const o = opts || {};
+    const id = sanitize(p && p.id != null ? p.id : '');
+    const match = o.matchId ? (' data-match-id="' + sanitize(o.matchId) + '"') : '';
+    const bucket = sanitize(o.bucket || '');
+    const role = o.role ? ('<span class="match-chip-role">' + sanitize(o.role) + '</span>') : '';
+    const name = sanitize((p.lastName || '') + ' ' + ((p.firstName || '')[0] ? ((p.firstName || '')[0] + '.') : (p.firstName || '')) || 'Гравець');
+    const meta = '#' + sanitize(p.number || '—') + (p.position ? (' · ' + sanitize(p.position)) : '');
+    const faceCls = o.face || 'pl-row tg-row';
+    const inner = o.inner || (role +
+      '<span class="match-chip-name">' + name.trim() + '</span>' +
+      '<span class="match-chip-meta">' + meta + '</span>');
+    return '<div class="sq-row" data-player-id="' + id + '"' + match + ' data-bucket="' + bucket + '">' +
+      this._squadUnder() +
+      '<div class="sq-face ' + faceCls + '" data-player-id="' + id + '" data-action="open-player-card" role="button">' +
+      inner + '</div></div>';
   },
 
   players() {
@@ -2281,26 +2327,31 @@ trainings() {
     const usedMatch = {};
     xiPeople.concat(benchPeople).forEach(p => { usedMatch[String(p.id)] = true; });
     const restPeople = list.filter(p => !usedMatch[String(p.id)]);
-    const matchOrder = !!(focus && xiPeople.length);
-    const starters = matchOrder ? xiPeople : list.filter(p => isStarter(p) && !['injured','rehab','recovery'].includes(p.status));
-    const reserves = matchOrder ? benchPeople : list.filter(p => !isStarter(p) && !['injured','rehab','recovery'].includes(p.status));
-    const infirmary = matchOrder ? restPeople : list.filter(p => ['injured','rehab','recovery'].includes(p.status));
+    const matchOrder = !!(focus && (xiPeople.length || benchPeople.length || (focus.lineupManual && (focus.xi || focus.bench))));
+    const outGroup = (p) => String((p && (p.group || p.squadRole)) || '').toLowerCase() === 'out';
+    const starters = matchOrder ? xiPeople : list.filter(p => isStarter(p) && !['injured','rehab','recovery'].includes(p.status) && !outGroup(p));
+    const reserves = matchOrder ? benchPeople : list.filter(p => !isStarter(p) && !['injured','rehab','recovery'].includes(p.status) && !outGroup(p));
+    const infirmary = matchOrder ? restPeople : list.filter(p => ['injured','rehab','recovery'].includes(p.status) || outGroup(p));
     const starterTitle = matchOrder ? 'Основа матчу' : 'Основа';
     const reserveTitle = matchOrder ? 'Лавка матчу' : 'Резерв';
     const otherTitle = matchOrder ? 'Поза заявкою' : 'Лазарет';
 
-    const sectionList = (title, arr, cls) => {
+    const sectionList = (title, arr, cls, bucket) => {
       if (!arr.length) return '';
       const rows = arr.map(p => {
         const att = attPct(p.id);
         const usage = this._playerUsage(p.id);
-        return '<div class="pl-row tg-row ' + cls + '" data-player-id="' + p.id + '" data-action="open-player-card" role="button">' +
-          '<span class="pl-num">#' + (p.number || '—') + '</span>' +
-          '<span class="pl-name">' + this._onlinePip('p:' + p.id) + sanitize(p.lastName || '') + ' ' + sanitize((p.firstName || '')[0] || '') + '.' + this.appointmentHtml(p) + '</span>' +
-          '<span class="pl-pos">' + sanitize(p.position || '') + '</span>' +
-          '<span class="pl-att">' + att + '%<small>' + this._fmtShort(usage.appMs) + '</small></span></div>';
+        return this._squadSwipeRow(p, {
+          matchId: focus && focus.id,
+          bucket: bucket,
+          face: 'pl-row tg-row ' + cls,
+          inner: '<span class="pl-num">#' + (p.number || '—') + '</span>' +
+            '<span class="pl-name">' + this._onlinePip('p:' + p.id) + sanitize(p.lastName || '') + ' ' + sanitize((p.firstName || '')[0] || '') + '.' + this.appointmentHtml(p) + '</span>' +
+            '<span class="pl-pos">' + sanitize(p.position || '') + '</span>' +
+            '<span class="pl-att">' + att + '%<small>' + this._fmtShort(usage.appMs) + '</small></span>'
+        });
       }).join('');
-      return '<div class="pl-section ' + cls + '"><div class="pl-section-h">' + title + ' · ' + arr.length + '</div>' + rows + '</div>';
+      return '<div class="pl-section sq-list ' + cls + '" data-bucket="' + bucket + '"><div class="pl-section-h">' + title + ' · ' + arr.length + '</div>' + rows + '</div>';
     };
 
     const meIdCards = mePlayer ? String(mePlayer.id) : '';
@@ -2345,10 +2396,12 @@ trainings() {
     }
 
     return this._liveClub() + header + strip +
-      '<p class="note-sm">' + (matchOrder ? 'Список як у найближчому або останньому матчі: основа, лавка, решта.' : 'Тап — акаунт. З акаунта — картка гравця.') + '</p>' +
-      sectionList(starterTitle, starters, 'pl-starters') +
-      sectionList(reserveTitle, reserves, 'pl-reserve') +
-      sectionList(otherTitle, infirmary, 'pl-infirmary') +
+      '<p class="note-sm">' + (matchOrder
+        ? 'Список цього матчу: основа, резерв, поза заявкою. Свайп вправо переводить з основи в резерв, довгий вправо дає два вибори. Вліво — меню, довгий вліво — вгору, вниз і редагувати. Довгий тап чіпляє гравця.'
+        : 'Тап — акаунт. Свайп вправо переводить між основою і резервом.') + '</p>' +
+      sectionList(starterTitle, starters, 'pl-starters', 'xi') +
+      sectionList(reserveTitle, reserves, 'pl-reserve', 'bench') +
+      sectionList(otherTitle, infirmary, 'pl-infirmary', 'out') +
       (!starters.length && !reserves.length && !infirmary.length ? '<div class="es">Немає гравців</div>' : '') +
       this._teamChat();
   },
