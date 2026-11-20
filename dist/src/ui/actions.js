@@ -2185,7 +2185,22 @@ const Actions = {
     App.renderCurrent();
   },
 
+  saveSupabaseKey() {
+    const el = document.getElementById('setSbKey');
+    if (!el || typeof SupabaseClub === 'undefined' || !SupabaseClub.rememberKey) {
+      try { Toast.show('Сервер ще не підключений у цій версії', 'warn'); } catch (_) {}
+      return;
+    }
+    const key = SupabaseClub.rememberKey(el.value.trim());
+    if (key) SupabaseClub.start(StorageManager).catch(() => {});
+    try { Toast.show(key ? 'Сервер підключено. Клуб сам піде на Supabase.' : 'Ключ прибрано', key ? 'ok' : 'warn'); } catch (_) {}
+  },
+
   saveSettings() {
+    const sbEl = document.getElementById('setSbKey');
+    if (sbEl && typeof SupabaseClub !== 'undefined' && SupabaseClub.rememberKey) {
+      SupabaseClub.rememberKey(sbEl.value.trim());
+    }
     const s = Store.get().settings;
     // IDs must match settings form in views.js
     const clubEl = document.getElementById('setClubName') || document.getElementById('setName');
@@ -2249,6 +2264,11 @@ const Actions = {
       StorageManager.save();
       App.applyBranding();
       Toast.show('Налаштування збережено', 'ok');
+      try {
+        if (typeof SupabaseClub !== 'undefined' && SupabaseClub.enabled && SupabaseClub.enabled() && !SupabaseClub._ready) {
+          SupabaseClub.start(StorageManager).catch(() => {});
+        }
+      } catch (_) {}
       try { App.renderCurrent(); } catch (_) {}
     };
 

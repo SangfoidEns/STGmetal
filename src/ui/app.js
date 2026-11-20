@@ -3482,6 +3482,7 @@ const App = {
         return;
       }
       if (action === 'save-settings') return Actions.saveSettings();
+      if (action === 'save-supabase-key') return Actions.saveSupabaseKey();
       if (action === 'staff-add') {
         e.preventDefault(); e.stopPropagation();
         const role = t.dataset.staffRole || '';

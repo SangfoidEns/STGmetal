@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z105',
+  APP_BUILD: 'z106',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -3661,8 +3661,12 @@ trainings() {
       </div>
       <div class="card glass settings-card">
         <div class="ct">Дані клубу</div>
-        <p class="note-sm">Спільні дані передаються лише файлом JSON: експорт з одного пристрою і імпорт на іншому. Файл клубу на сайті не використовується.</p>
+        <p class="note-sm">Клуб сам сходиться через сервер. JSON лишається запасом, якщо телефонам ще немає ключа.</p>
         <p class="note-sm">Анкета гравця приносить його вибір подарунка біля імені і подарунки, яких ще немає у тренера. Явку лишає тренер.</p>
+        <label class="fl"><span class="fl-label">Публічний ключ сервера (anon)</span>
+          <input id="setSbKey" class="fl-input" spellcheck="false" autocomplete="off" placeholder="eyJ…" value="${sanitize((typeof SupabaseClub !== 'undefined' && SupabaseClub._key) ? SupabaseClub._key() : '')}">
+        </label>
+        <button type="button" class="btn btn-p btn-sm" data-action="save-supabase-key">Підключити сервер</button>
         <p class="note-sm" id="clubSyncLine">${sanitize((typeof StorageManager !== 'undefined' && StorageManager._clubSyncText) || 'Клубний обмін: підключення…')}</p>
         <div class="settings-actions">
           <button type="button" class="btn btn-s" data-action="export-json">Експорт JSON</button>

@@ -111,6 +111,23 @@ const StorageManager = {
     } catch (_) { return true; }
   },
 
+  _supabaseOn() {
+    try {
+      return typeof SupabaseClub !== 'undefined' && SupabaseClub.enabled && SupabaseClub.enabled();
+    } catch (_) { return false; }
+  },
+
+  _canSyncWrite() {
+    if (this._isCoachWriter()) return true;
+    try {
+      if (typeof AuthManager !== 'undefined' && AuthManager.isPlayer && AuthManager.isPlayer()) {
+        const me = AuthManager.getLinkedPlayer && AuthManager.getLinkedPlayer();
+        return !!(me && me.id != null);
+      }
+    } catch (_) {}
+    return false;
+  },
+
   _clubStamp(value) {
     const n = Date.parse(value || '');
     return Number.isFinite(n) ? n : 0;
@@ -290,14 +307,24 @@ const StorageManager = {
   },
 
   async bootstrapClubSync() {
+    if (this._supabaseOn()) {
+      clearTimeout(this._clubPushTimer);
+      if (this._clubPoll) clearInterval(this._clubPoll);
+      this._clubReady = true;
+      try { await SupabaseClub.start(this); } catch (_) {}
+      this._freshInstall = false;
+      return;
+    }
     if (this._staticClubOnly()) {
       clearTimeout(this._clubPushTimer);
       if (this._clubPoll) clearInterval(this._clubPoll);
       this._clubReady = true;
       this._freshInstall = false;
-      this._setClubSyncLine(this._sessionIsCached()
+      const waitKey = typeof SupabaseClub !== 'undefined' && SupabaseClub.URL && !(SupabaseClub.enabled && SupabaseClub.enabled());
+      const extra = waitKey ? ' Сервер Supabase чекає публічний ключ у налаштуваннях.' : '';
+      this._setClubSyncLine((this._sessionIsCached()
         ? 'Дані з цього пристрою. Передача лише файлом JSON.'
-        : 'Імпортуйте клубний JSON. Файл на сайті не використовується.');
+        : 'Імпортуйте клубний JSON. Файл на сайті не використовується.') + extra);
       return;
     }
     let remote = null;
@@ -444,6 +471,10 @@ const StorageManager = {
         this._scheduleCloudPush(payload);
         this._clubDirty = true;
         this.scheduleClubPush();
+      }
+      if (this._supabaseOn() && !(opts && opts.localOnly)) {
+        this._clubDirty = true;
+        try { SupabaseClub.schedulePush(this); } catch (_) {}
       }
     } catch (e) {
       console.warn('[Storage.save]', e);
