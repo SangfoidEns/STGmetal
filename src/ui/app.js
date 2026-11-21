@@ -1322,10 +1322,25 @@ const App = {
     return node.closest('[data-action="match-save"], [data-action="match-warmup"], [data-action="match-logo"], [data-action="match-logo-clear"], [data-action="match-attendance"]');
   },
 
+  _matchButtonCovering(x, y) {
+    try {
+      const nodes = document.querySelectorAll('.match-toolbar [data-action], .match-actions [data-action]');
+      for (let i = 0; i < nodes.length; i++) {
+        const btn = nodes[i];
+        if (!btn || !btn.getBoundingClientRect) continue;
+        const r = btn.getBoundingClientRect();
+        if (r.width < 2 || r.height < 2) continue;
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return btn;
+      }
+    } catch (_) {}
+    return null;
+  },
+
   _takeMatchAction(e) {
     const node = e && e.target;
     if (!node || !node.closest) return false;
     let btn = this._matchActionFrom(node);
+    if (!btn && e.clientX != null) btn = this._matchButtonCovering(e.clientX, e.clientY);
     if (!btn && node.closest('#mobileNav, .mn')) {
       try {
         const stack = document.elementsFromPoint ? document.elementsFromPoint(e.clientX, e.clientY) : [];
@@ -1357,7 +1372,8 @@ const App = {
   _takeMatchChip(e) {
     if (this._squadQuietUntil && Date.now() < this._squadQuietUntil) return false;
     const node = e && e.target;
-    if (node && node.closest && node.closest('.match-savebar, .squad-view-toggle, .st, #appHeader, .header, select, .ym-pick, .ym-picks, .match-week, .match-toolbar, .pm-buckets')) return false;
+    if (e && e.clientX != null && this._matchButtonCovering(e.clientX, e.clientY)) return false;
+    if (node && node.closest && node.closest('.match-savebar, .squad-view-toggle, .st, #appHeader, .header, select, .ym-pick, .ym-picks, .match-week, .match-toolbar, .match-actions, .pm-buckets')) return false;
     const direct = node && node.closest && node.closest('.match-chip, [data-action="match-toggle"]');
     const chip = (direct && direct.getAttribute('data-action') === 'match-toggle')
       ? direct

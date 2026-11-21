@@ -8,7 +8,7 @@ const ClickGuard = {
   /** Ім'я в заявці матчу або в списку складу. Нижня панель його не забирає. */
   matchSquadClick(node) {
     if (!node || !node.closest) return null;
-    if (node.closest('.match-savebar')) return null;
+    if (node.closest('.match-savebar, .match-toolbar, .match-actions')) return null;
     return node.closest('.match-chip, [data-action="match-toggle"], [data-pick-player], .roster-pick');
   },
 

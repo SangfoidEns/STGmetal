@@ -105,7 +105,11 @@ const BoardEngine = {
     this._bindBenchPanelOnce();
     // Resize
     if (window.ResizeObserver) {
-      new ResizeObserver(() => { this._sizeStageToPitch && this._sizeStageToPitch(); this.applyCamera(); this.renderTokens(); this.renderDrawings(); }).observe(c);
+      new ResizeObserver(() => {
+        const changed = this._sizeStageToPitch && this._sizeStageToPitch();
+        this.applyCamera();
+        if (changed) { this.renderTokens(); this.renderDrawings(); }
+      }).observe(c);
       // Freeze guard: clear stuck multi-touch state that leaves zoom indicator active without movement
       if (!this._freezeGuard) {
         this._freezeGuard = setInterval(() => {
@@ -277,24 +281,25 @@ const BoardEngine = {
       }
       w = Math.max(120, Math.round(w));
       h = Math.max(180, Math.round(h));
-      // Inline !important-equivalent: clear conflicting CSS inset/100%
-      stage.style.cssText = [
-        'position:absolute',
-        'width:' + w + 'px',
-        'height:' + h + 'px',
-        'left:' + Math.round((cw - w) / 2) + 'px',
-        'top:' + Math.round((ch - h) / 2) + 'px',
-        'right:auto',
-        'bottom:auto',
-        'inset:auto',
-        'max-width:none',
-        'max-height:none',
-        'margin:0',
-        'box-sizing:border-box',
-        'aspect-ratio:68/105',
-        'overflow:visible',
-        'transform-origin:50% 50%'
-      ].join(';');
+      const left = Math.round((cw - w) / 2);
+      const top = Math.round((ch - h) / 2);
+      if (this._stageW === w && this._stageH === h && this._stageL === left && this._stageT === top) return false;
+      const set = (prop, value) => stage.style.setProperty(prop, value, 'important');
+      set('position', 'absolute');
+      set('width', w + 'px');
+      set('height', h + 'px');
+      set('left', left + 'px');
+      set('top', top + 'px');
+      set('right', 'auto');
+      set('bottom', 'auto');
+      set('inset', 'auto');
+      set('max-width', 'none');
+      set('max-height', 'none');
+      set('margin', '0');
+      set('box-sizing', 'border-box');
+      set('aspect-ratio', '68 / 105');
+      set('overflow', 'visible');
+      set('transform-origin', '50% 50%');
       // SVG must fill stage exactly (no letterbox) so % chips == markings
       const svg = document.getElementById('fieldSvg');
       const draw = document.getElementById('drawSvg');
@@ -309,7 +314,10 @@ const BoardEngine = {
       }
       this._stageW = w;
       this._stageH = h;
-    } catch (_) {}
+      this._stageL = left;
+      this._stageT = top;
+      return true;
+    } catch (_) { return false; }
   },
   zoomFit() { this.fitField(); },
   resetCamera() { this.fitField(); },
@@ -2681,6 +2689,8 @@ const BoardEngine = {
         `<div class="pt-wrap">${ringSvg}<div class="pt-avatar" style="${useAv && photoUrl ? '' : bgStyle}">${avInner}</div></div>` +
         `${statusBadge}${label}</div>`;
     });
+    if (html === this._tokenHtml && layer.childElementCount) return;
+    this._tokenHtml = html;
     layer.innerHTML = html;
     // Re-bind dblclick / contextmenu without inline handlers
     layer.querySelectorAll('.pt').forEach(el => {
@@ -2797,6 +2807,8 @@ const BoardEngine = {
       });
     }
 
+    if (html === this._drawHtml && svg.childNodes.length) return;
+    this._drawHtml = html;
     svg.innerHTML = html;
   },
 
@@ -2988,6 +3000,27 @@ const BoardEngine = {
   },
 
   renderToolbar() {
+    const live = Store.get() || {};
+    const ab0 = live.activeBoard || {};
+    const sel0 = (ab0.objects || []).find(o => o.id === ab0.selectedId);
+    const linked0 = (live.boards || []).find(x => x && String(x.id) === String(ab0.sourceBoardId || ''));
+    const trayKey = [
+      ab0.tool, ab0.toolsTrayOpen ? 1 : 0, ab0.paletteOpen ? 1 : 0, ab0.drawColor || '',
+      ab0.fieldView || '', ab0.scheme || '', ab0.sourceBoardId || '', ab0.useAvatars ? 1 : 0,
+      sel0 ? sel0.type : '', sel0 ? (sel0.color || '') : '', linked0 ? (linked0.name || '') : ''
+    ].join('|');
+    const trayNow = document.getElementById('btbToolsTray');
+    if (this._toolbarKey === trayKey && trayNow && document.getElementById('boardToolbarTop')) {
+      if (!ab0.toolsTrayOpen) {
+        trayNow.classList.remove('open');
+        trayNow.setAttribute('aria-hidden', 'true');
+        trayNow.style.setProperty('pointer-events', 'none', 'important');
+        trayNow.style.setProperty('visibility', 'hidden', 'important');
+        trayNow.style.setProperty('transform', 'translateY(110%)', 'important');
+      }
+      return;
+    }
+    this._toolbarKey = trayKey;
     // Прибрати залиплі копії лотка (portal на body + новий HTML = кілька видимих панелей)
     try { document.querySelectorAll('#btbToolsTray').forEach(el => el.remove()); } catch (_) {}
     const top = document.getElementById('boardToolbarTop') || document.getElementById('boardToolbar');

@@ -257,6 +257,11 @@ const StorageManager = {
     this.restoreCoachPhoto(migrated);
     this.restorePlayerPhotos(migrated);
     this.restoreOpponentLogos(migrated);
+    try {
+      const live = current.activeBoard;
+      const onBoard = !!(current.ui && current.ui.view === 'board');
+      if (onBoard && live && Array.isArray(live.objects)) migrated.activeBoard = live;
+    } catch (_) {}
     this._suppressClubPush = true;
     try {
       Store.set(migrated, { keepStamp: true });
@@ -628,7 +633,10 @@ const StorageManager = {
       feedMeta: s.feedMeta || {},
       activeBoard: {
         objects: (s.activeBoard && s.activeBoard.objects) || [],
-        fieldView: (s.activeBoard && s.activeBoard.fieldView) || 'full'
+        fieldView: (s.activeBoard && s.activeBoard.fieldView) || 'full',
+        scheme: (s.activeBoard && s.activeBoard.scheme) || '',
+        sourceBoardId: (s.activeBoard && s.activeBoard.sourceBoardId) || '',
+        updatedAt: (s.activeBoard && s.activeBoard.updatedAt) || ''
       }
     };
   },
@@ -886,6 +894,9 @@ const StorageManager = {
         }
       }
       if (data.activeBoard.fieldView) base.activeBoard.fieldView = data.activeBoard.fieldView;
+      if (data.activeBoard.scheme) base.activeBoard.scheme = data.activeBoard.scheme;
+      if (data.activeBoard.sourceBoardId) base.activeBoard.sourceBoardId = data.activeBoard.sourceBoardId;
+      if (data.activeBoard.updatedAt) base.activeBoard.updatedAt = data.activeBoard.updatedAt;
     }
     if (!base.settings.rbac) {
       base.settings.rbac = { coaches: [], playerLinks: {} };

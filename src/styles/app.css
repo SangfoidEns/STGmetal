@@ -3825,9 +3825,6 @@ body.board-workspace #fieldContainer.fc,
 body.mode-board-focus #fieldStage,
 body.board-workspace #fieldStage {
   position: absolute !important;
-  inset: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
 }
 #fieldSvg.fs,
 #drawSvg,
@@ -6885,8 +6882,8 @@ body.mode-board-focus .field-stage,
   right: auto !important;
   bottom: auto !important;
   aspect-ratio: 68 / 105 !important;
-  max-width: 100% !important;
-  max-height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
   transform-origin: 50% 50% !important;
   background: #1a5c2e;
   overflow: visible !important;
@@ -13333,3 +13330,51 @@ body:not(.tools-tray-open) #btbToolsTray {
   gap: 8px;
 }
 .player-time-line { margin-top: 6px; }
+
+/* z120: дошка не стрибає між шарами, кнопка плану ловить дотик над списком */
+#fieldStage #fieldSvg { z-index: 0 !important; pointer-events: none !important; }
+#fieldStage #drawSvg,
+#fieldStage #drawSvg * {
+  z-index: 1 !important;
+  pointer-events: none !important;
+}
+#fieldStage #playersLayer { z-index: 4 !important; }
+#v-board #boardToolbarTop,
+#v-board #boardToolbarBottom {
+  position: relative !important;
+  z-index: 40 !important;
+  pointer-events: auto !important;
+}
+.btb-tray:not(.open),
+body:not(.tools-tray-open) #btbToolsTray {
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+.match-toolbar {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 9600 !important;
+  isolation: isolate;
+  pointer-events: auto !important;
+  background: #141c18 !important;
+  padding: 8px 0 !important;
+}
+.match-actions {
+  position: relative !important;
+  z-index: 40 !important;
+  isolation: isolate;
+  pointer-events: auto !important;
+}
+.match-toolbar .btn,
+.match-toolbar button,
+.match-actions .btn,
+.match-actions button {
+  position: relative !important;
+  z-index: 2 !important;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+.match-chips,
+.match-chip {
+  z-index: 1 !important;
+}
