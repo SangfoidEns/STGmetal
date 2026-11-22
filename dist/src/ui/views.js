@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z122',
+  APP_BUILD: 'z123',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -3881,12 +3881,11 @@ trainings() {
     const form = this._loadForm(p.id);
     const role = this._loadRole();
     const score = form.score != null ? this._fmtLoad(form.score) : '—';
-    const weight = this._loadWeightText();
     const blurb = role === 'guest'
-      ? ('Середня оцінка за 28 днів. Синя смуга — тренування, жовта — матчі. Матч важить у ' + weight + ' раза більше за ті самі хвилини.')
+      ? ('Число від 0 до 10 за 28 днів: явка, навантаження, матчі, голи й оцінка. Синя смуга — тренування, жовта — матчі.')
       : (role === 'player'
-        ? ('Це твоя середня оцінка. Матч важчий: ті самі хвилини важать у ' + weight + ' раза більше, ніж тренування. Натисни рядок — відкриється гра або тренування.')
-        : ('Рахується сам з оцінок. Тренування: хвилини × RPE. Матч: хвилини × оцінка × ' + weight + '.'));
+        ? ('Число вище, коли ти ходиш на тренування, граєш, забиваєш і маєш високу оцінку. Натисни рядок — відкриється гра або тренування.')
+        : ('Від 0 до 10. Сюди входять явка, навантаження, матчі, голи й оцінка тренера. Одне тренування більше не ставить гравця першим.'));
     const events = (form.events || []).slice().reverse().slice(0, 5);
     const rows = events.map(ev => {
       const label = String(ev.date || '').slice(5) + ' · ' + (ev.name || '');
@@ -3903,7 +3902,8 @@ trainings() {
     const bits = 'Тренування ' + (form.trainN || 0) +
       (form.trainAvg != null ? (' · сер. ' + this._fmtLoad(form.trainAvg)) : '') +
       ' · матчі ' + (form.matchN || 0) +
-      (form.matchAvg != null ? (' · сер. ' + this._fmtLoad(form.matchAvg)) : '');
+      (form.matchAvg != null ? (' · сер. ' + this._fmtLoad(form.matchAvg)) : '') +
+      (form.goals ? (' · голи ' + form.goals) : '');
     return '<div class="load-panel">' +
       '<div class="load-panel-top"><b class="load-panel-score">' + score + '</b><span>лоад · 28 днів</span></div>' +
       this._loadSplit(form) +
@@ -3948,12 +3948,11 @@ trainings() {
     } catch (_) {}
     const rows = this._livePlayers(s.players).slice().sort((a, b) => (this._loadScore(b) || 0) - (this._loadScore(a) || 0) || (Number(a.number) || 99) - (Number(b.number) || 99));
     if (!rows.length) return '';
-    const weight = this._loadWeightText();
     const intro = role === 'guest'
-      ? ('Число від 1 до 10 — середня оцінка за 28 днів. Синя частина смуги — тренування, жовта — матчі. Матч важить у ' + weight + ' раза більше.')
+      ? ('Число від 0 до 10. Вище ті, хто ходить, грає і забиває. Синя частина смуги — тренування, жовта — матчі.')
       : (role === 'player'
-        ? ('Твій рядок підсвічений. Натисни гравця, щоб відкрити картку. Матч важить у ' + weight + ' раза більше за тренування тієї ж довжини.')
-        : ('Лоад більше не з анкети. Він сам збирається з RPE на тренуванні і оцінки за матч. Матч × ' + weight + '.'));
+        ? ('Твій рядок підсвічений. Натисни гравця, щоб відкрити картку. Вище ті, хто ходить на тренування, грає, забиває і має високу оцінку.')
+        : ('Від 0 до 10: явка, навантаження, матчі, голи й оцінка. Хто був лише на одному тренуванні, попереду не стоїть.'));
     const line = rows.map(p => {
       const name = [p.lastName, p.firstName].filter(Boolean).join(' ') || p.name || ('#' + (p.number || '—'));
       const form = this._loadForm(p.id);
@@ -3962,7 +3961,8 @@ trainings() {
       const note = 'тренування ' + (form.trainN || 0) +
         (form.trainAvg != null ? (' · ' + this._fmtLoad(form.trainAvg)) : '') +
         ' · матчі ' + (form.matchN || 0) +
-        (form.matchAvg != null ? (' · ' + this._fmtLoad(form.matchAvg)) : '');
+        (form.matchAvg != null ? (' · ' + this._fmtLoad(form.matchAvg)) : '') +
+        (form.goals ? (' · голи ' + form.goals) : '');
       return '<button type="button" class="load-hist-row' + mine + '" data-action="open-player-card" data-player-id="' + sanitize(String(p.id)) + '">' +
         '<span>' + sanitize(name) + '</span><b>' + value + '</b>' +
         this._loadSplit(form) +

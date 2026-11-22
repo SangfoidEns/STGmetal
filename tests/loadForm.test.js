@@ -39,7 +39,8 @@ describe('automatic load from ratings', () => {
     assert.equal(form.trainUnits, 720);
     assert.equal(form.matchUnits, Math.round(720 * LM.MATCH_WEIGHT));
     assert.ok(form.matchUnits > form.trainUnits);
-    assert.equal(form.score, 8);
+    assert.equal(form.quality, 8);
+    assert.ok(form.score > 8);
     assert.ok(form.events[1].weight > form.events[0].weight);
   });
 
@@ -56,9 +57,10 @@ describe('automatic load from ratings', () => {
     });
     const form = LM.formLoad('p1');
     const plain = (4 + 9) / 2;
-    assert.ok(form.score > plain);
+    assert.ok(form.quality > plain);
+    assert.ok(form.quality > 7);
+    assert.equal(form.quality, 7.6);
     assert.ok(form.score > 7);
-    assert.equal(form.score, 7.6);
   });
 
   it('ignores an absence, a cancelled match and a session outside the window', () => {
@@ -75,7 +77,8 @@ describe('automatic load from ratings', () => {
     const form = LM.formLoad('p1');
     assert.equal(form.trainN, 1);
     assert.equal(form.matchN, 0);
-    assert.equal(form.score, 6);
+    assert.equal(form.quality, 6);
+    assert.ok(form.score < 6);
     assert.equal(form.trainUnits, 480);
   });
 
@@ -113,5 +116,44 @@ describe('automatic load from ratings', () => {
     const match = LM._matches()[0];
     assert.equal(LM.playerMinutes(match, 'p1'), 20);
     assert.equal(LM.matchPlayerLoad(match, 'p1'), Math.round(20 * 8 * LM.MATCH_WEIGHT));
+  });
+
+  it('ranks a player who trains and plays above a player from one training', () => {
+    const trainings = [];
+    for (let i = 1; i <= 6; i++) {
+      trainings.push({
+        id: 't' + i,
+        date: iso(-i),
+        status: 'done',
+        duration: 90,
+        attendance: {
+          rare: i === 1 ? { present: true, rpe: 9 } : { present: false },
+          reg: { present: true, rpe: 6 }
+        }
+      });
+    }
+    const matches = [1, 2].map(function (i) {
+      return {
+        id: 'm' + i,
+        date: iso(-i),
+        status: 'played',
+        minutes: 90,
+        opponent: 'Суперник',
+        attendance: {
+          rare: { present: false, rating: 9 },
+          reg: { present: true, rating: 7, goals: i === 1 ? 1 : 0 }
+        }
+      };
+    });
+    const LM = boot({ trainings: trainings, matches: matches });
+    const rare = LM.formLoad('rare');
+    const reg = LM.formLoad('reg');
+    assert.equal(rare.trainN, 1);
+    assert.equal(rare.matchN, 0);
+    assert.equal(reg.trainN, 6);
+    assert.equal(reg.matchN, 2);
+    assert.equal(reg.goals, 1);
+    assert.ok(rare.score < 4);
+    assert.ok(reg.score > rare.score + 3);
   });
 });

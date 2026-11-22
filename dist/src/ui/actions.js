@@ -917,7 +917,7 @@ const Actions = {
         <p class="note-sm" style="grid-column:1/-1;margin:0">Капітана призначає головний тренер у Налаштування → Склад тренерів.</p>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_condition','Стан %'):'Стан %')}</label><input type="number" id="peC" value="${p.condition}"></div>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_readiness','Готовність %'):'Готовність %')}</label><input type="number" id="peR" value="${p.readiness}"></div>
-        <div class="fgr full"><label>Лоад</label><p class="note-sm">Лоад рахується сам з оцінок за тренування і за матч. Зараз ${typeof Views !== 'undefined' && Views._fmtLoad ? Views._fmtLoad(Views._loadScore(p)) : '—'}. Матч важить у ${typeof Views !== 'undefined' && Views._loadWeightText ? Views._loadWeightText() : '1,7'} раза більше.</p></div>
+        <div class="fgr full"><label>Лоад</label><p class="note-sm">Місце рахується само: явка, навантаження, матчі, голи й оцінка. Зараз ${typeof Views !== 'undefined' && Views._fmtLoad ? Views._fmtLoad(Views._loadScore(p)) : '—'}.</p></div>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_group','Група'):'Група')}</label><select id="peG">
           <option value="main" ${p.group==='main'?'selected':''}>Основний</option>
           <option value="reserve" ${p.group==='reserve'?'selected':''}>Резерв</option>

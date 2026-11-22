@@ -129,13 +129,15 @@ const LoadModel = {
   },
 
   /**
-   * Лоад гравця за вікно днів: середня оцінка, де вага — хвилини.
-   * Матч множить хвилини на MATCH_WEIGHT, тож одна гра тягне число сильніше за тренування.
+   * Місце гравця за 28 днів, від 0 до 10.
+   * Явка, навантаження, матчі, голи й оцінка. Одне тренування саме по собі місце не піднімає.
+   * quality лишається середньою оцінкою, де матч важить більше за ті самі хвилини.
    */
   formLoad(playerId, days, trainings, matches) {
     days = days || 28;
     const events = [];
     const self = this;
+    let goals = 0;
     this.pastTrainings(this._trainings(trainings)).forEach(function (t) {
       if (!self._inWindow(t.date, days)) return;
       const mark = self._attEntry(null, playerId, t);
@@ -165,6 +167,8 @@ const LoadModel = {
       if (rating == null) return;
       const minutes = self.playerMinutes(m, playerId);
       if (!minutes) return;
+      const scored = Number(cell.goals);
+      if (Number.isFinite(scored) && scored > 0) goals += scored;
       const weight = minutes * (self.MATCH_WEIGHT || 1);
       events.push({
         kind: 'match',
@@ -200,12 +204,48 @@ const LoadModel = {
       }
     });
     const round1 = function (n) { return Math.round(n * 10) / 10; };
+    const teamTrains = this.completedTrainings(this._trainings(trainings)).filter(function (t) {
+      return self._inWindow(t.date, days);
+    });
+    const teamMatches = this.playedMatches(this._matches(matches)).filter(function (m) {
+      return self._inWindow(m.date, days);
+    });
+    let came = 0;
+    teamTrains.forEach(function (t) {
+      if (self._isPresent(self._attEntry(null, playerId, t)) === true) came += 1;
+    });
+    let expected = 0;
+    teamTrains.forEach(function (t) {
+      expected += Math.max(1, Number(t.duration) || 75) * 7;
+    });
+    teamMatches.forEach(function (m) {
+      expected += Math.max(1, Number(m.minutes) || 90) * 7 * (self.MATCH_WEIGHT || 1);
+    });
+    const att = teamTrains.length ? (came / teamTrains.length) : 0;
+    const play = teamMatches.length ? (matchN / teamMatches.length) : 0;
+    const quality = weightSum ? (rated / weightSum) : 0;
+    const loadN = expected ? Math.min(1, (trainUnits + matchUnits) / expected) : 0;
+    const goalsN = Math.min(1, goals / 2);
+    const parts = [
+      { w: 3, v: att },
+      { w: 2, v: loadN },
+      { w: teamMatches.length ? 2.5 : 0, v: play },
+      { w: 1, v: goalsN },
+      { w: 1.5, v: quality / 10 }
+    ];
+    const wsum = parts.reduce(function (sum, part) { return sum + part.w; }, 0);
+    const hasTeam = teamTrains.length + teamMatches.length > 0;
     return {
-      score: weightSum ? round1(rated / weightSum) : null,
+      score: hasTeam ? round1(parts.reduce(function (sum, part) { return sum + part.w * part.v; }, 0) / wsum * 10) : null,
+      quality: weightSum ? round1(quality) : null,
       trainAvg: trainN ? round1(trainRated / trainN) : null,
       matchAvg: matchN ? round1(matchRated / matchN) : null,
       trainN: trainN,
       matchN: matchN,
+      goals: goals,
+      came: came,
+      teamTrains: teamTrains.length,
+      teamMatches: teamMatches.length,
       trainUnits: trainUnits,
       matchUnits: matchUnits,
       weight: this.MATCH_WEIGHT || 1,
