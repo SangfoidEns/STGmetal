@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z121',
+  APP_BUILD: 'z122',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -456,12 +456,14 @@ const Views = {
     const totalMin = activity.reduce((a, d) => a + (d.minutes || 0), 0);
     const totalHours = Math.round(totalMin / 60 * 10) / 10;
     const matchDays = activity.reduce((a, d) => a + (d.matches || 0), 0);
-    const todayStr = today();
+    const todayStr = (typeof CoachTools !== 'undefined' && CoachTools.berlinToday) ? CoachTools.berlinToday() : today();
     const nextMatch = (typeof CoachTools !== 'undefined' && CoachTools.nextMatch)
       ? CoachTools.nextMatch(s.matches)
       : (s.matches || []).filter(m => m && m.date >= todayStr && m.status !== 'played' && m.status !== 'cancelled' && m.status !== 'canceled').sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
-    const pastMatch = (s.matches || []).filter(m => m && m.date && m.date < todayStr && (!nextMatch || String(m.id) !== String(nextMatch.id)))
-      .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.time || '').localeCompare(String(a.time || '')))[0];
+    const pastMatch = (typeof CoachTools !== 'undefined' && CoachTools.latestResult)
+      ? CoachTools.latestResult(s.matches, nextMatch)
+      : (s.matches || []).filter(m => m && m.date && m.date < todayStr && (!nextMatch || String(m.id) !== String(nextMatch.id)))
+        .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.time || '').localeCompare(String(a.time || '')))[0];
     const recent = s.trainings.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 6);
     const drafts = s.trainings.filter(t => t.status === 'draft' || t.status === 'pinned');
     const boardCount = (s.boards || []).length;
@@ -607,7 +609,7 @@ const Views = {
             ${matchHtml}
           </div>
           ${pastMatch
-            ? ('<div class="cp-stat cp-stat-wide cp-stat-match cp-stat-past">' + this._matchPlaque(pastMatch, { clubShort: short, clubLogo: logo || this.clubMark(), kicker: 'Минулий матч' }) + '</div>')
+            ? ('<div class="cp-stat cp-stat-wide cp-stat-match cp-stat-past">' + this._matchPlaque(pastMatch, { clubShort: short, clubLogo: logo || this.clubMark(), kicker: ((typeof CoachTools !== 'undefined' && CoachTools.isoDay && CoachTools.isoDay(pastMatch.date) === todayStr) ? 'Матч сьогодні' : 'Минулий матч') }) + '</div>')
             : '<button type="button" class="cp-stat cp-stat-wide sc-tap cp-stat-action" data-view="matches"><span class="cp-stat-ic">🏟</span><span class="cp-stat-val">—</span><span class="cp-stat-lb">Минулий матч</span><span class="cp-stat-sub">Ще не зіграний</span></button>'}
           <button type="button" class="cp-stat cp-stat-wide sc-tap cp-stat-action" data-view="tactics">
             <span class="cp-stat-ic">🗂</span>
@@ -1164,7 +1166,7 @@ const Views = {
     const stats = me ? this._playerStats(me.id) : { attPct: 0, avgRpe: 0, load28: 0, cancelled: 0 };
     const mineUsage = me ? this._playerUsage(me.id) : { appMs: 0, boardMs: 0 };
     const next = this._nextPlanned(s.trainings);
-    const todayStr = today();
+    const todayStr = (typeof CoachTools !== 'undefined' && CoachTools.berlinToday) ? CoachTools.berlinToday() : today();
     const monthPrefix = todayStr.slice(0, 7);
     const nextMatch = (typeof CoachTools !== 'undefined' && CoachTools.nextMatch)
       ? CoachTools.nextMatch(s.matches)
@@ -1241,9 +1243,12 @@ const Views = {
 
       ${nextMatch ? ('<div class="cp-stat cp-stat-wide cp-stat-match">' + this._matchPlaque(nextMatch) + '</div>') : ''}
       ${(() => {
-        const past = (s.matches || []).filter(m => m && m.date && m.date < todayStr && (!nextMatch || String(m.id) !== String(nextMatch.id)))
-          .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.time || '').localeCompare(String(a.time || '')))[0];
-        return past ? ('<div class="cp-stat cp-stat-wide cp-stat-match cp-stat-past">' + this._matchPlaque(past, { kicker: 'Минулий матч' }) + '</div>') : '';
+        const past = (typeof CoachTools !== 'undefined' && CoachTools.latestResult)
+          ? CoachTools.latestResult(s.matches, nextMatch)
+          : (s.matches || []).filter(m => m && m.date && m.date < todayStr && (!nextMatch || String(m.id) !== String(nextMatch.id)))
+            .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.time || '').localeCompare(String(a.time || '')))[0];
+        const kicker = past && typeof CoachTools !== 'undefined' && CoachTools.isoDay && CoachTools.isoDay(past.date) === todayStr ? 'Матч сьогодні' : 'Минулий матч';
+        return past ? ('<div class="cp-stat cp-stat-wide cp-stat-match cp-stat-past">' + this._matchPlaque(past, { kicker: kicker }) + '</div>') : '';
       })()}
 
       ${next

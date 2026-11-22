@@ -265,4 +265,23 @@ describe('club feed and gift delete', () => {
     context.ClubFeed.sync();
     assert.equal(context.Store.state.feed.filter(x => x.kind === 'load').length, 1);
   });
+
+  it('shows a match played today as the latest result, not as the next match', () => {
+    const clock = context.CoachTools.berlinNow();
+    const later = '2099-01-01';
+    const matches = [
+      { id: 'old', opponent: 'Turbine', date: '2026-11-15', time: '13:00', status: 'played', scoreUs: 3, scoreThem: 5 },
+      { id: 'today', opponent: 'FC Freunde', date: clock.day, time: '18:00', status: 'played', scoreUs: 10, scoreThem: 7 },
+      { id: 'soon', opponent: 'Next Club', date: later, time: '18:00', status: 'planned' }
+    ];
+    assert.equal(context.CoachTools.matchIsPast(matches[1], clock.day, clock.hm), true);
+    assert.equal(context.CoachTools.latestResult(matches).id, 'today');
+    assert.equal(context.CoachTools.nextMatch(matches).id, 'soon');
+    const onlyToday = [
+      { id: 'old', opponent: 'Turbine', date: '2026-11-15', time: '13:00', status: 'played', scoreUs: 3, scoreThem: 5 },
+      { id: 'today', opponent: 'FC Freunde', date: clock.day, kickoff: '18:00', scoreUs: 10, scoreThem: 7 }
+    ];
+    assert.equal(context.CoachTools.latestResult(onlyToday).opponent, 'FC Freunde');
+    assert.equal(context.CoachTools.nextMatch(onlyToday), null);
+  });
 });

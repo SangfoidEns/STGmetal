@@ -1580,19 +1580,61 @@ CoachTools.isoDay = function (value) {
   return '';
 };
 
+CoachTools.berlinNow = function () {
+  const day = CoachTools.berlinToday();
+  let hm = '00:00';
+  try {
+    hm = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+    }).format(new Date());
+  } catch (_) {}
+  return { day: day, hm: String(hm || '00:00').slice(0, 5) };
+};
+
+/** Зіграний: статус, день уже минув, або сьогодні після початку чи з рахунком. */
+CoachTools.matchIsPast = function (m, todayStr, hm) {
+  if (!m) return false;
+  const st = String(m.status || '').toLowerCase();
+  if (st === 'cancelled' || st === 'canceled') return false;
+  if (st === 'played' || st === 'done') return true;
+  const day = CoachTools.isoDay(m.date);
+  const today = todayStr || CoachTools.berlinToday();
+  if (!day || !today) return false;
+  if (day < today) return true;
+  if (day > today) return false;
+  const scored = m.scoreUs != null && m.scoreUs !== '' && m.scoreThem != null && m.scoreThem !== '';
+  if (scored) return true;
+  const kick = String(m.kickoff || m.time || '').slice(0, 5);
+  return !!(kick && hm && kick <= hm);
+};
+
 /** Найближчий ще не зіграний матч. Дата в Європі/Берлін, без скасованих і без порожнього суперника. */
 CoachTools.nextMatch = function (matches, todayStr) {
-  const today = todayStr || CoachTools.berlinToday();
+  const clock = CoachTools.berlinNow();
+  const today = todayStr || clock.day;
+  const hm = (!todayStr || todayStr === clock.day) ? clock.hm : '00:00';
   return (matches || []).filter(function (m) {
-    if (!m) return false;
-    const st = String(m.status || '').toLowerCase();
-    if (st === 'played' || st === 'done' || st === 'cancelled' || st === 'canceled') return false;
+    if (!m || CoachTools.matchIsPast(m, today, hm)) return false;
     if (!String(m.opponent || '').trim()) return false;
     const day = CoachTools.isoDay(m.date);
     if (!day) return false;
     return !today || day >= today;
   }).sort(function (a, b) {
-    return CoachTools.isoDay(a.date).localeCompare(CoachTools.isoDay(b.date)) || String(a.time || '').localeCompare(String(b.time || ''));
+    return CoachTools.isoDay(a.date).localeCompare(CoachTools.isoDay(b.date)) || String(a.kickoff || a.time || '').localeCompare(String(b.kickoff || b.time || ''));
+  })[0] || null;
+};
+
+/** Останній результат, включно з матчем, який уже зіграли сьогодні. */
+CoachTools.latestResult = function (matches, skip) {
+  const clock = CoachTools.berlinNow();
+  const skipId = skip && skip.id != null ? String(skip.id) : '';
+  return (matches || []).filter(function (m) {
+    if (!m || !CoachTools.matchIsPast(m, clock.day, clock.hm)) return false;
+    if (!String(m.opponent || '').trim()) return false;
+    return !skipId || String(m.id) !== skipId;
+  }).sort(function (a, b) {
+    return CoachTools.isoDay(b.date).localeCompare(CoachTools.isoDay(a.date))
+      || String(b.kickoff || b.time || '').localeCompare(String(a.kickoff || a.time || ''));
   })[0] || null;
 };
 
