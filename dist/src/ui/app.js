@@ -1212,6 +1212,78 @@ const App = {
     sel.addEventListener('change', onChange);
   },
 
+  _capturePlace() {
+    const ui = (Store.get() && Store.get().ui) || {};
+    return {
+      view: ui.view || 'dashboard',
+      matchId: ui.matchId || null,
+      schemeAlbumId: ui.schemeAlbumId || null,
+      playerTrainTab: ui.playerTrainTab || null,
+      squadViewMode: ui.squadViewMode || null
+    };
+  },
+
+  _restorePlace(place) {
+    if (!place) return;
+    const s = Store.get();
+    if (!s) return;
+    s.ui = s.ui || {};
+    s.ui.matchId = place.matchId || null;
+    s.ui.schemeAlbumId = place.schemeAlbumId || null;
+    if (place.playerTrainTab) s.ui.playerTrainTab = place.playerTrainTab;
+    if (place.squadViewMode) s.ui.squadViewMode = place.squadViewMode;
+  },
+
+  leaveBoard() {
+    const place = this._boardReturn;
+    this._boardReturn = null;
+    try { if (typeof BoardEngine !== 'undefined' && BoardEngine.closeToolsTray) BoardEngine.closeToolsTray(true); } catch (_) {}
+    try { if (typeof BoardEngine !== 'undefined' && BoardEngine.leaveBoardMode) BoardEngine.leaveBoardMode(); } catch (_) {}
+    try { if (typeof BoardEngine !== 'undefined' && BoardEngine.exitFullscreen) BoardEngine.exitFullscreen(); } catch (_) {}
+    try {
+      const stack = (typeof TelegramManager !== 'undefined' && TelegramManager._viewStack) || null;
+      if (stack && stack[stack.length - 1] === 'board') stack.pop();
+    } catch (_) {}
+    const back = (place && place.view && place.view !== 'board')
+      ? place.view
+      : (((typeof TelegramManager !== 'undefined' && TelegramManager._viewStack) || []).slice(-1)[0] || 'dashboard');
+    if (place) this._restorePlace(place);
+    this.navigate(back, { fromBack: true });
+  },
+
+  _scrollMainTop() {
+    const go = () => {
+      try {
+        const main = document.getElementById('main');
+        if (main) main.scrollTop = 0;
+        document.querySelectorAll('.view.on').forEach(el => { el.scrollTop = 0; });
+        if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+        window.scrollTo(0, 0);
+      } catch (_) {}
+    };
+    go();
+    try { requestAnimationFrame(go); } catch (_) {}
+  },
+
+  _noteScreen() {
+    const ui = (Store.get() && Store.get().ui) || {};
+    const key = [ui.view || '', ui.matchId || '', ui.schemeAlbumId || '', ui.playerTrainTab || ''].join('|');
+    const changed = this._screenKey !== key;
+    this._screenKey = key;
+    if (changed && ui.view !== 'board') this._scrollMainTop();
+  },
+
+  _syncBackButton() {
+    try {
+      if (typeof TelegramManager === 'undefined') return;
+      const ui = (Store.get() && Store.get().ui) || {};
+      const nested = !!(ui.matchId || ui.schemeAlbumId);
+      const depth = (TelegramManager._viewStack || []).length;
+      if (ui.view === 'board' || nested || depth > 1) TelegramManager.showBackButton();
+      else TelegramManager.hideBackButton();
+    } catch (_) {}
+  },
+
   handleTelegramBack() {
     try {
       // спочатку закрити sheet / modal
@@ -1233,8 +1305,27 @@ const App = {
         }
         return;
       }
-      if (Store.get().ui.view === 'board') {
-        this.navigate('dashboard');
+      const ui = (Store.get() && Store.get().ui) || {};
+      if (ui.view === 'board') {
+        const ab = Store.get().activeBoard;
+        if (ab && ab.toolsTrayOpen) {
+          ab.toolsTrayOpen = false;
+          ab.paletteOpen = false;
+          try { BoardEngine.closeToolsTray && BoardEngine.closeToolsTray(true); } catch (_) {}
+          try { BoardEngine.renderToolbar && BoardEngine.renderToolbar(); } catch (_) {}
+          return;
+        }
+        this.leaveBoard();
+        return;
+      }
+      if (ui.matchId && ui.view === 'matches') {
+        ui.matchId = null;
+        this.renderCurrent();
+        return;
+      }
+      if (ui.schemeAlbumId && (ui.view === 'tactics' || ui.view === 'trainings')) {
+        ui.schemeAlbumId = null;
+        this.renderCurrent();
         return;
       }
       const prev = TelegramManager.popView();
@@ -1484,8 +1575,12 @@ const App = {
         console.warn('[navigate] board blocked — missing allow token', token);
         return;
       }
+      const from = Store.get().ui && Store.get().ui.view;
+      const optsIn = arguments[1] || {};
+      if (from && from !== 'board' && !optsIn.fromBack) this._boardReturn = this._capturePlace();
     }
     try { this.toggleMobileSidebar(false); } catch (_) {}
+    this.currentView = view;
     Store.get().ui.view = view;
     try { this.closeDrawer && this.closeDrawer(); } catch (_) {}
     document.querySelectorAll('.view').forEach(v => {
@@ -1562,9 +1657,9 @@ const App = {
         boardEl.style.display = 'none';
         boardEl.setAttribute('aria-hidden', 'true');
       }
-      try { TelegramManager.hideBackButton(); } catch (_) {}
     }
     this.renderCurrent();
+    try { this._syncBackButton(); } catch (_) {}
     try { this._bindPlayerCompare(); } catch (_) {}
     // field needs resize after layout change
     if (view === 'board') {
@@ -1948,6 +2043,7 @@ const App = {
         BoardEngine.render();
         this.initBoardToolbarDrag();
       } catch (e) { console.error('[board render]', e); }
+      try { this._noteScreen(); } catch (_) {}
       return;
     }
     // Не на дошці — гарантовано ховаємо лоток інструментів (баг: панель «липла» до меню)
@@ -2018,6 +2114,7 @@ const App = {
     try { this._bindPlayerCompare(); } catch (_) {}
     try { this.bindSquadViewButtons(); } catch (_) {}
     try { this.bindCoachCardButtons(); } catch (_) {}
+    try { this._noteScreen(); } catch (_) {}
   },
 
   async sendTeamChat() {
@@ -4876,9 +4973,6 @@ const App = {
 
       if (action === 'exit-board') {
         e.preventDefault(); e.stopPropagation();
-        try { BoardEngine.closeToolsTray && BoardEngine.closeToolsTray(true); } catch (_) {}
-        try { BoardEngine.leaveBoardMode && BoardEngine.leaveBoardMode(); } catch (_) {}
-        try { BoardEngine.exitFullscreen && BoardEngine.exitFullscreen(); } catch (_) {}
         document.body.classList.remove(
           'board-fs-nav', 'board-only-mode', 'mode-board-focus', 'board-workspace',
           'present-mode', 'tools-tray-open', 'bench-collapsed', 'board-on', 'board-active'
@@ -4886,7 +4980,7 @@ const App = {
         try {
           document.querySelectorAll('body > #btbToolsTray, body > .btb-tray').forEach(el => el.remove());
         } catch (_) {}
-        App.navigate('dashboard');
+        App.leaveBoard();
         return;
       }
       if (action === 'toggle-menu' || action === 'open-menu' || action === 'menu') {

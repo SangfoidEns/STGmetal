@@ -613,27 +613,32 @@ describe('club snapshot merge', () => {
   });
 
   it('keeps the larger player time and the newer online stamp', () => {
+    const now = Date.now();
+    const iso = (ms) => new Date(now - ms).toISOString();
+    const coachAt = iso(2 * 3600 * 1000);
+    const older = iso(4 * 3600 * 1000);
+    const newer = iso(30 * 60 * 1000);
     const merged = mergePayload({
       settings: {
-        coachStats: { appMs: 10, updatedAt: '2026-11-20T10:00:00.000Z' },
-        playerUsage: { p9: { appMs: 60000, boardMs: 15000, updatedAt: '2026-11-20T10:00:00.000Z' } },
+        coachStats: { appMs: 10, updatedAt: older },
+        playerUsage: { p9: { appMs: 60000, boardMs: 15000, updatedAt: older } },
         presence: {
-          coach: { at: '2026-11-20T12:00:00.000Z', name: 'Тренер', role: 'coach' },
-          'p:p9': { at: '2026-11-20T11:00:00.000Z', name: 'Єгор', role: 'player', playerId: 'p9' }
+          coach: { at: coachAt, name: 'Тренер', role: 'coach' },
+          'p:p9': { at: older, name: 'Єгор', role: 'player', playerId: 'p9' }
         }
       }
     }, {
       settings: {
-        coachStats: { appMs: 20, updatedAt: '2026-11-20T16:00:00.000Z' },
-        playerUsage: { p9: { appMs: 30000, boardMs: 45000, updatedAt: '2026-11-20T16:00:00.000Z' } },
+        coachStats: { appMs: 20, updatedAt: newer },
+        playerUsage: { p9: { appMs: 30000, boardMs: 45000, updatedAt: newer } },
         presence: {
-          'p:p9': { at: '2026-11-20T15:00:00.000Z', name: 'Єгор', role: 'player', playerId: 'p9' }
+          'p:p9': { at: newer, name: 'Єгор', role: 'player', playerId: 'p9' }
         }
       }
     });
     assert.equal(merged.settings.playerUsage.p9.appMs, 60000);
     assert.equal(merged.settings.playerUsage.p9.boardMs, 45000);
-    assert.equal(merged.settings.presence['p:p9'].at, '2026-11-20T15:00:00.000Z');
+    assert.equal(merged.settings.presence['p:p9'].at, newer);
     assert.equal(merged.settings.presence.coach.name, 'Тренер');
     assert.equal(merged.settings.coachStats.appMs, 20);
   });

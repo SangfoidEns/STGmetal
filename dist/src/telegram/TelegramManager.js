@@ -408,7 +408,12 @@ const TelegramManager = {
         } catch (_) {}
         return;
       }
-      this.hideBackButton && this.hideBackButton();
+      try {
+        if (typeof App !== 'undefined' && App._syncBackButton) App._syncBackButton();
+        else this.hideBackButton && this.hideBackButton();
+      } catch (_) {
+        this.hideBackButton && this.hideBackButton();
+      }
     } catch (e) {
       console.warn('[TG] syncChrome', e);
     }
