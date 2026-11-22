@@ -13378,3 +13378,151 @@ body:not(.tools-tray-open) #btbToolsTray {
 .match-chip {
   z-index: 1 !important;
 }
+
+/* Home: glass header over a profile that opens like a channel cover. */
+.header.header-tg.glass-pill-hdr .tg-hdr-pill {
+  background: rgba(10, 14, 18, 0.28) !important;
+  backdrop-filter: blur(16px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(140%) !important;
+  border-color: rgba(255,255,255,0.18) !important;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.12) !important;
+}
+body.is-home .app { position: relative; }
+body.is-home .header.header-tg.glass-pill-hdr {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30 !important;
+  pointer-events: none !important;
+  background: transparent !important;
+}
+body.is-home .header.header-tg.glass-pill-hdr .tg-hdr-pill,
+body.is-home .header.header-tg.glass-pill-hdr button {
+  pointer-events: auto !important;
+}
+body.is-home #v-dashboard {
+  padding-top: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+body.is-home .player-home { padding: 0 12px 24px; }
+body.is-home .tg-unfold {
+  --open: 0.16;
+  position: relative;
+  margin: 0 -12px 14px;
+  padding-top: calc(86px + env(safe-area-inset-top, 0px));
+}
+body.is-home .tg-unfold.is-full { padding-top: 0; }
+.tg-unfold-stage {
+  position: relative;
+  height: calc(132px + var(--open) * 200px);
+  display: grid;
+  place-items: center;
+  transition: height .34s cubic-bezier(.2,.8,.2,1);
+}
+.tg-unfold.is-pull .tg-unfold-stage { transition: none; }
+.tg-unfold.is-full .tg-unfold-stage { height: min(70vh, 540px); }
+.tg-unfold.is-flat .tg-unfold-stage,
+.tg-unfold.is-flat .tg-unfold-id { display: none; }
+.tg-unfold-photo {
+  width: calc(96px + var(--open) * 250px);
+  height: calc(96px + var(--open) * 250px);
+  max-width: calc(100% - 24px);
+  border: 0;
+  padding: 0;
+  overflow: hidden;
+  border-radius: calc((1 - var(--open)) * 50%);
+  background: #17201c;
+  box-shadow: 0 12px 28px rgba(0,0,0,.35);
+  cursor: pointer;
+  transition: width .34s cubic-bezier(.2,.8,.2,1), height .34s cubic-bezier(.2,.8,.2,1), border-radius .34s ease, max-width .34s ease;
+}
+.tg-unfold.is-pull .tg-unfold-photo { transition: none; }
+.tg-unfold.is-full .tg-unfold-photo {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+.tg-unfold-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 18%;
+  display: block;
+}
+.tg-unfold-photo .cp-avatar-ph {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+  font-weight: 800;
+}
+.tg-unfold-photo .cp-avatar-ph[style*="display:none"],
+.tg-unfold-photo .cp-avatar-ph[style*="display: none"] { display: none !important; }
+.tg-unfold-id {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 10px 16px 4px;
+}
+.tg-unfold.is-full .tg-unfold-id {
+  margin-top: -108px;
+  padding: 36px 16px 16px;
+  background: linear-gradient(to top, rgba(6,10,14,.92), rgba(6,10,14,.25) 72%, transparent);
+}
+.tg-unfold-kicker {
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.72);
+}
+.tg-unfold-name {
+  margin: 4px 0 0;
+  font-size: 26px;
+  line-height: 1.15;
+}
+.tg-unfold-role {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 12px;
+  border-radius: 99px;
+  border: 1px solid rgba(232,197,71,.7);
+  color: #e8c547;
+  font-size: 12px;
+  font-weight: 800;
+}
+.tg-unfold-club { margin-top: 8px; font-weight: 700; }
+.tg-unfold-status {
+  margin-top: 6px;
+  color: rgba(255,255,255,.78);
+  font-size: 13px;
+}
+.tg-unfold-bar {
+  position: sticky;
+  top: calc(78px + env(safe-area-inset-top, 0px));
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  margin: 0 12px;
+  pointer-events: none;
+}
+.tg-unfold.is-flat .tg-unfold-bar {
+  height: 44px;
+  opacity: 1;
+  margin-bottom: 8px;
+  padding: 0 14px;
+  border-radius: 16px;
+  background: rgba(12, 16, 20, 0.38);
+  border: 0.5px solid rgba(255,255,255,0.14);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  pointer-events: auto;
+}
