@@ -1,4 +1,4 @@
-const CACHE_NAME = 'metalist-coach-v20261123z125';
+const CACHE_NAME = 'metalist-coach-v20261123z126';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './assets/metalist-mark.svg',
   './src/styles/app.css',
