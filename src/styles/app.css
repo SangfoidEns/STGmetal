@@ -13461,31 +13461,76 @@ body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-acti
   padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)) !important;
 }
 
-/* Popups share the header glass: sheets and dialogs. */
+/* Every window over the app is a centered glass bubble. Scroll stays inside it. */
+.mo,
+#modal.mo,
 .tg-sheet-backdrop,
 .sw-sheet-backdrop {
-  background: rgba(0, 0, 0, 0.38) !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: max(20px, env(safe-area-inset-top, 0px)) 14px max(20px, env(safe-area-inset-bottom, 0px)) !important;
+  overflow: hidden !important;
+  background: rgba(0, 0, 0, 0.46) !important;
+}
+.mo.show,
+#modal.mo.show {
+  display: flex !important;
 }
 .tg-sheet,
 .tg-action-sheet,
 .sw-sheet,
 .mo .md,
 #modal .md {
-  background: rgba(16, 18, 24, 0.82) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  width: min(460px, 100%) !important;
+  max-width: 100% !important;
+  max-height: min(78vh, 720px) !important;
+  margin: 0 auto !important;
+  overflow: hidden !important;
+  border-radius: 28px !important;
+  background: rgba(16, 18, 24, 0.88) !important;
   background-image: none !important;
   backdrop-filter: blur(40px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(40px) saturate(180%) !important;
   border: 0.5px solid rgba(255, 255, 255, 0.22) !important;
-  border-radius: 28px !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 18px 48px rgba(0, 0, 0, 0.45) !important;
 }
-.mo {
-  background: rgba(0, 0, 0, 0.38) !important;
+.mo .mh,
+#modal .mh {
+  flex: 0 0 auto !important;
+  background: transparent !important;
+}
+.mo .mb,
+#modal .mb,
+#modalBody {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.tg-sheet,
+.tg-action-sheet,
+.sw-sheet {
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
 }
 .mo .mf,
 #modal .mf,
 #modalFooter {
-  background: transparent !important;
+  flex: 0 0 auto !important;
+  position: static !important;
+  bottom: auto !important;
+  background: rgba(16, 18, 24, 0.96) !important;
+  border-top: 0.5px solid rgba(255, 255, 255, 0.14) !important;
+  z-index: 2 !important;
+}
+.mo .mf .btn,
+#modalFooter .btn {
+  position: relative !important;
+  z-index: 2 !important;
 }
 .tg-sheet-btn {
   background: rgba(255, 255, 255, 0.08) !important;
