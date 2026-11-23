@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z124',
+  APP_BUILD: 'z125',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -416,27 +416,6 @@ const Views = {
     return null;
   },
 
-  /** Профіль як у каналі: коло виростає у велике фото і збирається назад. */
-  _profileUnfold(o) {
-    o = o || {};
-    const photo = o.photoHtml || '<span class="cp-avatar-ph">?</span>';
-    const pid = o.playerId ? (' data-player-id="' + sanitize(String(o.playerId)) + '"') : '';
-    const roleAttrs = o.roleAttrs ? (' ' + o.roleAttrs) : '';
-    return '<section class="tg-unfold" style="--open:0.16">' +
-      '<div class="tg-unfold-bar"><b>' + sanitize(o.name || '') + '</b><span>' + sanitize(o.kicker || '') + '</span></div>' +
-      '<div class="tg-unfold-stage">' +
-        '<button type="button" class="tg-unfold-photo" data-action="unfold-profile"' + pid +
-          ' title="Натисни або потягни вниз — фото розгорнеться">' + photo + '</button>' +
-      '</div>' +
-      '<div class="tg-unfold-id">' +
-        '<div class="tg-unfold-kicker">' + sanitize(o.kicker || '') + '</div>' +
-        '<h1 class="tg-unfold-name">' + sanitize(o.name || '') + (o.badgeHtml || '') + '</h1>' +
-        (o.role ? ('<div class="tg-unfold-role"' + roleAttrs + '>' + sanitize(o.role) + '</div>') : '') +
-        '<div class="tg-unfold-club"><span class="cp-brand-a">Металіст</span> <span class="cp-brand-b">Штуттгарт</span></div>' +
-        (o.statusHtml ? ('<div class="tg-unfold-status"><span class="cp-dot"></span>' + o.statusHtml + '</div>') : '') +
-      '</div></section>';
-  },
-
 
   /** SVG sparkline for dashboard / analytics */
   _sparkline(values, opts) {
@@ -543,23 +522,36 @@ const Views = {
         ${(() => {
           const pc = this._profilePersonCard();
           if (!pc) return '';
+          const avAction = pc.photo
+            ? 'data-action="open-photo"'
+            : (pc.kind === 'coach'
+              ? 'data-action="open-default-board"'
+              : (pc.player && pc.player.id ? ('data-action="open-fifa-card" data-player-id="' + pc.player.id + '"') : ''));
           const ph = pc.kind === 'coach'
             ? this._photoTag(this._coachPhotoSources(), pc.initials)
             : (pc.photo
               ? this._photoTag([pc.photo], pc.initials)
               : `<span class="cp-avatar-ph">${sanitize(pc.initials || '??')}</span>`);
-          return this._profileUnfold({
-            name: pc.name,
-            kicker: pc.kind === 'coach' ? 'Тренер' : 'Гравець',
-            role: pc.pos,
-            roleAttrs: pc.kind === 'coach' ? 'data-action="coach-easter" role="button" title="Утримуйте 1с · картка тренера"' : '',
-            badgeHtml: this._giftStatusBadge(pc.gifts),
-            photoHtml: ph,
-            playerId: pc.player && pc.player.id,
-            statusHtml: pc.kind === 'player'
-              ? ((typeof I18n!=='undefined'?I18n.t('attendance','Відвідуваність'):'Відвідуваність') + ' ' + Math.round(pc.attPct || 0) + '%')
-              : sanitize(statusLabel)
-          });
+          return `
+        <div class="cp-hero cp-person cp-clean" style="--pos-bg:${pc.accent.bg};--pos-ring:${pc.accent.ring};">
+          <div class="cp-avatar-wrap">
+            <button type="button" class="cp-avatar" ${avAction}
+              title="${pc.photo ? 'Фото на весь екран' : (pc.kind === 'coach' ? 'Дошка' : 'FIFA-картка')}"
+              style="border-color:var(--pos-ring);background:var(--pos-bg)">
+              ${ph}
+            </button>
+          </div>
+          <div class="cp-role-line"><span class="cp-role-kind">${pc.kind === 'coach' ? 'Тренер' : 'Гравець'}</span></div>
+          <h1 class="cp-title cp-title-name">${sanitize(pc.name)}${this._giftStatusBadge(pc.gifts)}</h1>
+          <div class="cp-role-badge" ${pc.kind === 'coach' ? 'data-action="coach-easter" role="button" title="Утримуйте 1с · картка тренера"' : ''} style="border-color:var(--pos-ring);color:var(--pos-ring);cursor:${pc.kind === 'coach' ? 'pointer' : 'default'}">${sanitize(pc.pos)}</div>
+          <div class="cp-club-line cp-club-brand"><span class="cp-brand-a">Металіст</span> <span class="cp-brand-b">Штуттгарт</span></div>
+          <div class="cp-status">
+            <span class="cp-dot"></span>
+            ${pc.kind === 'player'
+              ? ((typeof I18n!=='undefined'?I18n.t('attendance','Відвідуваність'):'Відвідуваність') + ' ' + Math.round(pc.attPct || 0) + '% · тап по фото → FIFA')
+              : sanitize(statusLabel)}
+          </div>
+        </div>`;
         })()}
 
         ${coachXp ? `
@@ -1210,23 +1202,22 @@ const Views = {
 
     return `
       <div class="player-home">
-      ${me ? this._profileUnfold({
-        name: fullName,
-        kicker: 'Гравець',
-        role: me.position || '—',
-        roleAttrs: 'data-action="edit-self-player" role="button" title="Профіль"',
-        badgeHtml: featBadge,
-        photoHtml: photoHtml,
-        playerId: me.id,
-        statusHtml: (typeof I18n!=='undefined'?I18n.t('attendance','Відвідуваність'):'Відвідуваність') + ' ' + Math.round(stats.attPct || 0) + '%'
-      }) : ''}
       ${this._pitchBar()}
       <div class="st player-cab-head">${t('my_cabinet')} · <span class="cp-brand-a">МЕТАЛІСТ</span> <span class="cp-brand-b">ШТУТТГАРТ</span>
         <button type="button" class="btn btn-s btn-sm" data-action="edit-self-player">Профіль</button>
       </div>
       ${me ? `
         <div class="cp-hero cp-person cp-clean player-profile-hero ${this._playerBackdrop(me).className}" style="${themeStyle};${this._playerBackdrop(me).style}">
+          <div class="cp-avatar-wrap" data-stop-nav="1">
+            <button type="button" class="cp-avatar" data-action="${photo ? 'open-photo' : 'open-fifa-card'}" data-player-id="${me.id}"
+              title="${photo ? 'Фото на весь екран' : 'FIFA-картка'}" style="border-color:var(--pos-ring);background:var(--pos-bg)">
+              ${photoHtml}
+            </button>
+          </div>
+          <div class="cp-role-line"><span class="cp-role-kind">Гравець</span></div>
+          <h1 class="cp-title cp-title-name">${sanitize(fullName)} ${featBadge}</h1>
           ${statusText ? '<div class="player-status-line">' + sanitize(statusText) + '</div>' : ''}
+          <div class="cp-role-badge" style="border-color:var(--pos-ring);color:var(--pos-ring)">${sanitize(me.position || '—')}</div>
           <div class="soc-xp-block player-home-xp">
             <div class="soc-xp-head"><span>LVL ${prog.level}</span><span>${prog.xp || 0} XP</span></div>
             <div class="soc-xp-bar"><div class="soc-xp-fill" style="width:${prog.levelProgress || 0}%"></div></div>
@@ -1235,7 +1226,7 @@ const Views = {
           ${(typeof SessionPlay !== 'undefined') ? SessionPlay.weekHtml(me.id) + SessionPlay.sealHtml(me.id) : ''}
           ${this._accountProgress(me.id)}
           ${bio ? '<p class="player-bio-home">' + sanitize(bio) + '</p>' : ''}
-          <div class="cp-status"><span class="cp-dot"></span>${(typeof I18n!=='undefined'?I18n.t('attendance','Відвідуваність'):'Відвідуваність')} ${Math.round(stats.attPct || 0)}% · натисни фото зверху, щоб розгорнути</div>
+          <div class="cp-status"><span class="cp-dot"></span>${(typeof I18n!=='undefined'?I18n.t('attendance','Відвідуваність'):'Відвідуваність')} ${Math.round(stats.attPct || 0)}% · тап по фото — на весь екран</div>
           ${this._timeChips(mineUsage.appMs, mineUsage.boardMs)}
           ${this._loadPanel(me, true)}
         </div>` : this._noPlayerLink()}

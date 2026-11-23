@@ -2034,7 +2034,6 @@ const App = {
       const v = (Store.get().ui && Store.get().ui.view) || 'dashboard';
       document.body.classList.toggle('board-on', v === 'board');
       document.body.classList.toggle('board-active', v === 'board');
-      document.body.classList.toggle('is-home', v === 'dashboard');
     } catch (_) {}
 
     const view = (Store.get().ui && Store.get().ui.view) || 'dashboard';
@@ -2115,60 +2114,7 @@ const App = {
     try { this._bindPlayerCompare(); } catch (_) {}
     try { this.bindSquadViewButtons(); } catch (_) {}
     try { this.bindCoachCardButtons(); } catch (_) {}
-    try { this._bindProfileUnfold(); } catch (_) {}
     try { this._noteScreen(); } catch (_) {}
-  },
-
-  _setProfileOpen(el, open, lock) {
-    if (!el) return;
-    const v = Math.max(0, Math.min(1, Number(open) || 0));
-    el.style.setProperty('--open', String(Math.round(v * 1000) / 1000));
-    el.classList.toggle('is-full', v > 0.82);
-    el.classList.toggle('is-flat', v < 0.05);
-    if (lock === true) el.dataset.lock = '1';
-    else if (lock === false) el.dataset.lock = '0';
-  },
-
-  _bindProfileUnfold() {
-    if (this._unfoldOn) return;
-    const main = document.getElementById('main');
-    if (!main) return;
-    this._unfoldOn = true;
-    let startY = 0;
-    let startOpen = 0.16;
-    const current = () => document.querySelector('.view.on .tg-unfold');
-    main.addEventListener('scroll', () => {
-      const el = current();
-      if (!el || el.classList.contains('is-pull')) return;
-      const y = main.scrollTop;
-      if (el.dataset.lock === '1' && y < 8) return;
-      if (y > 8) el.dataset.lock = '0';
-      const fromScroll = Math.max(0, 1 - y / 240);
-      this._setProfileOpen(el, y < 2 ? Math.max(fromScroll, 0.16) : fromScroll, null);
-    }, { passive: true });
-    main.addEventListener('pointerdown', (e) => {
-      startY = e.clientY;
-      const el = current();
-      startOpen = el ? parseFloat(el.style.getPropertyValue('--open') || '0.16') : 0.16;
-    }, { passive: true });
-    main.addEventListener('pointermove', (e) => {
-      const el = current();
-      if (!el || main.scrollTop > 2) return;
-      const dy = e.clientY - startY;
-      if (dy < 14) return;
-      el.classList.add('is-pull');
-      this._setProfileOpen(el, Math.min(1, startOpen + (dy - 14) / 240), null);
-    }, { passive: true });
-    const end = () => {
-      const el = current();
-      if (!el) return;
-      el.classList.remove('is-pull');
-      const open = parseFloat(el.style.getPropertyValue('--open') || '0.16');
-      if (open > 0.62 && main.scrollTop < 4) this._setProfileOpen(el, 1, true);
-      else if (main.scrollTop < 2 && open < 0.62) this._setProfileOpen(el, 0.16, false);
-    };
-    main.addEventListener('pointerup', end);
-    main.addEventListener('pointercancel', end);
   },
 
   async sendTeamChat() {
@@ -4422,23 +4368,6 @@ const App = {
           : '<div class="es">Подарунків ще немає</div>';
         Modal.open('🎁 ' + name, '<div class="gifts-modal">' + stories + '<div class="gifts-list">' + list + '</div></div>',
           [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
-        return;
-      }
-      if (action === 'unfold-profile') {
-        e.preventDefault();
-        e.stopPropagation();
-        const el = t.closest && t.closest('.tg-unfold');
-        if (!el) return;
-        const open = parseFloat(el.style.getPropertyValue('--open') || '0.16');
-        const main = document.getElementById('main');
-        if (open > 0.82) {
-          this._setProfileOpen(el, 0.16, false);
-          if (main) main.scrollTop = 0;
-        } else {
-          this._setProfileOpen(el, 1, true);
-          if (main) main.scrollTop = 0;
-        }
-        try { TelegramManager.haptic && TelegramManager.haptic('light'); } catch (_) {}
         return;
       }
       if (action === 'open-photo') {
