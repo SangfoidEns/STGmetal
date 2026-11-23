@@ -33,6 +33,7 @@ on conflict (id) do update set public = true;
 drop policy if exists club_media_read on storage.objects;
 drop policy if exists club_media_insert on storage.objects;
 drop policy if exists club_media_update on storage.objects;
+drop policy if exists club_media_delete on storage.objects;
 
 create policy club_media_read on storage.objects
   for select to anon, authenticated using (bucket_id = 'club-media');
@@ -40,5 +41,7 @@ create policy club_media_insert on storage.objects
   for insert to anon, authenticated with check (bucket_id = 'club-media');
 create policy club_media_update on storage.objects
   for update to anon, authenticated using (bucket_id = 'club-media') with check (bucket_id = 'club-media');
+create policy club_media_delete on storage.objects
+  for delete to anon, authenticated using (bucket_id = 'club-media');
 
 notify pgrst, 'reload schema';

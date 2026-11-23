@@ -271,6 +271,7 @@ const SupabaseClub = {
           if (stillMine()) this._sm._clubDirty = false;
           else this._again = true;
           if (remote.updated_at) this._sm._clubUpdatedAt = remote.updated_at;
+          await this.sweep(remote.path || '', off.payload);
           return true;
         }
         const rev = remote.empty ? 0 : (remote.rev || 0);
@@ -335,7 +336,7 @@ const SupabaseClub = {
 
   async commit(payload, rev, exists) {
     const next = (Number(rev) || 0) + 1;
-    const path = 'state/' + next + '-' + Date.now().toString(36) + '.json';
+    const path = 'state/current.json';
     const text = JSON.stringify(payload);
     const fileOk = await this.upload(path, text, 'application/json');
     const body = {
@@ -357,7 +358,9 @@ const SupabaseClub = {
       if (res.status === 409) return 'conflict';
       if (!res.ok) return false;
       const rows = await res.json().catch(() => []);
-      return Array.isArray(rows) && rows.length ? true : 'conflict';
+      if (!Array.isArray(rows) || !rows.length) return 'conflict';
+      await this.sweep(path, payload);
+      return true;
     }
     const res = await fetch(this.URL + '/rest/v1/club_state?id=eq.metalist&rev=eq.' + (Number(rev) || 0), {
       method: 'PATCH',
@@ -373,7 +376,72 @@ const SupabaseClub = {
     if (!res.ok) return false;
     const rows = await res.json().catch(() => []);
     if (!Array.isArray(rows) || !rows.length) return 'conflict';
+    await this.sweep(path, payload);
     return true;
+  },
+
+  async listFolder(folder) {
+    const names = [];
+    for (let offset = 0; offset < 5000; offset += 100) {
+      const res = await fetch(this.URL + '/storage/v1/object/list/club-media', {
+        method: 'POST',
+        headers: this.headers(),
+        body: JSON.stringify({ prefix: folder, limit: 100, offset: offset })
+      });
+      if (!res.ok) return null;
+      const rows = await res.json().catch(() => null);
+      if (!Array.isArray(rows)) return null;
+      rows.forEach(row => {
+        if (!row || row.id == null || !row.name || String(row.name).indexOf('.') < 0) return;
+        const raw = String(row.name).replace(/^\/+/, '');
+        names.push(raw.indexOf(folder + '/') === 0 ? raw : (folder + '/' + raw));
+      });
+      if (rows.length < 100) break;
+    }
+    return names;
+  },
+
+  async removePaths(paths) {
+    const todo = (paths || []).filter(Boolean);
+    for (let i = 0; i < todo.length; i += 100) {
+      const chunk = todo.slice(i, i + 100);
+      const res = await fetch(this.URL + '/storage/v1/object/club-media', {
+        method: 'DELETE',
+        headers: this.headers(),
+        body: JSON.stringify({ prefixes: chunk })
+      });
+      if (!res.ok) return false;
+    }
+    return true;
+  },
+
+  usedMedia(payload) {
+    const keep = new Set();
+    this._walk(payload, (value) => {
+      const text = String(value || '');
+      const mark = '/club-media/';
+      const at = text.indexOf(mark);
+      if (at < 0) return;
+      const name = text.slice(at + mark.length).split('?')[0].split('#')[0];
+      if (name.indexOf('media/') === 0) keep.add(name);
+    });
+    return keep;
+  },
+
+  async sweep(keepPath, payload) {
+    try {
+      const state = await this.listFolder('state');
+      if (state) {
+        const drop = state.filter(path => path !== keepPath);
+        if (drop.length) await this.removePaths(drop);
+      }
+      const media = await this.listFolder('media');
+      if (media) {
+        const keep = this.usedMedia(payload);
+        const drop = media.filter(path => !keep.has(path));
+        if (drop.length) await this.removePaths(drop);
+      }
+    } catch (_) {}
   },
 
   async offload(payload) {

@@ -120,6 +120,31 @@ describe('supabase club sync', () => {
     const body = JSON.parse(patch.opts.body);
     assert.equal(body.rev, 5);
     assert.equal(body.payload, null);
-    assert.match(body.path, /^state\/5-/);
+    assert.equal(body.path, 'state/current.json');
+  });
+
+  it('drops old club copies and photos the club no longer uses', async () => {
+    const ctx = boot();
+    ctx.SupabaseClub.KEY = 'anon-public';
+    const payload = {
+      players: [{ photoUrl: ctx.SupabaseClub.URL + '/storage/v1/object/public/club-media/media/keep.png' }]
+    };
+    ctx.fetch.next.push(jsonRes(200, [
+      { name: 'current.json', id: 'a' },
+      { name: '1-old.json', id: 'b' },
+      { name: 'folder', id: null }
+    ]));
+    ctx.fetch.next.push(jsonRes(200, []));
+    ctx.fetch.next.push(jsonRes(200, [
+      { name: 'keep.png', id: 'c' },
+      { name: 'gone.jpg', id: 'd' }
+    ]));
+    ctx.fetch.next.push(jsonRes(200, []));
+    await ctx.SupabaseClub.sweep('state/current.json', payload);
+    const prefixes = ctx.calls
+      .filter(call => call.opts.method === 'DELETE')
+      .flatMap(call => JSON.parse(call.opts.body).prefixes)
+      .sort();
+    assert.deepEqual(prefixes, ['media/gone.jpg', 'state/1-old.json']);
   });
 });
