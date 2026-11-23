@@ -13480,22 +13480,68 @@ body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-acti
 .tg-sheet,
 .tg-action-sheet,
 .sw-sheet,
+#tgActionSheet,
+.action-sheet,
 .mo .md,
 #modal .md {
   display: flex !important;
   flex-direction: column !important;
   width: min(460px, 100%) !important;
   max-width: 100% !important;
-  max-height: calc(100dvh - 140px - env(safe-area-inset-bottom, 0px)) !important;
+  max-height: none !important;
   margin: 0 auto !important;
   overflow: hidden !important;
   border-radius: 32px !important;
-  background: rgba(16, 18, 24, 0.62) !important;
+  border-bottom-left-radius: 32px !important;
+  border-bottom-right-radius: 32px !important;
+  clip-path: inset(0 round 32px) !important;
+  background: transparent !important;
   background-image: none !important;
-  backdrop-filter: blur(40px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(40px) saturate(180%) !important;
-  border: 0.5px solid rgba(255, 255, 255, 0.22) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 18px 48px rgba(0, 0, 0, 0.35) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+  animation: none !important;
+  position: relative !important;
+}
+.tg-sheet::before,
+.tg-action-sheet::before,
+.sw-sheet::before,
+#tgActionSheet::before,
+.action-sheet::before,
+.mo .md::before,
+#modal .md::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(16, 18, 24, 0.82);
+  border: 0.5px solid rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 18px 48px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  pointer-events: none;
+  z-index: 0;
+}
+.tg-sheet-scroll {
+  position: relative;
+  z-index: 1;
+  min-height: 0;
+  max-height: calc(100dvh - 150px - env(safe-area-inset-bottom, 0px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.mo .md,
+#modal .md {
+  max-height: calc(100dvh - 150px - env(safe-area-inset-bottom, 0px)) !important;
+}
+.mo .md > *,
+#modal .md > * {
+  position: relative;
+  z-index: 1;
 }
 .mo .mh,
 #modal .mh {
@@ -13512,11 +13558,11 @@ body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-acti
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
-.tg-sheet,
-.tg-action-sheet,
-.sw-sheet {
-  overflow-y: auto !important;
-  -webkit-overflow-scrolling: touch;
+.tg-sheet-backdrop.show .tg-sheet,
+.tg-sheet-backdrop.show .tg-action-sheet,
+.tg-sheet-backdrop.show .sw-sheet {
+  transform: none !important;
+  animation: none !important;
 }
 .mo .mf,
 #modal .mf,
@@ -13537,12 +13583,29 @@ body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-acti
   gap: 8px !important;
   margin: 0 !important;
   padding: 12px !important;
+  overflow: hidden !important;
   border-radius: 28px !important;
-  background: rgba(16, 18, 24, 0.62) !important;
-  backdrop-filter: blur(40px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(40px) saturate(180%) !important;
-  border: 0.5px solid rgba(255, 255, 255, 0.22) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 10px 28px rgba(0, 0, 0, 0.28) !important;
+  clip-path: inset(0 round 28px) !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.match-toolbar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(16, 18, 24, 0.82);
+  border: 0.5px solid rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  pointer-events: none;
+  z-index: 0;
+}
+.match-toolbar > * {
+  position: relative;
+  z-index: 1;
 }
 .mo .mf .btn,
 #modalFooter .btn {

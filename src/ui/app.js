@@ -386,6 +386,15 @@ const App = {
 
   /** Пасхалка: тап по «Тренер» → FIFA-картка тренера (режим перегляду) */
   
+  _roundSheet(backdrop) {
+    const sheet = backdrop && backdrop.querySelector('.tg-sheet, .sw-sheet, .tg-action-sheet');
+    if (!sheet || sheet.querySelector(':scope > .tg-sheet-scroll')) return;
+    const scroll = document.createElement('div');
+    scroll.className = 'tg-sheet-scroll';
+    while (sheet.firstChild) scroll.appendChild(sheet.firstChild);
+    sheet.appendChild(scroll);
+  },
+
   openStopwatch() {
     document.querySelectorAll('.sw-sheet-backdrop').forEach(el => el.remove());
     const backdrop = document.createElement('div');
@@ -416,6 +425,7 @@ const App = {
         <button type="button" class="tg-sheet-btn tg-sheet-cancel" data-sw="close">Закрити</button>
       </div>`;
     document.body.appendChild(backdrop);
+    this._roundSheet(backdrop);
     requestAnimationFrame(() => backdrop.classList.add('show'));
 
     const sync = () => {
@@ -2257,6 +2267,7 @@ const App = {
     sheet.className = 'tg-sheet';
     backdrop.appendChild(sheet);
     document.body.appendChild(backdrop);
+    this._roundSheet(backdrop);
     requestAnimationFrame(() => {
       backdrop.classList.add('show');
     });
@@ -2330,6 +2341,7 @@ const App = {
       '<button type="button" class="tg-sheet-btn" data-sq="players">Відкрити повний список</button>' +
       '<button type="button" class="tg-sheet-btn tg-sheet-cancel" data-sq="close">Закрити</button></div>';
     document.body.appendChild(backdrop);
+    this._roundSheet(backdrop);
     requestAnimationFrame(function() { backdrop.classList.add('show'); });
     const close = function() { backdrop.classList.remove('show'); setTimeout(function(){ backdrop.remove(); }, 220); };
     backdrop.addEventListener('click', function(e) {
@@ -2364,6 +2376,7 @@ const App = {
       '<button type="button" class="tg-sheet-btn tg-sheet-danger" data-psheet="delete" data-pid="' + p.id + '">🗑 ' + (typeof I18n!=='undefined'?I18n.t('sheet_delete','Видалити'):'Видалити') + '</button>' +
       '<button type="button" class="tg-sheet-btn tg-sheet-cancel" data-psheet="close">' + (typeof I18n!=='undefined'?I18n.t('close','Закрити'):'Закрити') + '</button></div>';
     document.body.appendChild(backdrop);
+    this._roundSheet(backdrop);
     requestAnimationFrame(function() { backdrop.classList.add('show'); });
     const close = function() { backdrop.classList.remove('show'); setTimeout(function() { backdrop.remove(); }, 220); };
     backdrop.addEventListener('click', function(e) {
@@ -2452,6 +2465,7 @@ const App = {
       '<button type="button" class="tg-sheet-btn tg-sheet-danger" data-ssheet="delete" data-bid="' + b.id + '">🗑 ' + (typeof I18n!=='undefined'?I18n.t('sheet_delete','Видалити'):'Видалити') + '</button>' +
       '<button type="button" class="tg-sheet-btn tg-sheet-cancel" data-ssheet="close">Закрити</button></div>';
     document.body.appendChild(backdrop);
+    this._roundSheet(backdrop);
     requestAnimationFrame(function() { backdrop.classList.add('show'); });
     const close = function() { backdrop.classList.remove('show'); setTimeout(function() { backdrop.remove(); }, 220); };
     backdrop.addEventListener('click', function(e) {
@@ -2572,6 +2586,7 @@ const App = {
       coachBtns +
       '<button type="button" class="tg-sheet-btn tg-sheet-cancel" data-nsheet="close">Закрити</button></div>';
     document.body.appendChild(backdrop);
+    this._roundSheet(backdrop);
     requestAnimationFrame(function() { backdrop.classList.add('show'); });
     const close = function() { backdrop.classList.remove('show'); setTimeout(function() { backdrop.remove(); }, 220); };
     backdrop.addEventListener('click', function(e) {
@@ -2994,6 +3009,7 @@ const App = {
       (sub ? '<div class="tg-sheet-sub">' + sub + '</div>' : '') +
       buttons + '</div>';
     document.body.appendChild(backdrop);
+    this._roundSheet(backdrop);
     requestAnimationFrame(function () { backdrop.classList.add('show'); });
     const close = function () { backdrop.classList.remove('show'); setTimeout(function () { backdrop.remove(); }, 220); };
     backdrop.addEventListener('click', function (e) {
