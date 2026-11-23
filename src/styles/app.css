@@ -13433,3 +13433,61 @@ body:not(.board-on):not(.mode-board-focus):not(.board-only-mode) .app > .main {
   position: relative;
   z-index: 1;
 }
+
+/* Bottom bar uses the same frosted capsule as the header. */
+#mobileNav.glass-nav,
+.mn.glass-nav,
+body.tg-mini-app #mobileNav,
+body.tg-mini-app .mn {
+  left: 12px !important;
+  right: 12px !important;
+  bottom: max(8px, env(safe-area-inset-bottom, 8px)) !important;
+  min-height: 62px !important;
+  padding: 6px 10px !important;
+  border-radius: 999px !important;
+  overflow: hidden !important;
+  clip-path: inset(0 round 999px) !important;
+  background: rgba(16, 18, 24, 0.82) !important;
+  background-image: none !important;
+  backdrop-filter: blur(40px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(180%) !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.22) !important;
+  border-top: 0.5px solid rgba(255, 255, 255, 0.22) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 10px 28px rgba(0, 0, 0, 0.28) !important;
+}
+body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-active) .app > .main,
+body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-active) #main,
+body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-active) .main {
+  padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* Popups share the header glass: sheets and dialogs. */
+.tg-sheet-backdrop,
+.sw-sheet-backdrop {
+  background: rgba(0, 0, 0, 0.38) !important;
+}
+.tg-sheet,
+.tg-action-sheet,
+.sw-sheet,
+.mo .md,
+#modal .md {
+  background: rgba(16, 18, 24, 0.82) !important;
+  background-image: none !important;
+  backdrop-filter: blur(40px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(180%) !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.22) !important;
+  border-radius: 28px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 18px 48px rgba(0, 0, 0, 0.45) !important;
+}
+.mo {
+  background: rgba(0, 0, 0, 0.38) !important;
+}
+.mo .mf,
+#modal .mf,
+#modalFooter {
+  background: transparent !important;
+}
+.tg-sheet-btn {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.12) !important;
+}

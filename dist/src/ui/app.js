@@ -203,33 +203,7 @@ const App = {
   },
 
   initSwipeNav() {
-    const main = document.getElementById('main');
-    if (!main || main.dataset.swipeBound) return;
-    main.dataset.swipeBound = '1';
-    const order = ['dashboard', 'trainings', 'players', 'calendar', 'tactics'];
-    let sx = 0, sy = 0, tracking = false;
-    main.addEventListener('pointerdown', (e) => {
-      if (document.body.classList.contains('mode-board-focus')) return;
-      if (e.target.closest('.btb, button, a, input, select, textarea, .pt, .ball, .ym, .ym-track, .ym-pick, #modal, .md')) return;
-      tracking = true;
-      sx = e.clientX;
-      sy = e.clientY;
-    }, { passive: true });
-    main.addEventListener('pointerup', (e) => {
-      if (!tracking) return;
-      tracking = false;
-      if (document.body.classList.contains('mode-board-focus')) return;
-      const dx = e.clientX - sx;
-      const dy = e.clientY - sy;
-      if (Math.abs(dx) < 72 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
-      const cur = this.currentView || 'dashboard';
-      const i = order.indexOf(cur);
-      if (i < 0) return;
-      const next = dx < 0 && i < order.length - 1 ? order[i + 1] : (dx > 0 && i > 0 ? order[i - 1] : null);
-      if (!next) return;
-      if (next === 'board') this.allowBoardOnce('explicit');
-      this.navigate(next);
-    }, { passive: true });
+    /* Горизонтальний свайп більше не гортає розділи: він збивав кнопки і списки. */
   },
 
   openDrawer() { this.toggleMobileSidebar(true); },
