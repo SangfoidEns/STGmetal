@@ -3,6 +3,7 @@ const SupabaseClub = {
   URL: 'https://zloluzqzswdwaimlqlqx.supabase.co',
   KEY: '',
   KEY_RUNTIME: '',
+  ROW_LIMIT: 1500000,
 
   enabled() {
     return !!(this.URL && this._key());
@@ -131,8 +132,10 @@ const SupabaseClub = {
     this._timer = setTimeout(() => { this.push().catch(() => {}); }, 900);
   },
 
-  async fetchRemote() {
-    const res = await fetch(this.URL + '/rest/v1/club_state?id=eq.metalist&select=id,updated_at,updated_by,rev,path,payload', {
+  async fetchRemote(opts) {
+    const light = !!(opts && opts.light);
+    const select = light ? 'id,updated_at,updated_by,rev,path' : 'id,updated_at,updated_by,rev,path,payload';
+    const res = await fetch(this.URL + '/rest/v1/club_state?id=eq.metalist&select=' + select, {
       headers: this.headers(null, { json: false }),
       cache: 'no-store'
     });
@@ -150,8 +153,8 @@ const SupabaseClub = {
     const rows = await res.json();
     if (!Array.isArray(rows) || !rows.length) return { empty: true, rev: 0 };
     const row = rows[0];
-    let payload = row.payload && typeof row.payload === 'object' ? row.payload : null;
-    if (row.path) {
+    let payload = !light && row.payload && typeof row.payload === 'object' ? row.payload : null;
+    if (!light && row.path) {
       const file = await this.download(row.path);
       if (file) payload = file;
     }
@@ -190,7 +193,16 @@ const SupabaseClub = {
   async pull(opts) {
     if (!this.enabled() || !this._sm) return false;
     if (typeof BoardEngine !== 'undefined' && BoardEngine.dragObj) return false;
-    const remote = (opts && opts.known) || await this.fetchRemote();
+    let remote = opts && opts.known;
+    if (!remote) {
+      const head = await this.fetchRemote({ light: true });
+      if (!head || head.error || head.missing || head.empty) remote = head;
+      else if (this._sm._clubUpdatedAt && head.updated_at && head.updated_at === this._sm._clubUpdatedAt && !(opts && opts.force)) {
+        this._rev = head.rev;
+        this._line('Клуб на сервері');
+        return false;
+      } else remote = await this.fetchRemote();
+    }
     if (!remote || remote.error) {
       this._line(this._fail(remote));
       return false;
@@ -264,14 +276,16 @@ const SupabaseClub = {
             this._sm._clubDirty = false;
           } catch (_) {}
         };
-        if (remote.payload && this.same(remote.payload, off.payload)) {
+        const fits = JSON.stringify(off.payload).length <= this.ROW_LIMIT;
+        const placed = fits ? !remote.path : remote.path === 'state/current.json';
+        if (remote.payload && this.same(remote.payload, off.payload) && placed) {
           this.paintUrls(off.map);
           remember(remote.updated_at);
           this._line('Клуб на сервері');
           if (stillMine()) this._sm._clubDirty = false;
           else this._again = true;
           if (remote.updated_at) this._sm._clubUpdatedAt = remote.updated_at;
-          await this.sweep(remote.path || '', off.payload);
+          await this.sweep(fits ? '' : 'state/current.json', off.payload);
           return true;
         }
         const rev = remote.empty ? 0 : (remote.rev || 0);
@@ -336,18 +350,19 @@ const SupabaseClub = {
 
   async commit(payload, rev, exists) {
     const next = (Number(rev) || 0) + 1;
-    const path = 'state/current.json';
     const text = JSON.stringify(payload);
-    const fileOk = await this.upload(path, text, 'application/json');
+    const fits = text.length <= this.ROW_LIMIT;
+    const path = fits ? null : 'state/current.json';
+    const fileOk = path ? await this.upload(path, text, 'application/json') : true;
     const body = {
       id: 'metalist',
       rev: next,
       updated_at: new Date().toISOString(),
       updated_by: this._who(),
-      path: fileOk ? path : null,
-      payload: fileOk ? null : (text.length < 700000 ? payload : null)
+      path: path,
+      payload: fits ? payload : null
     };
-    if (!fileOk && body.payload == null) return false;
+    if (!fileOk) return false;
     this._pendingAt = body.updated_at;
     if (!exists) {
       const res = await fetch(this.URL + '/rest/v1/club_state', {
@@ -359,7 +374,7 @@ const SupabaseClub = {
       if (!res.ok) return false;
       const rows = await res.json().catch(() => []);
       if (!Array.isArray(rows) || !rows.length) return 'conflict';
-      await this.sweep(path, payload);
+      await this.sweep(path || '', payload);
       return true;
     }
     const res = await fetch(this.URL + '/rest/v1/club_state?id=eq.metalist&rev=eq.' + (Number(rev) || 0), {
@@ -376,7 +391,7 @@ const SupabaseClub = {
     if (!res.ok) return false;
     const rows = await res.json().catch(() => []);
     if (!Array.isArray(rows) || !rows.length) return 'conflict';
-    await this.sweep(path, payload);
+    await this.sweep(path || '', payload);
     return true;
   },
 
@@ -435,7 +450,7 @@ const SupabaseClub = {
         const drop = state.filter(path => path !== keepPath);
         if (drop.length) await this.removePaths(drop);
       }
-      const media = await this.listFolder('media');
+      const media = payload ? await this.listFolder('media') : null;
       if (media) {
         const keep = this.usedMedia(payload);
         const drop = media.filter(path => !keep.has(path));

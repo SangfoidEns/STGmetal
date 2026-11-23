@@ -83,18 +83,17 @@ describe('supabase club sync', () => {
     };
     ctx.fetch.next.push(jsonRes(200, []));
     ctx.fetch.next.push(jsonRes(200, { Key: 'media' }));
-    ctx.fetch.next.push(jsonRes(200, { Key: 'state' }));
     ctx.fetch.next.push(jsonRes(201, [{ id: 'metalist', rev: 1 }]));
     const ok = await ctx.SupabaseClub.push();
     assert.equal(ok, true);
     const posted = ctx.calls.map(call => call.url);
     assert.equal(posted.some(url => url.indexOf('/storage/v1/object/club-media/media/') >= 0), true);
-    const state = ctx.calls.find(call => call.url.indexOf('/storage/v1/object/club-media/state/') >= 0);
-    const file = JSON.parse(state.opts.body);
-    assert.equal(file.players[0].photoUrl.indexOf('https://'), 0);
-    assert.equal(file.players[0].photoUrl.indexOf('data:'), -1);
+    assert.equal(posted.some(url => url.indexOf('/storage/v1/object/club-media/state/') >= 0), false);
     const insert = ctx.calls.find(call => call.opts.method === 'POST' && call.url.indexOf('/rest/v1/club_state') >= 0);
-    assert.equal(JSON.parse(insert.opts.body).payload, null);
+    const body = JSON.parse(insert.opts.body);
+    assert.equal(body.path, null);
+    assert.equal(body.payload.players[0].photoUrl.indexOf('https://'), 0);
+    assert.equal(body.payload.players[0].photoUrl.indexOf('data:'), -1);
   });
 
   it('keeps the newer phone when two writes meet', async () => {
@@ -110,8 +109,7 @@ describe('supabase club sync', () => {
       save() {}
     };
     ctx.fetch.next.push(jsonRes(200, [{ id: 'metalist', rev: 4, updated_at: '2026-11-20T00:00:00.000Z', path: '', payload: { players: [{ id: 'old' }] } }]));
-    ctx.fetch.next.push(jsonRes(200, []));
-    ctx.fetch.next.push(jsonRes(200, [{ id: 'metalist', rev: 5, path: 'state/5.json' }]));
+    ctx.fetch.next.push(jsonRes(200, [{ id: 'metalist', rev: 5 }]));
     const ok = await ctx.SupabaseClub.push();
     assert.equal(ok, true);
     assert.equal(pulls, 0);
@@ -119,8 +117,8 @@ describe('supabase club sync', () => {
     assert.match(patch.url, /rev=eq\.4/);
     const body = JSON.parse(patch.opts.body);
     assert.equal(body.rev, 5);
-    assert.equal(body.payload, null);
-    assert.equal(body.path, 'state/current.json');
+    assert.equal(body.path, null);
+    assert.equal(body.payload.players[0].id, 'yehor');
   });
 
   it('drops old club copies and photos the club no longer uses', async () => {
