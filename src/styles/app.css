@@ -11688,7 +11688,7 @@ body.role-guest .team-chat { display: none !important; }
   padding: 16px 14px 14px !important;
   border-radius: 22px !important;
   border: 1.5px solid var(--gift-ring, #e8c547) !important;
-  box-shadow: 0 10px 28px rgba(0,0,0,0.35) !important;
+  box-shadow: 0 0 0 1px var(--gift-ring, #e8c547), 0 0 22px var(--gift-ring, #e8c547), 0 10px 28px rgba(0,0,0,0.35) !important;
   color: #f4efe2;
 }
 .club-player-card .fifa-shine { display: none; }
@@ -12192,9 +12192,16 @@ body.role-guest .team-chat { display: none !important; }
     linear-gradient(180deg, rgba(16,12,6,0.42) 0%, rgba(8,10,16,0.94) 34%, rgba(8,10,16,0.9) 68%, rgba(8,10,16,0.62) 100%),
     radial-gradient(80% 42% at 50% 0%, rgba(232,197,71,0.48), transparent 68%),
     repeating-linear-gradient(90deg, #16315c 0 16px, #d4b15e 16px 32px) !important;
-  border: 2px solid #e8c547 !important;
+  border: 2px solid var(--gift-ring, #e8c547) !important;
+  box-shadow: 0 0 0 1px var(--gift-ring, #e8c547), 0 0 26px var(--gift-ring, #e8c547), 0 12px 28px rgba(0,0,0,0.4) !important;
   color: #f4efe2 !important;
 }
+.pl-cards.fifa-stack {
+  grid-template-columns: 1fr !important;
+  gap: 14px;
+}
+.squad-fifa { min-width: 0; cursor: pointer; }
+.squad-fifa .club-player-card { width: 100%; box-sizing: border-box; }
 .club-player-card.fifa-classic::before,
 .club-player-card.fifa-classic::after { content: none !important; background: none !important; }
 .cc-crest, .settings-crest {

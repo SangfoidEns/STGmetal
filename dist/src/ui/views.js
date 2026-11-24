@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z148',
+  APP_BUILD: 'z149',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -889,15 +889,17 @@ const Views = {
     const logoTag = clubLogo
       ? ('<img class="fifa-club-logo" src="' + (typeof sanitize==='function'?sanitize(clubLogo):clubLogo) + '" alt="club" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'"/>')
       : '';
-    const gs = this._playerGiftStyle ? this._playerGiftStyle(p.id) : { ring: posColor, bg: 'linear-gradient(165deg,#241c10,#12100c)' };
+    const gs = this._playerGiftStyle ? this._playerGiftStyle(p.id) : { ring: posColor, bg: 'linear-gradient(165deg,#241c10,#12100c)', hue: 42 };
+    const giftHue = gs.hue != null ? gs.hue : 42;
+    const giftRing = 'hsl(' + giftHue + ' 78% 58%)';
     const photoAction = photo ? ' data-action="open-photo" data-player-id="' + p.id + '"' : '';
     return `
-      <div class="fifa-card club-player-card fifa-classic" style="--pos-color:${posColor};--gift-ring:#e8c547;--acc-ring:#e8c547" data-fifa-player="${p.id}" data-compare-host="${p.id}">
+      <div class="fifa-card club-player-card fifa-classic" style="--pos-color:${posColor};--gift-ring:${giftRing};--acc-ring:${giftRing};--acc-h:${giftHue}" data-fifa-player="${p.id}" data-compare-host="${p.id}">
         <div class="cpc-brand">
           <div class="cpc-brand-name"><span>МЕТАЛІСТ</span> <b>ШТУТТГАРТ</b></div>
         </div>
         <div class="cpc-hero">
-          <button type="button" class="cpc-photo"${photoAction} style="border-color:${gs.ring || posColor}">
+          <button type="button" class="cpc-photo"${photoAction} style="border-color:${giftRing}">
             ${avatarInner}
             ${cap}
           </button>
@@ -1885,6 +1887,13 @@ trainings() {
       '</div>' + this._timeChips(usage.appMs, usage.boardMs) + '</div></div>';
   },
 
+  _squadFifa(p) {
+    let st = {};
+    try { st = this._playerStats ? (this._playerStats(p.id) || {}) : {}; } catch (_) {}
+    return '<div class="squad-fifa" data-player-id="' + p.id + '" data-action="open-player-card" role="button" tabindex="0">' +
+      this._fifaCard(p, st) + '</div>';
+  },
+
   _fmtShort(ms) {
     const m = Math.round((Number(ms) || 0) / 60000);
     if (m < 60) return m + 'хв';
@@ -2330,24 +2339,20 @@ trainings() {
         if (aMe !== bMe) return aMe - bMe;
         return xpOf(b) - xpOf(a) || ((a.number || 0) - (b.number || 0));
       });
-      const cards = list.map(p => this._squadPlaque(p, attPct(p.id), roleLabel(p))).join('');
-      return this._liveClub() + '<div class="st">Команда</div><div class="pl-cards">' + (cards || '<div class="es">Немає гравців</div>') + '</div>' + this._teamChat();
+      const cards = list.map(p => this._squadFifa(p)).join('');
+      return this._liveClub() + '<div class="st">Команда</div><div class="pl-cards fifa-stack">' + (cards || '<div class="es">Немає гравців</div>') + '</div>' + this._teamChat();
     }
 
     if (typeof AuthManager !== 'undefined' && AuthManager.isGuest && AuthManager.isGuest()) {
-      const cards = list.map(p => {
-        let lv = 1;
-        try { lv = PlayerProgress.compute(p.id).level; } catch (_) {}
-        return this._squadPlaque(p, attPct(p.id), roleLabel(p) + ' · LVL ' + lv);
-      }).join('');
+      const cards = list.map(p => this._squadFifa(p)).join('');
       return this._liveClub() + '<div class="st">Склад Металіст Штуттгарт</div>' +
-        '<p class="note-sm">Тап по картці — акаунт. З акаунта відкривається картка гравця.</p>' +
-        '<div class="pl-cards">' + (cards || '<div class="es">Немає гравців</div>') + '</div>' + this._teamChat();
+        '<p class="note-sm">Тап по картці — акаунт.</p>' +
+        '<div class="pl-cards fifa-stack">' + (cards || '<div class="es">Немає гравців</div>') + '</div>' + this._teamChat();
     }
 
     if (!isCoach) {
-      const cards = list.map(p => this._squadPlaque(p, attPct(p.id), roleLabel(p))).join('');
-      return this._liveClub() + '<div class="st">Склад <span class="note-sm">перегляд</span></div><div class="pl-cards">' +
+      const cards = list.map(p => this._squadFifa(p)).join('');
+      return this._liveClub() + '<div class="st">Склад <span class="note-sm">перегляд</span></div><div class="pl-cards fifa-stack">' +
         (typeof this._coachSquadCard === 'function' ? this._coachSquadCard() : '') +
         (cards || '<div class="es">Немає гравців</div>') + '</div>' + this._teamChat();
     }
@@ -2410,7 +2415,7 @@ trainings() {
       const bMe = meIdCards && String(b.id) === meIdCards ? 0 : 1;
       if (aMe !== bMe) return aMe - bMe;
       return xpOfCard(b) - xpOfCard(a) || ((Number(a.number) || 0) - (Number(b.number) || 0));
-    }).map(p => this._squadPlaque(p, attPct(p.id), roleLabel(p))).join('');
+    }).map(p => this._squadFifa(p)).join('');
 
     const coachStats = (s.coachStats || {});
     const trN = (s.trainings || []).length;
@@ -2435,8 +2440,8 @@ trainings() {
 
     if (viewMode === 'cards') {
       return this._liveClub() + header + strip +
-        '<p class="note-sm">Тап — акаунт. З акаунта — картка гравця. Перемикач Список / Картки зверху.</p>' +
-        '<div class="pl-cards">' +
+        '<p class="note-sm">Картка кожного гравця. Рамка світиться кольором його подарунка.</p>' +
+        '<div class="pl-cards fifa-stack">' +
         (typeof this._coachSquadCard === 'function' ? this._coachSquadCard() : '') +
         (cardsCoach || '<div class="es">Немає гравців</div>') +
         '</div>' + this._teamChat();
