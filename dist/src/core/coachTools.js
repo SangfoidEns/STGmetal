@@ -537,185 +537,123 @@ CoachTools._kitRand = function (seed) {
     return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
   };
 };
-CoachTools._kitInk = function (rand, alpha) {
-  const tone = Math.round(176 + rand() * 64);
-  const a = alpha == null ? (0.16 + rand() * 0.18) : alpha;
-  return 'rgba(' + tone + ',' + Math.min(255, tone + 3) + ',' + Math.min(255, tone + 8) + ',' + a.toFixed(2) + ')';
+CoachTools._kitSmooth = function (points) {
+  const n = points.length;
+  if (!n) return '';
+  const fmt = function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); };
+  let d = 'M' + fmt(points[0]);
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(n - 1, i + 2)];
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += ' C' + c1x.toFixed(1) + ',' + c1y.toFixed(1) + ' ' + c2x.toFixed(1) + ',' + c2y.toFixed(1) + ' ' + fmt(p2);
+  }
+  return d;
 };
-CoachTools._kitStripe = function (x, w, amp, freq, phase, shear) {
-  const steps = 6;
+CoachTools._kitRibbon = function (spec) {
+  const angle = spec.angle * Math.PI / 180;
+  const ca = Math.cos(angle);
+  const sa = Math.sin(angle);
+  const steps = 20;
   const left = [];
   const right = [];
-  const lean = shear || 0;
+  const core = [];
   for (let i = 0; i <= steps; i++) {
-    const y = 168 * i / steps;
-    const sway = Math.sin(y / freq + phase) * amp;
-    left.push([x + sway + y * lean, y]);
-    right.push([x + w + sway * 0.72 + y * lean, y]);
+    const t = i / steps;
+    const s = -120 + t * 460;
+    const wave = Math.sin(s * spec.freq + spec.phase) * spec.amp +
+      Math.sin(s * spec.freq * 0.47 + spec.phase * 1.4) * spec.amp * 0.28;
+    const taper = spec.taper ? (0.42 + 0.58 * Math.sin(t * Math.PI)) : 1;
+    const breath = spec.breath ? (0.78 + 0.22 * Math.sin(t * Math.PI * 2 + spec.phase)) : 1;
+    const half = spec.width * taper * breath * 0.5;
+    const n = spec.offset + wave;
+    const x = s * ca - n * sa;
+    const y = s * sa + n * ca;
+    left.push([x + sa * half, y - ca * half]);
+    right.push([x - sa * half, y + ca * half]);
+    core.push([x, y]);
   }
-  const curve = function (from, to) {
-    const my = (from[1] + to[1]) / 2;
-    return ' C' + from[0].toFixed(1) + ',' + my.toFixed(1) + ' ' + to[0].toFixed(1) + ',' + my.toFixed(1) + ' ' + to[0].toFixed(1) + ',' + to[1].toFixed(1);
+  return {
+    body: CoachTools._kitSmooth(left.concat(right.reverse())) + ' Z',
+    spine: CoachTools._kitSmooth(core)
   };
-  let d = 'M' + left[0][0].toFixed(1) + ',' + left[0][1].toFixed(1);
-  for (let i = 1; i < left.length; i++) d += curve(left[i - 1], left[i]);
-  for (let i = right.length - 1; i >= 0; i--) {
-    const from = i === right.length - 1 ? left[left.length - 1] : right[i + 1];
-    d += curve(from, right[i]);
+};
+CoachTools._kitBands = function (rand, spec) {
+  let out = '';
+  let offset = spec.start;
+  for (let i = 0; i < spec.count; i++) {
+    const width = spec.width[0] + rand() * (spec.width[1] - spec.width[0]);
+    const amp = spec.amp[0] + rand() * (spec.amp[1] - spec.amp[0]);
+    const hot = i % 2 === 0;
+    const alpha = spec.alpha[0] + rand() * (spec.alpha[1] - spec.alpha[0]);
+    const fill = hot
+      ? 'rgba(255,186,74,' + alpha.toFixed(2) + ')'
+      : 'rgba(244,247,252,' + (alpha * 0.92).toFixed(2) + ')';
+    const ribbon = CoachTools._kitRibbon({
+      angle: spec.angle,
+      offset: offset,
+      width: width,
+      amp: amp,
+      freq: spec.freq,
+      phase: spec.phase + i * 0.35,
+      taper: !!spec.taper,
+      breath: !!spec.breath
+    });
+    out += '<path d="' + ribbon.body + '" fill="' + fill + '"/>';
+    out += '<path d="' + ribbon.spine + '" fill="none" stroke="rgba(255,228,170,' + Math.min(0.85, alpha + 0.28).toFixed(2) + ')" stroke-width="' + spec.core.toFixed(1) + '" stroke-linecap="round"/>';
+    offset += width + spec.gap * (0.82 + rand() * 0.36);
   }
-  return d + ' Z';
+  return out;
 };
 CoachTools._kitPatterns = [
-  { id: 'kit', label: 'Форма', draw: function (rand) {
-    let out = '';
-    let x = -18;
-    const n = 5 + Math.floor(rand() * 3);
-    for (let i = 0; i < n; i++) {
-      const w = 12 + rand() * 18;
-      out += '<path d="' + CoachTools._kitStripe(x, w, 8 + rand() * 16, 26 + rand() * 24, rand() * 6, 0) + '" fill="' + CoachTools._kitInk(rand) + '"/>';
-      x += w + 8 + rand() * 14;
-    }
-    return out;
+  { id: 'kit', label: 'Вогонь форми', draw: function (rand) {
+    return CoachTools._kitBands(rand, { angle: 48, start: -150, count: 7, width: [15, 22], gap: 16, amp: [6, 10], freq: 0.045, phase: rand() * 6, alpha: [0.34, 0.46], core: 1.5 });
   } },
-  { id: 'fine', label: 'Тонкі хвилі', draw: function (rand) {
-    let out = '';
-    for (let i = 0; i < 14; i++) {
-      const x = -10 + i * (188 / 14) + rand() * 4;
-      out += '<path d="' + CoachTools._kitStripe(x, 2.2 + rand() * 2.4, 6 + rand() * 10, 18 + rand() * 16, rand() * 6, 0) + '" fill="' + CoachTools._kitInk(rand, 0.22 + rand() * 0.2) + '"/>';
-    }
-    return out;
+  { id: 'blaze', label: 'Зустрічний вогонь', draw: function (rand) {
+    return CoachTools._kitBands(rand, { angle: -46, start: -160, count: 7, width: [14, 20], gap: 15, amp: [6, 11], freq: 0.042, phase: rand() * 6, alpha: [0.32, 0.44], core: 1.4 });
   } },
-  { id: 'slash', label: 'Косий друк', draw: function (rand) {
-    let out = '';
-    let x = -40;
-    for (let i = 0; i < 7; i++) {
-      const w = 10 + rand() * 12;
-      out += '<path d="' + CoachTools._kitStripe(x, w, 6 + rand() * 10, 30 + rand() * 20, rand() * 5, 0.18 + rand() * 0.12) + '" fill="' + CoachTools._kitInk(rand) + '"/>';
-      x += w + 16 + rand() * 10;
-    }
-    return out;
+  { id: 'steep', label: 'Крутий кут', draw: function (rand) {
+    return CoachTools._kitBands(rand, { angle: 64, start: -170, count: 8, width: [12, 18], gap: 14, amp: [5, 9], freq: 0.05, phase: rand() * 6, alpha: [0.3, 0.42], core: 1.2 });
   } },
-  { id: 'tide', label: 'Приплив', draw: function (rand) {
+  { id: 'shallow', label: 'Пологий вогонь', draw: function (rand) {
+    return CoachTools._kitBands(rand, { angle: 28, start: -150, count: 6, width: [16, 24], gap: 18, amp: [5, 8], freq: 0.038, phase: rand() * 6, alpha: [0.3, 0.42], core: 1.3 });
+  } },
+  { id: 'fine', label: 'Гострі язики', draw: function (rand) {
+    return CoachTools._kitBands(rand, { angle: 50, start: -150, count: 12, width: [4, 7], gap: 10, amp: [4, 7], freq: 0.055, phase: rand() * 6, alpha: [0.4, 0.55], core: 0.9 });
+  } },
+  { id: 'twin', label: 'Парне полумʼя', draw: function (rand) {
     let out = '';
-    let y = -16;
+    let offset = -150;
+    const phase = rand() * 6;
     for (let i = 0; i < 6; i++) {
-      const h = 10 + rand() * 14;
-      const amp = 8 + rand() * 12;
-      const phase = rand() * 6;
-      const freq = 24 + rand() * 18;
-      let d = '';
-      const top = [];
-      const bot = [];
-      for (let s = 0; s <= 6; s++) {
-        const x = 168 * s / 6;
-        const sway = Math.sin(x / freq + phase) * amp;
-        top.push([x, y + sway]);
-        bot.push([x, y + h + sway * 0.7]);
-      }
-      d = 'M' + top[0][0].toFixed(1) + ',' + top[0][1].toFixed(1);
-      for (let s = 1; s < top.length; s++) {
-        const mx = (top[s - 1][0] + top[s][0]) / 2;
-        d += ' C' + mx.toFixed(1) + ',' + top[s - 1][1].toFixed(1) + ' ' + mx.toFixed(1) + ',' + top[s][1].toFixed(1) + ' ' + top[s][0].toFixed(1) + ',' + top[s][1].toFixed(1);
-      }
-      for (let s = bot.length - 1; s >= 0; s--) {
-        const from = s === bot.length - 1 ? top[top.length - 1] : bot[s + 1];
-        const mx = (from[0] + bot[s][0]) / 2;
-        d += ' C' + mx.toFixed(1) + ',' + from[1].toFixed(1) + ' ' + mx.toFixed(1) + ',' + bot[s][1].toFixed(1) + ' ' + bot[s][0].toFixed(1) + ',' + bot[s][1].toFixed(1);
-      }
-      out += '<path d="' + d + ' Z" fill="' + CoachTools._kitInk(rand) + '"/>';
-      y += h + 10 + rand() * 12;
+      out += CoachTools._kitBands(rand, { angle: 44, start: offset, count: 1, width: [5, 7], gap: 0, amp: [6, 8], freq: 0.044, phase: phase, alpha: [0.46, 0.46], core: 1.1 });
+      out += CoachTools._kitBands(rand, { angle: 44, start: offset + 10, count: 1, width: [3, 5], gap: 0, amp: [6, 8], freq: 0.044, phase: phase + 0.15, alpha: [0.28, 0.28], core: 0.7 });
+      offset += 36 + rand() * 8;
     }
     return out;
   } },
-  { id: 'twin', label: 'Парні смуги', draw: function (rand) {
-    let out = '';
-    let x = -8;
-    for (let i = 0; i < 6; i++) {
-      const amp = 7 + rand() * 12;
-      const freq = 22 + rand() * 18;
-      const phase = rand() * 6;
-      out += '<path d="' + CoachTools._kitStripe(x, 3.5, amp, freq, phase, 0) + '" fill="' + CoachTools._kitInk(rand, 0.34) + '"/>';
-      out += '<path d="' + CoachTools._kitStripe(x + 7, 2.4, amp, freq, phase + 0.2, 0) + '" fill="' + CoachTools._kitInk(rand, 0.22) + '"/>';
-      x += 26 + rand() * 10;
-    }
-    return out;
+  { id: 'tongue', label: 'Язики', draw: function (rand) {
+    return CoachTools._kitBands(rand, { angle: -52, start: -160, count: 6, width: [18, 26], gap: 18, amp: [7, 11], freq: 0.04, phase: rand() * 6, alpha: [0.3, 0.4], core: 1.6, taper: true });
   } },
-  { id: 'veil', label: 'Широкі хвилі', draw: function (rand) {
-    let out = '';
-    let x = -24;
-    for (let i = 0; i < 3; i++) {
-      const w = 28 + rand() * 22;
-      out += '<path d="' + CoachTools._kitStripe(x, w, 14 + rand() * 12, 40 + rand() * 16, rand() * 6, 0) + '" fill="' + CoachTools._kitInk(rand, 0.12 + rand() * 0.1) + '"/>';
-      x += w + 18 + rand() * 16;
-    }
-    return out;
+  { id: 'broad', label: 'Широке полумʼя', draw: function (rand) {
+    return CoachTools._kitBands(rand, { angle: 40, start: -140, count: 4, width: [28, 36], gap: 22, amp: [8, 12], freq: 0.032, phase: rand() * 6, alpha: [0.22, 0.3], core: 1.8 });
   } },
-  { id: 'scratch', label: 'Риски', draw: function (rand) {
-    let out = '';
-    for (let i = 0; i < 28; i++) {
-      const x = rand() * 168;
-      const y = rand() * 140;
-      const len = 18 + rand() * 36;
-      const bend = (rand() - 0.5) * 16;
-      const ink = CoachTools._kitInk(rand, 0.28 + rand() * 0.25);
-      out += '<path d="M' + x.toFixed(1) + ',' + y.toFixed(1) + ' C' + (x + bend).toFixed(1) + ',' + (y + len * 0.4).toFixed(1) + ' ' + (x - bend).toFixed(1) + ',' + (y + len * 0.7).toFixed(1) + ' ' + x.toFixed(1) + ',' + (y + len).toFixed(1) + '" fill="none" stroke="' + ink + '" stroke-width="' + (1.1 + rand() * 1.6).toFixed(1) + '" stroke-linecap="round"/>';
-    }
-    return out;
+  { id: 'pulse', label: 'Пульс', draw: function (rand) {
+    return CoachTools._kitBands(rand, { angle: -38, start: -155, count: 6, width: [12, 18], gap: 16, amp: [5, 8], freq: 0.048, phase: rand() * 6, alpha: [0.32, 0.44], core: 1.3, breath: true });
   } },
-  { id: 'marble', label: 'Мармур', draw: function (rand) {
-    let out = '';
-    for (let i = 0; i < 5; i++) {
-      const x = rand() * 140;
-      const ink = CoachTools._kitInk(rand, 0.2 + rand() * 0.18);
-      out += '<path d="M' + (x - 30).toFixed(1) + ',-8 C' + (x + 40).toFixed(1) + ',30 ' + (x - 50).toFixed(1) + ',80 ' + (x + 10).toFixed(1) + ',120 C' + (x + 50).toFixed(1) + ',150 ' + (x - 10).toFixed(1) + ',176 ' + (x + 24).toFixed(1) + ',188" fill="none" stroke="' + ink + '" stroke-width="' + (3 + rand() * 7).toFixed(1) + '" stroke-linecap="round"/>';
-    }
-    return out;
+  { id: 'long', label: 'Довга хвиля', draw: function (rand) {
+    return CoachTools._kitBands(rand, { angle: 46, start: -150, count: 6, width: [13, 19], gap: 17, amp: [10, 14], freq: 0.026, phase: rand() * 6, alpha: [0.3, 0.42], core: 1.4 });
   } },
-  { id: 'contour', label: 'Рельєф', draw: function (rand) {
-    let out = '';
-    for (let i = 0; i < 4; i++) {
-      const cx = 30 + rand() * 100;
-      const cy = 24 + rand() * 110;
-      const rx = 18 + rand() * 36;
-      const ry = 12 + rand() * 28;
-      const ink = CoachTools._kitInk(rand, 0.28);
-      out += '<path d="M' + (cx - rx).toFixed(1) + ',' + cy.toFixed(1) +
-        ' C' + (cx - rx).toFixed(1) + ',' + (cy - ry).toFixed(1) + ' ' + (cx + rx).toFixed(1) + ',' + (cy - ry).toFixed(1) + ' ' + (cx + rx).toFixed(1) + ',' + cy.toFixed(1) +
-        ' C' + (cx + rx * 0.6).toFixed(1) + ',' + (cy + ry).toFixed(1) + ' ' + (cx - rx * 0.8).toFixed(1) + ',' + (cy + ry * 0.8).toFixed(1) + ' ' + (cx - rx).toFixed(1) + ',' + cy.toFixed(1) +
-        ' Z" fill="none" stroke="' + ink + '" stroke-width="' + (1.2 + rand()).toFixed(1) + '"/>';
-    }
-    return out;
+  { id: 'dense', label: 'Щільний друк', draw: function (rand) {
+    return CoachTools._kitBands(rand, { angle: -58, start: -170, count: 10, width: [7, 11], gap: 8, amp: [4, 7], freq: 0.05, phase: rand() * 6, alpha: [0.28, 0.4], core: 0.8 });
   } },
-  { id: 'rain', label: 'Струмені', draw: function (rand) {
-    let out = '';
-    for (let i = 0; i < 18; i++) {
-      const x = -6 + i * 10 + rand() * 4;
-      const y = rand() * 40;
-      const len = 36 + rand() * 70;
-      const bend = (rand() - 0.5) * 10;
-      out += '<path d="M' + x.toFixed(1) + ',' + y.toFixed(1) + ' C' + (x + bend).toFixed(1) + ',' + (y + len * 0.45).toFixed(1) + ' ' + (x - bend).toFixed(1) + ',' + (y + len * 0.7).toFixed(1) + ' ' + (x + bend * 0.3).toFixed(1) + ',' + (y + len).toFixed(1) + '" fill="none" stroke="' + CoachTools._kitInk(rand, 0.3) + '" stroke-width="' + (1.4 + rand() * 1.8).toFixed(1) + '" stroke-linecap="round"/>';
-    }
-    return out;
-  } },
-  { id: 'cross', label: 'Перетин', draw: function (rand) {
-    let out = CoachTools._kitPatterns[0].draw(rand);
-    let y = 36 + rand() * 20;
-    for (let i = 0; i < 2; i++) {
-      out += '<path d="' + CoachTools._kitStripe(y, 8 + rand() * 6, 6, 30, rand() * 4, 0).replace(/(\d+\.?\d*),(\d+\.?\d*)/g, function (_, a, b) { return b + ',' + a; }) + '" fill="' + CoachTools._kitInk(rand, 0.14) + '"/>';
-      y += 50 + rand() * 20;
-    }
-    return out;
-  } },
-  { id: 'edge', label: 'Край форми', draw: function (rand) {
-    let out = '';
-    let x = -12;
-    for (let i = 0; i < 6; i++) {
-      const fade = Math.max(0.05, 0.34 - i * 0.045);
-      const w = 8 + rand() * 12;
-      out += '<path d="' + CoachTools._kitStripe(x, w, 10 + rand() * 8, 24 + rand() * 14, rand() * 6, 0) + '" fill="' + CoachTools._kitInk(rand, fade) + '"/>';
-      x += w + 6 + rand() * 8;
-    }
-    return out;
+  { id: 'flare', label: 'Спалах', draw: function (rand) {
+    return CoachTools._kitBands(rand, { angle: 54, start: -160, count: 6, width: [16, 24], gap: 16, amp: [6, 10], freq: 0.036, phase: rand() * 6, alpha: [0.34, 0.48], core: 1.7, taper: true });
   } }
 ];
 CoachTools.giftPatternSvg = function (g) {
@@ -726,7 +664,7 @@ CoachTools.giftPatternSvg = function (g) {
   const pick = penalty ? 0 : (CoachTools.footballPatternIndex(g) % families.length);
   const fam = families[pick] || families[0];
   const body = fam.draw(CoachTools._kitRand(seed ^ (pick * 997)));
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="168" height="168" viewBox="0 0 168 168">' + body + '</svg>';
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="168" height="224" viewBox="0 0 168 224">' + body + '</svg>';
   return {
     svg: svg,
     hue: hue,

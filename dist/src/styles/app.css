@@ -12377,9 +12377,9 @@ body.mode-board-focus #boardToolbarTop.btb-top {
   cursor: pointer !important;
 }
 .player-collectible.gift-field::before {
-  background-size: 132px 132px;
+  background-size: 100% 100%;
   background-position: center;
-  background-repeat: repeat;
+  background-repeat: no-repeat;
   opacity: 1;
 }
 .player-collectible.gift-field::after {
@@ -13908,7 +13908,8 @@ body.role-guest [data-del-player] {
   z-index: 0;
   pointer-events: none;
   background-image: var(--home-pat);
-  background-size: 168% 168%;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
   background-position: center;
   opacity: 0.92;
 }
@@ -13937,7 +13938,9 @@ body.role-guest [data-del-player] {
   color: rgba(236, 239, 244, 0.9);
 }
 .player-collectible.gift-field::before {
-  background-size: 210px 260px;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
   opacity: 1;
 }
 .player-collectible.gift-field::after {
