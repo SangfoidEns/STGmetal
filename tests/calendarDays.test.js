@@ -29,11 +29,11 @@ describe('calendar weekday letters', () => {
     assert.match(html, /title="Субота">Сб</);
     assert.match(html, /title="Неділя">Нд</);
     assert.equal(html.includes('>А<'), false);
-    assert.equal(context.Views.APP_BUILD, 'z137');
-    assert.equal(context.Views.versionLabel(), '137');
+    assert.equal(context.Views.APP_BUILD, 'z138');
+    assert.equal(context.Views.versionLabel(), '138');
     const settings = context.Views.settings();
-    assert.match(settings, /Версія 137/);
-    assert.equal(settings.includes('z137'), false);
+    assert.match(settings, /Версія 138/);
+    assert.equal(settings.includes('z138'), false);
     const library = context.Views.tactics();
     assert.match(library, /Всі альбоми/);
     assert.match(library, /open-scheme-archive/);

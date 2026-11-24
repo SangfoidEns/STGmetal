@@ -13632,3 +13632,114 @@ body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-acti
 .tg-side-match .tg-next-cd {
   text-align: left !important;
 }
+
+/* Club night: the glass needs a living background behind it. */
+html {
+  background: #07080c !important;
+}
+body {
+  background: transparent !important;
+}
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+body::before {
+  background:
+    radial-gradient(ellipse 42% 32% at 12% 0%, rgba(213, 255, 63, 0.28), transparent 70%),
+    radial-gradient(ellipse 48% 36% at 100% 6%, rgba(232, 197, 71, 0.34), transparent 68%),
+    radial-gradient(ellipse 55% 40% at 78% 100%, rgba(26, 58, 92, 0.55), transparent 70%),
+    radial-gradient(ellipse 30% 22% at 48% 38%, rgba(213, 255, 63, 0.08), transparent 70%),
+    linear-gradient(168deg, #05060a 0%, #10141c 46%, #080b10 100%);
+  animation: ms-aurora 22s ease-in-out infinite alternate;
+}
+body::after {
+  opacity: 0.55;
+  background-image:
+    linear-gradient(rgba(213, 255, 63, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232, 197, 71, 0.04) 1px, transparent 1px);
+  background-size: 84px 84px;
+  mask-image: radial-gradient(ellipse at 50% 18%, #000 0%, transparent 72%);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 18%, #000 0%, transparent 72%);
+}
+@keyframes ms-aurora {
+  from { transform: scale(1) translate3d(0, 0, 0); }
+  to { transform: scale(1.06) translate3d(0, -1.5%, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body::before { animation: none; }
+}
+body.board-on::before,
+body.board-on::after,
+body.mode-board-focus::before,
+body.mode-board-focus::after,
+body.board-only-mode::before,
+body.board-only-mode::after,
+body.board-active::before,
+body.board-active::after,
+body.view-board::before,
+body.view-board::after {
+  display: none !important;
+}
+body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-active) .app,
+body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-active) .main,
+body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-active) #main,
+body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-active) .page,
+body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-active) .pt {
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+}
+
+/* Every plaque uses the same dark glass as the header. */
+.glass,
+.card,
+.card.glass,
+.list-card,
+.tg-row,
+.pl-card,
+.coach-public-card,
+.guest-hero-card,
+.player-stats-card,
+.next-tr-card,
+.next-match-card,
+.soc-profile,
+.soc-feed,
+.soc-peers,
+.cp-block,
+.coach-tools,
+.coach-tools-collapse,
+.metric-card,
+.dash-metric,
+.st-card,
+.an-chart,
+.an-summary,
+.an-table,
+.load-hist,
+.list-panel,
+.cal-card,
+.scheme-card,
+.album-card {
+  background: rgba(14, 16, 22, 0.42) !important;
+  background-image: none !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.24) !important;
+  border-radius: 22px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 12px 32px rgba(0, 0, 0, 0.24) !important;
+  color: var(--text);
+}
+.card .sc,
+.dg .sc,
+.player-stats-card .sc {
+  background: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: none !important;
+  border-radius: 14px !important;
+}
