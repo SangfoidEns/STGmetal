@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z142',
+  APP_BUILD: 'z143',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -2150,6 +2150,7 @@ trainings() {
     const catalog = (typeof CoachTools !== 'undefined' && CoachTools.GIFT_CATALOG ? CoachTools.GIFT_CATALOG : []).map(g => {
       return '<button type="button" class="gift-award-btn rarity-' + (g.rarity || 'common') + '" data-action="award-gift" data-player-id="' + p.id + '" data-gift-id="' + g.id + '" style="--art-hue:' + (g.hue != null ? g.hue : 42) + '">' +
         '<span class="gab-ico">' + (g.ico || '🎁') + '</span>' +
+        (g.series ? '<span class="gab-series">' + sanitize(g.series) + '</span>' : '') +
         '<span class="gab-label">' + sanitize(g.label || g.id) + '</span>' +
         '</button>';
     }).join('');

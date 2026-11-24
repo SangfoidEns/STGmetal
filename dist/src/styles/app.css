@@ -13900,3 +13900,57 @@ body.role-player [data-del-player],
 body.role-guest [data-del-player] {
   display: none !important;
 }
+
+.tg-gift-art::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--home-pat);
+  background-size: 168% 168%;
+  background-position: center;
+  opacity: 0.92;
+}
+.tg-gift-sheen {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(118deg, transparent 34%, rgba(255, 255, 255, 0.28) 48%, transparent 62%),
+    radial-gradient(90% 70% at 50% 0%, rgba(213, 255, 63, 0.22), transparent 58%);
+}
+.tg-gift-art.rarity-legendary {
+  box-shadow: inset 0 0 0 1px rgba(213, 255, 63, 0.72), 0 0 18px rgba(232, 197, 71, 0.38) !important;
+}
+.tg-gift-art.is-penalty {
+  box-shadow: inset 0 0 0 1.5px #d5ff3f, 0 0 22px rgba(213, 255, 63, 0.5) !important;
+}
+.tg-gift-serial {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
+  z-index: 3;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-align: center;
+  color: #d5ff3f;
+}
+.player-collectible.gift-field::before {
+  background-size: 240px 240px;
+  opacity: 0.95;
+}
+.player-collectible.gift-field::after {
+  background:
+    radial-gradient(70% 48% at 12% 0%, rgba(213, 255, 63, 0.18), transparent 58%),
+    radial-gradient(60% 40% at 100% 8%, rgba(232, 197, 71, 0.16), transparent 52%),
+    radial-gradient(ellipse 130% 110% at 50% 50%, transparent 50%, rgba(0, 0, 0, 0.42) 100%);
+}
+.gab-series {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #d5ff3f;
+}

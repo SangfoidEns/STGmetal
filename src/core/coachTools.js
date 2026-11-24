@@ -247,6 +247,11 @@ CoachTools.GIFT_CATALOG = [
     description: 'За голи і удари, від яких тримається рахунок.' },
   { id: 'clean_sheet', ico: '🧤', label: 'Суха сітка', rarity: 'epic', hue: 168, pattern: 10, anim: 'sway',
     description: 'Ворота лишились зачиненими.' },
+  { id: 'first_saved_penalty', ico: '🧤', label: 'Перший витягнутий пенальті',
+    rarity: 'legendary', hue: 74, pattern: 16, anim: 'flash', special: 'penalty-save',
+    exclusive: 'club', series: 'Команда',
+    description: 'Артефакт від клубу і команди. За перший пенальті, який воротар забрав.',
+    momentHint: 'Перший витягнутий пенальті. Подарунок клубу і команди.' },
   { id: 'hat_trick', ico: '⚽', label: 'Хет-трик', rarity: 'epic', hue: 28, pattern: 7, anim: 'spin',
     description: 'Три голи в одному матчі або три точні виконання на тренуванні.' },
   { id: 'captain_band', ico: '🎗️', label: 'Пов’язка капітана', rarity: 'epic', hue: 48, pattern: 1, anim: 'pulse',
@@ -415,7 +420,8 @@ CoachTools.FOOTBALL_PATTERNS = [
   { id: 'shield', label: 'Герб' },
   { id: 'timer', label: 'Секундомір' },
   { id: 'cone', label: 'Фішка' },
-  { id: 'studs', label: 'Шипи' }
+  { id: 'studs', label: 'Шипи' },
+  { id: 'penalty', label: 'Пенальті' }
 ];
 CoachTools.FOOTBALL_SYMBOLS = CoachTools.FOOTBALL_PATTERNS;
 CoachTools._patternBase = function (g) {
@@ -500,6 +506,12 @@ CoachTools._footballSymbol = function (id, ink, opacity) {
     return g + '<path' + e + ' d="M0,-6.4 L4.6,3.8 H-4.6 Z M-2.2,0.4 H2.2 L2.6,1.6 H-2.6 Z"/>' +
       '<path d="M-5,4.2 H5 A5,1.15 0 1 1 -5,4.2 Z"/>' + z;
   }
+  if (id === 'penalty') {
+    return g + '<circle cx="0" cy="1.4" r="1.05"/>' +
+      '<path fill="none" stroke="' + ink + '" stroke-width="0.7" d="M0,1.4 m-5.1,0 a5.1,5.1 0 1 0 10.2,0 a5.1,5.1 0 1 0 -10.2,0"/>' +
+      '<path d="M-6.1,4.8 C-3.8,1.4 -1.2,-0.2 1.8,-1.5 L2.5,0.3 C0.2,1.2 -1.6,2.5 -3.1,4.8 Z"/>' +
+      '<path d="M0.4,-5.6 L2.8,-2.6 L1.6,-1.9 L-0.2,-4.2 Z"/>' + z;
+  }
   return g + '<path d="M-5.2,-1 H5.2 V0.5 H-5.2 Z M-4.2,0.5 L-2.7,5 H-5.6 Z M-0.8,0.5 L0.8,5.2 H-2.3 Z M2.6,0.5 L4.2,5 H1.2 Z"/>' + z;
 };
 CoachTools._footballSymbolTile = function (id, ink) {
@@ -521,10 +533,39 @@ CoachTools.giftPatternSvg = function (g) {
   const seed = g ? CoachTools.giftSeed(g) : 0x4d4554;
   const hue = g ? CoachTools.giftHue(g) : 42;
   const idx = CoachTools.footballPatternIndex(g);
-  const def = CoachTools.FOOTBALL_PATTERNS[idx] || CoachTools.FOOTBALL_PATTERNS[0];
-  const ink = 'hsl(' + hue + ' 22% 96%)';
-  const body = CoachTools._footballSymbolTile(def.id, ink);
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="168" height="168" viewBox="0 0 168 168">' + body + '</svg>';
+  const defs = CoachTools.FOOTBALL_PATTERNS || [];
+  let def = defs[idx] || defs[0];
+  const gid = (g && g.giftId) || '';
+  if (gid === 'first_saved_penalty' || (g && g.special === 'penalty-save')) {
+    def = defs.find(function (item) { return item.id === 'penalty'; }) || def;
+  }
+  const ink = 'hsl(' + hue + ' 16% 94%)';
+  const lime = '#d5ff3f';
+  const gold = '#e8c547';
+  const ox = (seed % 20) * 0.35;
+  const oy = ((seed >>> 6) % 20) * 0.35;
+  const glyph = CoachTools._footballSymbol(def.id, ink, 0.2);
+  const tiles = [];
+  const gap = 56;
+  for (let row = 0; row <= 3; row++) {
+    for (let col = -1; col <= 3; col++) {
+      const x = ox + col * gap + (row % 2 ? gap / 2 : 0);
+      const y = oy + row * gap;
+      tiles.push('<g transform="translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ') scale(0.62)">' + glyph + '</g>');
+    }
+  }
+  const grid = [];
+  for (let i = 14; i < 168; i += 28) {
+    grid.push('<path d="M' + i + ',0 V168" stroke="' + lime + '" stroke-opacity="0.16" stroke-width="0.45"/>');
+    grid.push('<path d="M0,' + i + ' H168" stroke="' + gold + '" stroke-opacity="0.12" stroke-width="0.4"/>');
+  }
+  const orbits = '<circle cx="84" cy="78" r="58" fill="none" stroke="' + lime + '" stroke-opacity="0.42" stroke-width="0.7"/>' +
+    '<circle cx="84" cy="78" r="34" fill="none" stroke="' + gold + '" stroke-opacity="0.5" stroke-width="0.55"/>' +
+    '<circle cx="84" cy="78" r="3.2" fill="' + lime + '" fill-opacity="0.85"/>' +
+    '<path d="M16,146 C48,36 126,18 158,96" fill="none" stroke="' + lime + '" stroke-opacity="0.55" stroke-width="0.85"/>' +
+    '<path d="M10,46 C72,6 148,58 160,146" fill="none" stroke="' + gold + '" stroke-opacity="0.4" stroke-width="0.7"/>';
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="168" height="168" viewBox="0 0 168 168">' +
+    grid.join('') + orbits + tiles.join('') + '</svg>';
   return { svg: svg, hue: hue, seed: seed, patternId: def.id, patternLabel: def.label };
 };
 /** Колір картки футболіста — як раніше, від головного подарунка. */
@@ -895,9 +936,13 @@ CoachTools.giftBackdropHtml = function (g, size) {
   const media = (g && g.mediaUrl)
     ? ('<img class="tg-emoji-media" src="' + String(g.mediaUrl).replace(/"/g, '') + '" alt="">')
     : ico;
-  return '<span class="tg-gift-art size-' + (size || 'md') + ' rarity-' + rar +
+  const penalty = (g && (g.giftId === 'first_saved_penalty' || g.special === 'penalty-save')) ? ' is-penalty' : '';
+  const serial = (size === 'lg' && g && CoachTools.giftSerial) ? CoachTools.giftSerial(g) : '';
+  return '<span class="tg-gift-art size-' + (size || 'md') + ' rarity-' + rar + penalty +
     '" style="--art-hue:' + pat.hue + ';--home-pat:url(\'data:image/svg+xml,' + encodeURIComponent(pat.svg) + '\')">' +
+    '<span class="tg-gift-sheen"></span>' +
     '<span class="tg-gift-art-ico">' + media + '</span>' +
+    (serial ? ('<span class="tg-gift-serial">' + serial + '</span>') : '') +
     '</span>';
 };
 
@@ -964,6 +1009,9 @@ CoachTools.giveGift = function (playerId, giftId, momentText) {
     ico: def.ico,
     label: def.label,
     rarity: def.rarity || 'common',
+    special: def.special || '',
+    exclusive: def.exclusive || '',
+    series: def.series || '',
     seed,
     hue,
     pattern,

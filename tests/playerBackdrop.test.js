@@ -74,4 +74,18 @@ describe('player collectible backgrounds', () => {
     const gift = ctx.CoachTools._footballSymbol('ball', '#fff');
     assert.match(gift, /opacity="0\.26"/);
   });
+
+  it('adds the first saved penalty as a club gift with a night pattern', () => {
+    const ctx = boot();
+    const def = ctx.CoachTools.giftById('first_saved_penalty');
+    assert.equal(def.label, 'Перший витягнутий пенальті');
+    assert.equal(def.exclusive, 'club');
+    assert.equal(def.series, 'Команда');
+    const drawn = ctx.CoachTools.giftPatternSvg({ giftId: 'first_saved_penalty', special: 'penalty-save', seed: 3, hue: 74 });
+    assert.equal(drawn.patternId, 'penalty');
+    assert.equal(drawn.svg.includes('<text'), false);
+    assert.equal(drawn.svg.includes('rotate('), false);
+    assert.match(drawn.svg, /#d5ff3f/);
+    assert.match(drawn.svg, /#e8c547/);
+  });
 });
