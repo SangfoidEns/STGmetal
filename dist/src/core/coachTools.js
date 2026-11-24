@@ -537,123 +537,124 @@ CoachTools._kitRand = function (seed) {
     return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
   };
 };
-CoachTools._kitSmooth = function (points) {
-  const n = points.length;
-  if (!n) return '';
-  const fmt = function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); };
-  let d = 'M' + fmt(points[0]);
-  for (let i = 0; i < n - 1; i++) {
-    const p0 = points[Math.max(0, i - 1)];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[Math.min(n - 1, i + 2)];
-    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
-    const c1y = p1[1] + (p2[1] - p0[1]) / 6;
-    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
-    const c2y = p2[1] - (p3[1] - p1[1]) / 6;
-    d += ' C' + c1x.toFixed(1) + ',' + c1y.toFixed(1) + ' ' + c2x.toFixed(1) + ',' + c2y.toFixed(1) + ' ' + fmt(p2);
-  }
-  return d;
+CoachTools._glassPt = function (s, n, angle) {
+  const a = angle * Math.PI / 180;
+  return [84 + s * Math.cos(a) - n * Math.sin(a), 112 + s * Math.sin(a) + n * Math.cos(a)];
 };
-CoachTools._kitRibbon = function (spec) {
-  const angle = spec.angle * Math.PI / 180;
-  const ca = Math.cos(angle);
-  const sa = Math.sin(angle);
-  const steps = 20;
-  const left = [];
-  const right = [];
-  const core = [];
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const s = -120 + t * 460;
-    const wave = Math.sin(s * spec.freq + spec.phase) * spec.amp +
-      Math.sin(s * spec.freq * 0.47 + spec.phase * 1.4) * spec.amp * 0.28;
-    const taper = spec.taper ? (0.42 + 0.58 * Math.sin(t * Math.PI)) : 1;
-    const breath = spec.breath ? (0.78 + 0.22 * Math.sin(t * Math.PI * 2 + spec.phase)) : 1;
-    const half = spec.width * taper * breath * 0.5;
-    const n = spec.offset + wave;
-    const x = s * ca - n * sa;
-    const y = s * sa + n * ca;
-    left.push([x + sa * half, y - ca * half]);
-    right.push([x - sa * half, y + ca * half]);
-    core.push([x, y]);
-  }
-  return {
-    body: CoachTools._kitSmooth(left.concat(right.reverse())) + ' Z',
-    spine: CoachTools._kitSmooth(core)
-  };
+CoachTools._glassQuad = function (a, b, c, d) {
+  const f = function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); };
+  return 'M' + f(a) + ' L' + f(b) + ' L' + f(c) + ' L' + f(d) + ' Z';
 };
-CoachTools._kitBands = function (rand, spec) {
-  let out = '';
-  let offset = spec.start;
-  for (let i = 0; i < spec.count; i++) {
-    const width = spec.width[0] + rand() * (spec.width[1] - spec.width[0]);
-    const amp = spec.amp[0] + rand() * (spec.amp[1] - spec.amp[0]);
-    const hot = i % 2 === 0;
-    const alpha = spec.alpha[0] + rand() * (spec.alpha[1] - spec.alpha[0]);
-    const fill = hot
-      ? 'rgba(255,186,74,' + alpha.toFixed(2) + ')'
-      : 'rgba(244,247,252,' + (alpha * 0.92).toFixed(2) + ')';
-    const ribbon = CoachTools._kitRibbon({
-      angle: spec.angle,
-      offset: offset,
-      width: width,
-      amp: amp,
-      freq: spec.freq,
-      phase: spec.phase + i * 0.35,
-      taper: !!spec.taper,
-      breath: !!spec.breath
-    });
-    out += '<path d="' + ribbon.body + '" fill="' + fill + '"/>';
-    out += '<path d="' + ribbon.spine + '" fill="none" stroke="rgba(255,228,170,' + Math.min(0.85, alpha + 0.28).toFixed(2) + ')" stroke-width="' + spec.core.toFixed(1) + '" stroke-linecap="round"/>';
-    offset += width + spec.gap * (0.82 + rand() * 0.36);
-  }
-  return out;
+CoachTools._glassInk = function (light, alpha) {
+  return light
+    ? 'rgba(255,255,255,' + alpha.toFixed(2) + ')'
+    : 'rgba(0,0,0,' + alpha.toFixed(2) + ')';
+};
+CoachTools._glassSlab = function (angle, n, width, light, alpha) {
+  const half = width / 2;
+  return '<path d="' + CoachTools._glassQuad(
+    CoachTools._glassPt(-260, n - half, angle),
+    CoachTools._glassPt(260, n - half, angle),
+    CoachTools._glassPt(260, n + half, angle),
+    CoachTools._glassPt(-260, n + half, angle)
+  ) + '" fill="' + CoachTools._glassInk(light, alpha) + '"/>';
 };
 CoachTools._kitPatterns = [
-  { id: 'kit', label: 'Вогонь форми', draw: function (rand) {
-    return CoachTools._kitBands(rand, { angle: 48, start: -150, count: 7, width: [15, 22], gap: 16, amp: [6, 10], freq: 0.045, phase: rand() * 6, alpha: [0.34, 0.46], core: 1.5 });
-  } },
-  { id: 'blaze', label: 'Зустрічний вогонь', draw: function (rand) {
-    return CoachTools._kitBands(rand, { angle: -46, start: -160, count: 7, width: [14, 20], gap: 15, amp: [6, 11], freq: 0.042, phase: rand() * 6, alpha: [0.32, 0.44], core: 1.4 });
-  } },
-  { id: 'steep', label: 'Крутий кут', draw: function (rand) {
-    return CoachTools._kitBands(rand, { angle: 64, start: -170, count: 8, width: [12, 18], gap: 14, amp: [5, 9], freq: 0.05, phase: rand() * 6, alpha: [0.3, 0.42], core: 1.2 });
-  } },
-  { id: 'shallow', label: 'Пологий вогонь', draw: function (rand) {
-    return CoachTools._kitBands(rand, { angle: 28, start: -150, count: 6, width: [16, 24], gap: 18, amp: [5, 8], freq: 0.038, phase: rand() * 6, alpha: [0.3, 0.42], core: 1.3 });
-  } },
-  { id: 'fine', label: 'Гострі язики', draw: function (rand) {
-    return CoachTools._kitBands(rand, { angle: 50, start: -150, count: 12, width: [4, 7], gap: 10, amp: [4, 7], freq: 0.055, phase: rand() * 6, alpha: [0.4, 0.55], core: 0.9 });
-  } },
-  { id: 'twin', label: 'Парне полумʼя', draw: function (rand) {
+  { id: 'slab', label: 'Плити', draw: function (rand) {
     let out = '';
-    let offset = -150;
-    const phase = rand() * 6;
-    for (let i = 0; i < 6; i++) {
-      out += CoachTools._kitBands(rand, { angle: 44, start: offset, count: 1, width: [5, 7], gap: 0, amp: [6, 8], freq: 0.044, phase: phase, alpha: [0.46, 0.46], core: 1.1 });
-      out += CoachTools._kitBands(rand, { angle: 44, start: offset + 10, count: 1, width: [3, 5], gap: 0, amp: [6, 8], freq: 0.044, phase: phase + 0.15, alpha: [0.28, 0.28], core: 0.7 });
-      offset += 36 + rand() * 8;
+    const shift = (rand() - 0.5) * 10;
+    for (let i = -3; i <= 3; i++) {
+      const light = i % 2 === 0;
+      out += CoachTools._glassSlab(50, i * 38 + shift, 22, light, light ? 0.2 : 0.12);
     }
     return out;
   } },
-  { id: 'tongue', label: 'Язики', draw: function (rand) {
-    return CoachTools._kitBands(rand, { angle: -52, start: -160, count: 6, width: [18, 26], gap: 18, amp: [7, 11], freq: 0.04, phase: rand() * 6, alpha: [0.3, 0.4], core: 1.6, taper: true });
+  { id: 'facet', label: 'Грані', draw: function (rand) {
+    let out = '';
+    const angle = -48;
+    const shift = (rand() - 0.5) * 8;
+    for (let i = -4; i <= 4; i++) {
+      for (let j = -3; j <= 3; j++) {
+        const n0 = i * 36 + shift;
+        const s0 = j * 74;
+        const light = (i + j) % 2 === 0;
+        const alpha = light ? 0.12 + ((Math.abs(i + j) % 3) * 0.04) : 0.07;
+        out += '<path d="' + CoachTools._glassQuad(
+          CoachTools._glassPt(s0, n0, angle),
+          CoachTools._glassPt(s0 + 62, n0, angle),
+          CoachTools._glassPt(s0 + 62, n0 + 24, angle),
+          CoachTools._glassPt(s0, n0 + 24, angle)
+        ) + '" fill="' + CoachTools._glassInk(light, alpha) + '" stroke="rgba(255,255,255,0.2)" stroke-width="0.45"/>';
+      }
+    }
+    return out;
   } },
-  { id: 'broad', label: 'Широке полумʼя', draw: function (rand) {
-    return CoachTools._kitBands(rand, { angle: 40, start: -140, count: 4, width: [28, 36], gap: 22, amp: [8, 12], freq: 0.032, phase: rand() * 6, alpha: [0.22, 0.3], core: 1.8 });
+  { id: 'pane', label: 'Вікна', draw: function (rand) {
+    let out = '';
+    const cols = 3;
+    const rows = 4;
+    const gw = 168 / cols;
+    const gh = 224 / rows;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const x = c * gw + 6;
+        const y = r * gh + 6;
+        const w = gw - 12;
+        const h = gh - 12;
+        const light = (r + c) % 2 === 0;
+        out += '<path d="M' + x.toFixed(1) + ',' + y.toFixed(1) + ' h' + w.toFixed(1) + ' v' + h.toFixed(1) + ' h' + (-w).toFixed(1) + ' Z" fill="' + CoachTools._glassInk(light, light ? 0.16 : 0.08) + '" stroke="rgba(255,255,255,0.22)" stroke-width="0.6"/>';
+      }
+    }
+    out += CoachTools._glassSlab(42, (rand() - 0.5) * 20, 16, true, 0.1);
+    return out;
   } },
-  { id: 'pulse', label: 'Пульс', draw: function (rand) {
-    return CoachTools._kitBands(rand, { angle: -38, start: -155, count: 6, width: [12, 18], gap: 16, amp: [5, 8], freq: 0.048, phase: rand() * 6, alpha: [0.32, 0.44], core: 1.3, breath: true });
+  { id: 'lens', label: 'Лінзи', draw: function (rand) {
+    const spots = [
+      [48 + rand() * 20, 58, 78, 46, 0.14],
+      [118, 150 + rand() * 16, 86, 52, 0.1],
+      [84, 28, 50, 22, 0.18]
+    ];
+    let out = '<path d="M0,0 H168 V224 H0 Z" fill="rgba(255,255,255,0.03)"/>';
+    spots.forEach(function (s, i) {
+      out += '<ellipse cx="' + s[0].toFixed(1) + '" cy="' + s[1].toFixed(1) + '" rx="' + s[2] + '" ry="' + s[3] + '" fill="' + CoachTools._glassInk(i !== 1, s[4]) + '"/>';
+    });
+    out += CoachTools._glassSlab(36, 8, 10, true, 0.12);
+    return out;
   } },
-  { id: 'long', label: 'Довга хвиля', draw: function (rand) {
-    return CoachTools._kitBands(rand, { angle: 46, start: -150, count: 6, width: [13, 19], gap: 17, amp: [10, 14], freq: 0.026, phase: rand() * 6, alpha: [0.3, 0.42], core: 1.4 });
+  { id: 'veil', label: 'Вуаль', draw: function () {
+    return CoachTools._glassSlab(56, -28, 70, true, 0.1) +
+      CoachTools._glassSlab(56, 36, 46, false, 0.1) +
+      CoachTools._glassSlab(-40, 6, 28, true, 0.08);
   } },
-  { id: 'dense', label: 'Щільний друк', draw: function (rand) {
-    return CoachTools._kitBands(rand, { angle: -58, start: -170, count: 10, width: [7, 11], gap: 8, amp: [4, 7], freq: 0.05, phase: rand() * 6, alpha: [0.28, 0.4], core: 0.8 });
+  { id: 'shine', label: 'Блиск', draw: function (rand) {
+    const shift = (rand() - 0.5) * 24;
+    return '<defs><linearGradient id="sh" x1="0" y1="0" x2="1" y2="1">' +
+      '<stop offset="0" stop-color="#fff" stop-opacity="0"/>' +
+      '<stop offset="0.42" stop-color="#fff" stop-opacity="0.28"/>' +
+      '<stop offset="0.58" stop-color="#fff" stop-opacity="0.05"/>' +
+      '<stop offset="1" stop-color="#fff" stop-opacity="0"/>' +
+      '</linearGradient></defs>' +
+      CoachTools._glassSlab(44, shift, 54, true, 0.05).replace('fill="rgba(255,255,255,0.05)"', 'fill="url(#sh)"') +
+      CoachTools._glassSlab(44, shift + 34, 18, false, 0.1);
   } },
-  { id: 'flare', label: 'Спалах', draw: function (rand) {
-    return CoachTools._kitBands(rand, { angle: 54, start: -160, count: 6, width: [16, 24], gap: 16, amp: [6, 10], freq: 0.036, phase: rand() * 6, alpha: [0.34, 0.48], core: 1.7, taper: true });
+  { id: 'crystal', label: 'Кристал', draw: function (rand) {
+    let out = '';
+    const gems = [[84, 70, 54, 36], [46, 150, 40, 28], [126, 156, 36, 26], [84, 24, 28, 16]];
+    gems.forEach(function (g, i) {
+      const ox = (rand() - 0.5) * 8;
+      out += '<path d="M' + (g[0] + ox).toFixed(1) + ',' + (g[1] - g[3]).toFixed(1) +
+        ' L' + (g[0] + g[2] + ox).toFixed(1) + ',' + g[1].toFixed(1) +
+        ' L' + (g[0] + ox).toFixed(1) + ',' + (g[1] + g[3]).toFixed(1) +
+        ' L' + (g[0] - g[2] + ox).toFixed(1) + ',' + g[1].toFixed(1) +
+        ' Z" fill="' + CoachTools._glassInk(i % 2 === 0, i % 2 === 0 ? 0.16 : 0.1) + '" stroke="rgba(255,255,255,0.24)" stroke-width="0.6"/>';
+    });
+    return out;
+  } },
+  { id: 'sheet', label: 'Пластини', draw: function (rand) {
+    const shift = (rand() - 0.5) * 12;
+    return CoachTools._glassSlab(-46, -34 + shift, 48, true, 0.16) +
+      CoachTools._glassSlab(-46, 30 + shift, 36, false, 0.12) +
+      CoachTools._glassSlab(48, 4, 14, true, 0.14);
   } }
 ];
 CoachTools.giftPatternSvg = function (g) {

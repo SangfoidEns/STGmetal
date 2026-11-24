@@ -13911,14 +13911,15 @@ body.role-guest [data-del-player] {
   background-size: 100% 100%;
   background-repeat: no-repeat;
   background-position: center;
-  opacity: 0.92;
+  opacity: 1;
+  mix-blend-mode: soft-light;
 }
 .tg-gift-sheen {
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  background: linear-gradient(118deg, transparent 40%, rgba(255, 255, 255, 0.16) 50%, transparent 60%);
+  background: linear-gradient(125deg, rgba(255, 255, 255, 0.16), transparent 42%);
 }
 .tg-gift-art.rarity-legendary {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55), 0 8px 18px rgba(0, 0, 0, 0.35) !important;
@@ -13942,9 +13943,10 @@ body.role-guest [data-del-player] {
   background-repeat: no-repeat;
   background-position: center;
   opacity: 1;
+  mix-blend-mode: soft-light;
 }
 .player-collectible.gift-field::after {
-  background: radial-gradient(ellipse 130% 110% at 50% 42%, transparent 58%, rgba(0, 0, 0, 0.28) 100%);
+  background: radial-gradient(ellipse 130% 110% at 50% 42%, transparent 62%, rgba(0, 0, 0, 0.18) 100%);
 }
 .gab-series {
   font-size: 9px;

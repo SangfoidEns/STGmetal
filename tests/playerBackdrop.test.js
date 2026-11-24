@@ -86,7 +86,8 @@ describe('player collectible backgrounds', () => {
     assert.equal(drawn.svg.includes('<text'), false);
     assert.equal(drawn.svg.includes('rotate('), false);
     assert.match(drawn.svg, /<path/);
-    assert.match(drawn.svg, /255,186,74/);
+    assert.match(drawn.svg, /rgba\(255,255,255,0\./);
+    assert.equal(drawn.svg.includes('255,186,74'), false);
     assert.equal(drawn.svg.includes('viewBox="0 0 168 168"'), false);
     assert.ok(ctx.CoachTools._kitPatterns.length >= 8);
     const other = ctx.CoachTools.giftPatternSvg({ uid: 'other-gift', seed: 88, hue: 200 });
