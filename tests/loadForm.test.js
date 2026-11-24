@@ -156,4 +156,15 @@ describe('automatic load from ratings', () => {
     assert.ok(rare.score < 4);
     assert.ok(reg.score > rare.score + 3);
   });
+
+  it('averages only the player own mark, not the planned session intensity', () => {
+    const LM = boot({
+      trainings: [
+        { id: 'a', date: iso(-2), status: 'done', duration: 80, intensity: 9, attendance: { yehor: { present: true }, other: { present: true, rpe: 4 } } },
+        { id: 'b', date: iso(-1), status: 'done', duration: 80, intensity: 8, attendance: { yehor: { present: true, rpe: 5 }, other: { present: true, rpe: 5 } } }
+      ]
+    });
+    assert.equal(LM.avgPlayerRpe(LM._trainings(), 'yehor'), 5);
+    assert.equal(LM.avgPlayerRpe(LM._trainings(), 'other'), 4.5);
+  });
 });

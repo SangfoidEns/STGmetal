@@ -13408,10 +13408,10 @@ body:not(.board-on):not(.mode-board-focus):not(.board-only-mode) .app > .main {
   border-radius: 999px !important;
   overflow: hidden !important;
   isolation: isolate;
-  background: transparent !important;
+  background: rgba(16, 18, 24, 0.94) !important;
   background-image: none !important;
-  border: 0 !important;
-  box-shadow: none !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.22) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 10px 28px rgba(0, 0, 0, 0.28) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   clip-path: inset(0 round 999px);
@@ -13421,7 +13421,7 @@ body:not(.board-on):not(.mode-board-focus):not(.board-only-mode) .app > .main {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: rgba(16, 18, 24, 0.82);
+  background: rgba(16, 18, 24, 0.55);
   border: 0.5px solid rgba(255, 255, 255, 0.22);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
   backdrop-filter: blur(40px) saturate(180%);
@@ -13615,4 +13615,18 @@ body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-acti
 .tg-sheet-btn {
   background: rgba(255, 255, 255, 0.08) !important;
   border: 0.5px solid rgba(255, 255, 255, 0.12) !important;
+}
+.tg-hdr-pill > #nextMatchBtn,
+.tg-hdr-pill > .tg-side-match {
+  justify-self: start !important;
+  justify-content: flex-start !important;
+  align-items: flex-start !important;
+  text-align: left !important;
+  width: auto !important;
+  max-width: 148px !important;
+  margin-right: auto !important;
+}
+.tg-side-match .tg-next-val,
+.tg-side-match .tg-next-cd {
+  text-align: left !important;
 }

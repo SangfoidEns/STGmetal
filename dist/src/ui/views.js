@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z133',
+  APP_BUILD: 'z134',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -3629,10 +3629,80 @@ trainings() {
           : ((Number(t.duration) || 0) * (Number(avgRpe || t.intensity) || 0));
       } catch (_) { load = 0; }
       const label = String(t.date || '').slice(5);
-      return { label, attPct, avgRpe: Math.round(avgRpe * 10) / 10, load };
+      return { label, attPct, avgRpe: Math.round(avgRpe * 10) / 10, load, match: false };
     });
 
-    const line = (values, color, id, maxHint) => {
+    const byDay = {};
+    const touchDay = (date) => {
+      const key = String(date || '').slice(0, 10);
+      if (!key) return null;
+      if (!byDay[key]) byDay[key] = { label: key.slice(5), rpes: [], load: 0, match: false, warmRpe: null, warmLoad: 0 };
+      return byDay[key];
+    };
+    const sessionRpe = (t) => {
+      const att = t.attendance || {};
+      const rpes = [];
+      Object.keys(att).forEach(k => {
+        const a = att[k];
+        if (!a || a.present === false) return;
+        const r = a.rpe != null && a.rpe !== '' ? Number(a.rpe) : (a.intensity != null && a.intensity !== '' ? Number(a.intensity) : NaN);
+        if (isFinite(r)) rpes.push(r);
+      });
+      return rpes.length ? rpes.reduce((x, y) => x + y, 0) / rpes.length : (Number(t.intensity) || 0);
+    };
+    const addLoad = (minutes, intensity) => {
+      try {
+        return (typeof LoadModel !== 'undefined' && LoadModel.sessionLoad)
+          ? LoadModel.sessionLoad(minutes, intensity)
+          : (Number(minutes) || 0) * (Number(intensity) || 0);
+      } catch (_) { return 0; }
+    };
+    done.forEach(t => {
+      const row = touchDay(t.date);
+      if (!row) return;
+      const avg = sessionRpe(t);
+      const warm = t.md === 'WU' || /розмин/i.test(String(t.name || ''));
+      if (warm) {
+        row.warmRpe = avg;
+        row.warmLoad += addLoad(t.duration, avg);
+      } else {
+        if (avg) row.rpes.push(avg);
+        row.load += addLoad(t.duration, avg);
+      }
+    });
+    const todayKey = (typeof LoadModel !== 'undefined' && LoadModel.todayStr) ? LoadModel.todayStr() : '';
+    (s.matches || []).forEach(m => {
+      if (!m || !m.date) return;
+      if (todayKey && String(m.date) > todayKey) return;
+      const st = String(m.status || '').toLowerCase();
+      if (st === 'cancelled' || st === 'canceled' || st === 'скасовано') return;
+      const hasAtt = !!(m.attendance && Object.keys(m.attendance).length);
+      if (st !== 'played' && st !== 'done' && st !== 'completed' && st !== 'зіграно' && !hasAtt) return;
+      const row = touchDay(m.date);
+      if (!row) return;
+      row.match = true;
+      const ratings = Object.keys(m.attendance || {}).map(id => {
+        const cell = m.attendance[id];
+        if (!cell || cell.present === false || cell.present === 0 || cell.present === '0') return null;
+        if (cell.present !== true && cell.present !== 1 && cell.present !== '1') return null;
+        return cell.rating != null && cell.rating !== '' ? Number(cell.rating) : 6;
+      }).filter(v => v != null && isFinite(v));
+      const avg = ratings.length ? ratings.reduce((a, v) => a + v, 0) / ratings.length : 6;
+      row.rpes = [avg];
+      const minutes = Math.max(1, Number(m.minutes) || 90);
+      const weight = (typeof LoadModel !== 'undefined' && LoadModel.MATCH_WEIGHT) || 1.7;
+      row.load += Math.round(addLoad(minutes, avg) * weight);
+    });
+    const dayStats = Object.keys(byDay).sort().slice(-12).map(key => {
+      const row = byDay[key];
+      if (!row.rpes.length && row.warmRpe != null) row.rpes.push(row.warmRpe);
+      if (row.warmLoad) row.load += row.warmLoad;
+      const avgRpe = row.rpes.length ? row.rpes.reduce((a, b) => a + b, 0) / row.rpes.length : 0;
+      return { label: row.label, avgRpe: Math.round(avgRpe * 10) / 10, load: Math.round(row.load), match: !!row.match };
+    });
+    const plotStats = dayStats.length ? dayStats : sessionStats;
+
+    const line = (values, color, id, maxHint, stats) => {
       const w = 320, h = 120;
       const nums = values.map(v => Number(v) || 0);
       if (!nums.length) return '<div class="an-empty">Немає точок</div>';
@@ -3645,8 +3715,14 @@ trainings() {
       });
       const d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
       const area = d + ' L' + pts[pts.length - 1][0].toFixed(1) + ',' + (h - 22) + ' L' + pts[0][0].toFixed(1) + ',' + (h - 22) + ' Z';
-      const dots = pts.map(p => '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3" fill="' + color + '"><title>' + p[2] + '</title></circle>').join('');
-      const labels = pts.map((p, i) => '<text x="' + p[0].toFixed(1) + '" y="' + (h - 6) + '" text-anchor="middle" fill="#9aa4b2" font-size="9">' + sanitize(sessionStats[i].label) + '</text>').join('');
+      const rows = stats || sessionStats;
+      const dots = pts.map((p, i) => {
+        const mark = rows[i] && rows[i].match;
+        const fill = mark ? '#d5ff3f' : color;
+        const ring = mark ? '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="7" fill="none" stroke="#d5ff3f" stroke-width="1.5"/>' : '';
+        return ring + '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="' + (mark ? '4.5' : '3') + '" fill="' + fill + '"><title>' + (mark ? 'Матч · ' : '') + p[2] + '</title></circle>';
+      }).join('');
+      const labels = pts.map((p, i) => '<text x="' + p[0].toFixed(1) + '" y="' + (h - 6) + '" text-anchor="middle" fill="' + ((rows[i] && rows[i].match) ? '#d5ff3f' : '#9aa4b2') + '" font-size="9">' + sanitize(rows[i] ? rows[i].label : '') + '</text>').join('');
       return '<svg class="an-svg" viewBox="0 0 ' + w + ' ' + h + '" role="img">' +
         '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1">' +
         '<stop offset="0%" stop-color="' + color + '" stop-opacity="0.45"/>' +
@@ -3656,19 +3732,22 @@ trainings() {
         dots + labels + '</svg>';
     };
 
-    const bars = (values, color) => {
+    const bars = (values, color, stats) => {
       const w = 320, h = 120;
+      const rows = stats || sessionStats;
       if (!values.length) return '<div class="an-empty">Немає точок</div>';
       const max = Math.max(...values.map(v => Number(v) || 0), 1);
       const gap = 6;
       const bw = Math.max(8, (w - 20 - gap * values.length) / values.length);
       const rects = values.map((v, i) => {
         const val = Number(v) || 0;
+        const mark = rows[i] && rows[i].match;
         const bh = Math.max(2, (val / max) * (h - 36));
         const x = 10 + i * (bw + gap);
         const y = h - 22 - bh;
-        return '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + bh.toFixed(1) + '" rx="4" fill="' + color + '"><title>' + val + '</title></rect>' +
-          '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (h - 6) + '" text-anchor="middle" fill="#9aa4b2" font-size="9">' + sanitize(sessionStats[i].label) + '</text>';
+        const fill = mark ? '#d5ff3f' : color;
+        return '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + bh.toFixed(1) + '" rx="4" fill="' + fill + '"><title>' + (mark ? 'Матч · ' : '') + val + '</title></rect>' +
+          '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (h - 6) + '" text-anchor="middle" fill="' + (mark ? '#d5ff3f' : '#9aa4b2') + '" font-size="9">' + sanitize(rows[i] ? rows[i].label : '') + '</text>';
       }).join('');
       return '<svg class="an-svg" viewBox="0 0 ' + w + ' ' + h + '" role="img">' + rects + '</svg>';
     };
@@ -3738,10 +3817,10 @@ trainings() {
 
     return '<div class="an-charts">' +
       card('Відвідуваність команди', 'Частка присутніх на останніх сесіях, %', line(sessionStats.map(x => x.attPct), '#2ecc71', 'anAtt', 100), true) +
-      card('RPE сесій', 'Середня інтенсивність на тренуванні', line(sessionStats.map(x => x.avgRpe), '#e8c547', 'anRpe', 10)) +
-      card('Навантаження сесій', 'Тривалість × RPE', bars(sessionStats.map(x => x.load), '#3b82f6')) +
+      card('RPE сесій', 'Середня інтенсивність. День матчу — лаймовий.', line(plotStats.map(x => x.avgRpe), '#e8c547', 'anRpe', 10, plotStats)) +
+      card('Навантаження сесій', 'Тренування: хв × RPE. Матч: 90 хв × оцінка × 1.7. День матчу — лаймовий.', bars(plotStats.map(x => x.load), '#3b82f6', plotStats)) +
       card('Відвідуваність гравців', 'Хто тримає ритм сезону', hbars(names.map(n => ({ label: n.label, value: n.st.attPct || 0, text: (n.st.attPct != null ? n.st.attPct + '%' : '—'), color: n.color })), r => r.color)) +
-      card('RPE гравців', 'Середнє відчуття навантаження', hbars(names.map(n => ({ label: n.label, value: n.st.avgRpe || 0, text: n.st.avgRpe != null ? n.st.avgRpe : '—', color: n.color })), r => r.color)) +
+      card('RPE гравців', 'Середня власна оцінка важкості тренувань, від 1 до 10. Вище означає, що гравцю було важче. Це не рейтинг сили.', hbars(names.map(n => ({ label: n.label, value: n.st.avgRpe || 0, text: n.st.avgRpe != null ? n.st.avgRpe : '—', color: n.color })), r => r.color)) +
       card('Навантаження 28 днів', 'Тренування: хв × RPE. Матч: 90 хв × оцінка × ' + ((typeof LoadModel !== 'undefined' && LoadModel.MATCH_WEIGHT) || 1.7), hbars(names.map(n => ({ label: n.label, value: n.st.load28 || 0, color: n.color })), r => r.color)) +
       card('XP гравців', 'Тренування, матчі, голи й оцінка', hbars(names.map(n => {
         let xp = 0;

@@ -410,9 +410,10 @@ const LoadModel = {
       const a = this._attEntry(trainings, playerId, t);
       const p = this._isPresent(a);
       if (p === false) return;
-      if (p == null && !(a && typeof a === 'object')) return;
-      const r = this._entryRpe(a, t);
-      if (r != null && !isNaN(r)) vals.push(r);
+      if (!a || typeof a !== 'object') return;
+      const own = (a.rpe != null && a.rpe !== '') ? +a.rpe
+        : ((a.intensity != null && a.intensity !== '') ? +a.intensity : null);
+      if (own != null && !isNaN(own)) vals.push(own);
     });
     if (!vals.length) return null;
     return Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 10) / 10;
