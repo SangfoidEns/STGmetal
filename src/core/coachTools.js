@@ -537,35 +537,44 @@ CoachTools._kitRand = function (seed) {
     return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
   };
 };
-CoachTools._glassMark = {
-  horse: '<path d="M0.2,-6.4 L1.8,-4.2 L0.8,-3.2 C2.8,-3.5 5.2,-1.8 5.7,0 C6.1,1.2 5.2,2.1 4.4,1.9 L4.8,2.9 C3.6,4.2 1.7,3.8 1,2.9 L-0.1,4.3 C-1.4,5.8 -3.8,5.4 -4.6,3.9 L-5.1,2.1 L-3.8,1.5 L-4.8,0.2 L-3.3,-0.8 L-4.2,-1.9 L-2,-2.5 L-1.3,-3.9 Z"/>',
-  ball: '<circle cx="0" cy="0" r="6"/><path d="M0,-2.3 L2.1,-0.7 L1.3,1.8 H-1.3 L-2.1,-0.7 Z"/>',
-  shield: '<path d="M-5.2,-5.2 H5.2 V-0.6 C5.2,2.1 2.6,4.2 0,5.8 C-2.6,4.2 -5.2,2.1 -5.2,-0.6 Z"/>',
-  jersey: '<path d="M-5.8,-1.8 L-3.3,-4.6 L-1.6,-5.2 L0,-3.2 L1.6,-5.2 L3.3,-4.6 L5.8,-1.8 L4.3,-0.5 V5 H-4.3 V-0.5 Z"/>',
-  ring: '<path d="M0,-6.1 A6.1,6.1 0 1 1 0,6.1 A6.1,6.1 0 1 1 0,-6.1 M0,-2.1 A2.1,2.1 0 1 1 0,2.1 A2.1,2.1 0 1 1 0,-2.1"/>',
-  gem: '<path d="M0,-6.2 L5.2,0 L0,6.2 L-5.2,0 Z"/>',
-  chev: '<path d="M-6,1.4 L0,-4 L6,1.4 M-6,4.8 L0,-0.6 L6,4.8"/>',
-  spark: '<path d="M0,-6.4 L1.2,-1.2 L6.4,0 L1.2,1.2 L0,6.4 L-1.2,1.2 L-6.4,0 L-1.2,-1.2 Z"/>'
-};
-CoachTools._glassTile = function (mark) {
-  const glyph = '<g fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.5)" stroke-width="0.85" stroke-linecap="round" stroke-linejoin="round">' + mark + '</g>';
+CoachTools._glassSweep = function (angle, gap, width, alpha, bend, offset) {
+  const a = angle * Math.PI / 180;
+  const ca = Math.cos(a);
+  const sa = Math.sin(a);
   let out = '';
-  for (let r = 0; r < 4; r++) {
-    for (let c = 0; c < 4; c++) {
-      out += '<g transform="translate(' + (18 + c * 36) + ' ' + (18 + r * 36) + ')">' + glyph + '</g>';
-    }
+  for (let i = -7; i <= 7; i++) {
+    const n = i * gap + (offset || 0);
+    const cx = 80 - n * sa;
+    const cy = 110 + n * ca;
+    const len = 280;
+    const x1 = cx - ca * len;
+    const y1 = cy - sa * len;
+    const x2 = cx + ca * len;
+    const y2 = cy + sa * len;
+    const mx = (x1 + x2) / 2 - sa * (bend || 0);
+    const my = (y1 + y2) / 2 + ca * (bend || 0);
+    const d = bend
+      ? 'M' + x1.toFixed(1) + ',' + y1.toFixed(1) + ' Q' + mx.toFixed(1) + ',' + my.toFixed(1) + ' ' + x2.toFixed(1) + ',' + y2.toFixed(1)
+      : 'M' + x1.toFixed(1) + ',' + y1.toFixed(1) + ' L' + x2.toFixed(1) + ',' + y2.toFixed(1);
+    out += '<path d="' + d + '" fill="none" stroke="rgba(255,255,255,' + alpha.toFixed(2) + ')" stroke-width="' + width.toFixed(1) + '" stroke-linecap="round"/>';
   }
   return out;
 };
 CoachTools._kitPatterns = [
-  { id: 'horse', label: 'Кінь', draw: function () { return CoachTools._glassTile(CoachTools._glassMark.horse); } },
-  { id: 'ball', label: 'Мʼяч', draw: function () { return CoachTools._glassTile(CoachTools._glassMark.ball); } },
-  { id: 'shield', label: 'Щит', draw: function () { return CoachTools._glassTile(CoachTools._glassMark.shield); } },
-  { id: 'jersey', label: 'Форма', draw: function () { return CoachTools._glassTile(CoachTools._glassMark.jersey); } },
-  { id: 'ring', label: 'Кільце', draw: function () { return CoachTools._glassTile(CoachTools._glassMark.ring); } },
-  { id: 'gem', label: 'Діамант', draw: function () { return CoachTools._glassTile(CoachTools._glassMark.gem); } },
-  { id: 'chev', label: 'Шеврон', draw: function () { return CoachTools._glassTile(CoachTools._glassMark.chev); } },
-  { id: 'spark', label: 'Іскра', draw: function () { return CoachTools._glassTile(CoachTools._glassMark.spark); } }
+  { id: 'flow', label: 'Потік', draw: function (shift) { return CoachTools._glassSweep(46, 26, 1.15, 0.2, 0, shift || 0); } },
+  { id: 'return', label: 'Зворотний', draw: function (shift) { return CoachTools._glassSweep(-44, 26, 1.15, 0.2, 0, shift || 0); } },
+  { id: 'steep', label: 'Крутий', draw: function (shift) { return CoachTools._glassSweep(64, 24, 1.05, 0.18, 0, shift || 0); } },
+  { id: 'calm', label: 'Спокій', draw: function (shift) { return CoachTools._glassSweep(30, 30, 1.25, 0.18, 0, shift || 0); } },
+  { id: 'pair', label: 'Пари', draw: function (shift) {
+    const base = shift || 0;
+    return CoachTools._glassSweep(48, 36, 1.15, 0.2, 0, base) + CoachTools._glassSweep(48, 36, 0.7, 0.12, 0, base + 7);
+  } },
+  { id: 'veil', label: 'Вуаль', draw: function (shift) {
+    const base = shift || 0;
+    return CoachTools._glassSweep(42, 42, 8, 0.07, 0, base) + CoachTools._glassSweep(42, 42, 0.8, 0.2, 0, base);
+  } },
+  { id: 'bow', label: 'Дуга', draw: function (shift) { return CoachTools._glassSweep(50, 28, 1.15, 0.2, 10, shift || 0); } },
+  { id: 'air', label: 'Повітря', draw: function (shift) { return CoachTools._glassSweep(-36, 46, 1.3, 0.16, 0, shift || 0); } }
 ];
 CoachTools.giftPatternSvg = function (g) {
   const seed = g ? CoachTools.giftSeed(g) : 0x4d4554;
@@ -574,9 +583,10 @@ CoachTools.giftPatternSvg = function (g) {
   const penalty = g && (g.giftId === 'first_saved_penalty' || g.special === 'penalty-save');
   const pick = CoachTools.footballPatternIndex(g) % families.length;
   const fam = penalty
-    ? { id: 'penalty', label: 'Пенальті', draw: function () { return CoachTools._glassTile(CoachTools._glassMark.ring); } }
+    ? { id: 'penalty', label: 'Пенальті', draw: function () { return CoachTools._glassSweep(46, 22, 1.25, 0.24, 0, 3); } }
     : (families[pick] || families[0]);
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">' + fam.draw() + '</svg>';
+  const shift = (seed % 13) - 6;
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="220" viewBox="0 0 160 220">' + fam.draw(shift) + '</svg>';
   return {
     svg: svg,
     hue: hue,

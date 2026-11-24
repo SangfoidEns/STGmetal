@@ -12377,9 +12377,9 @@ body.mode-board-focus #boardToolbarTop.btb-top {
   cursor: pointer !important;
 }
 .player-collectible.gift-field::before {
-  background-size: 144px 144px;
-  background-position: 0 0;
-  background-repeat: repeat;
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
   opacity: 1;
   mix-blend-mode: normal;
 }
@@ -13909,8 +13909,8 @@ body.role-guest [data-del-player] {
   z-index: 0;
   pointer-events: none;
   background-image: var(--home-pat);
-  background-size: 112px 112px;
-  background-repeat: repeat;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
   background-position: center;
   opacity: 1;
   mix-blend-mode: normal;
@@ -13941,44 +13941,23 @@ body.role-guest [data-del-player] {
 }
 .player-collectible.gift-field {
   background-image:
-    radial-gradient(90% 70% at 12% 0%, hsl(var(--acc-h, 42) 82% 62% / 0.55), transparent 58%),
-    radial-gradient(80% 64% at 100% 100%, hsl(var(--acc-h, 42) 68% 26% / 0.9), transparent 62%),
-    linear-gradient(165deg, hsl(var(--acc-h, 42) 54% 30%), hsl(var(--acc-h, 42) 46% 11%)) !important;
-  background-size: 180% 180%, 170% 170%, 100% 100% !important;
+    radial-gradient(90% 70% at 12% 0%, hsl(var(--acc-h, 42) 78% 58% / 0.45), transparent 60%),
+    radial-gradient(80% 64% at 100% 100%, hsl(var(--acc-h, 42) 64% 24% / 0.75), transparent 62%),
+    linear-gradient(165deg, hsl(var(--acc-h, 42) 52% 28%), hsl(var(--acc-h, 42) 44% 12%)) !important;
+  background-size: 100% 100% !important;
   background-repeat: no-repeat !important;
-  animation: msFieldDrift 16s ease-in-out infinite alternate;
 }
 .player-collectible.gift-field::before {
-  background-size: 144px 144px;
-  background-repeat: repeat;
-  background-position: 0 0;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
   opacity: 1;
   mix-blend-mode: normal;
-  animation: msPatDrift 32s linear infinite;
+  -webkit-mask-image: radial-gradient(ellipse 92% 90% at 50% 48%, #000 58%, transparent 100%);
+  mask-image: radial-gradient(ellipse 92% 90% at 50% 48%, #000 58%, transparent 100%);
 }
 .player-collectible.gift-field::after {
-  background:
-    radial-gradient(46% 34% at 18% 12%, rgba(255, 255, 255, 0.2), transparent 70%),
-    radial-gradient(ellipse 130% 110% at 50% 42%, transparent 64%, rgba(0, 0, 0, 0.2) 100%);
-  background-size: 180% 180%, 100% 100%;
-  animation: msSheen 12s ease-in-out infinite alternate;
-}
-@keyframes msFieldDrift {
-  from { background-position: 0% 0%, 100% 80%, center; }
-  to { background-position: 70% 36%, 8% 12%, center; }
-}
-@keyframes msPatDrift {
-  from { background-position: 0 0; }
-  to { background-position: 144px 144px; }
-}
-@keyframes msSheen {
-  from { background-position: 0% 0%, center; }
-  to { background-position: 100% 70%, center; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .player-collectible.gift-field,
-  .player-collectible.gift-field::before,
-  .player-collectible.gift-field::after { animation: none; }
+  background: radial-gradient(ellipse 130% 110% at 50% 42%, transparent 66%, rgba(0, 0, 0, 0.16) 100%);
 }
 .gab-series {
   font-size: 9px;
