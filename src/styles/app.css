@@ -13788,3 +13788,98 @@ body.sb-open #sbBackdrop {
   box-shadow: none !important;
   border-radius: 14px !important;
 }
+
+.club-public { gap: 12px; }
+.club-public .club-hero,
+.club-public .club-block,
+.club-public .club-kpis div,
+.club-public .club-act,
+.club-public .club-grow,
+.club-public .club-photo,
+.club-public .club-media-link,
+.club-public .club-forge {
+  background: rgba(14, 16, 22, 0.42) !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.22) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
+}
+.club-public .club-hero,
+.club-public .club-block,
+.club-public .club-forge {
+  border-radius: 22px !important;
+  padding: 14px;
+}
+.club-public .club-kpis div,
+.club-public .club-act,
+.club-public .club-grow,
+.club-public .club-photo,
+.club-public .club-media-link {
+  border-radius: 16px !important;
+}
+.club-public .club-hero h1 { font-size: 22px; letter-spacing: -0.02em; }
+.club-public .club-block h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #e8c547;
+}
+.moments-rail {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 4px;
+  margin: 0 -2px;
+}
+.moment-card {
+  position: relative;
+  flex: 0 0 min(78%, 280px);
+  margin: 0;
+  scroll-snap-align: start;
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(8, 10, 14, 0.55);
+  border: 0.5px solid rgba(255, 255, 255, 0.18);
+}
+.moment-card img,
+.moment-card video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  background: #0b0d10;
+}
+.moment-card figcaption {
+  padding: 8px 10px 10px;
+  font-size: 13px;
+  line-height: 1.3;
+}
+.moment-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(14, 16, 22, 0.72);
+  border: 0.5px solid rgba(255, 255, 255, 0.28);
+  color: #e8c547;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.moment-set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.moment-set-row span { min-width: 0; font-size: 13px; }

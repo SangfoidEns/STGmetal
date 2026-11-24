@@ -485,6 +485,13 @@ function applyStampedFields(merged, a, b) {
     ['clubName', 'clubShort', 'primary', 'accent', 'coachName', 'logoData', 'defaultDuration', 'defaultIntensity', 'sound', 'autosave', 'staff', 'social', 'guestMedia'].forEach(function (field) {
       takeStampedSetting(out, base, extra, field);
     });
+    (function () {
+      const left = fieldTime(base, 'moments');
+      const right = fieldTime(extra, 'moments');
+      if (!left && !right) return;
+      const src = right >= left ? extra : base;
+      if (src && Array.isArray(src.moments)) out.moments = src.moments;
+    })();
     [
       'removedGiftIds', 'removedBoardIds', 'removedAlbumIds', 'removedTrainingIds',
       'removedMatchIds', 'removedPlayerIds', 'removedSectionIds', 'removedDiaryIds',
@@ -924,7 +931,7 @@ function collapseTrainings(payload) {
   }
 
   const DIFF_LISTS = ['players', 'trainings', 'exercises', 'boards', 'schemeAlbums', 'schemeSections', 'calendar', 'matches', 'tournaments', 'diary', 'myExercises', 'animations', 'gifts'];
-  const DIFF_SETTINGS = ['clubName', 'clubShort', 'primary', 'accent', 'logoData', 'coachName', 'coachPhoto', 'defaultDuration', 'defaultIntensity', 'sound', 'autosave', 'social', 'guestMedia', 'staff', 'telegramChannel', 'instagram', 'youtube'];
+  const DIFF_SETTINGS = ['clubName', 'clubShort', 'primary', 'accent', 'logoData', 'coachName', 'coachPhoto', 'defaultDuration', 'defaultIntensity', 'sound', 'autosave', 'social', 'guestMedia', 'moments', 'staff', 'telegramChannel', 'instagram', 'youtube'];
 
   function stableJson(value) {
     try { return JSON.stringify(value == null ? null : value); } catch (_) { return ''; }

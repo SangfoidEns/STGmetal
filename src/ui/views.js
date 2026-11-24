@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z140',
+  APP_BUILD: 'z141',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -1481,31 +1481,69 @@ const Views = {
       return '<a class="club-media-link" href="' + sanitize(url) + '" target="_blank" rel="noopener">' + sanitize(title) + '</a>';
     }).join('') + links.map(url => '<a class="club-media-link" href="' + sanitize(url) + '" target="_blank" rel="noopener">' + sanitize(url) + '</a>').join('');
     const next = this._nextPlanned(s.trainings);
+    const clubName = set.clubName || 'Металіст Штуттгарт';
 
     return '<div class="club-public">' +
-      '<div class="club-hero">' +
+      '<section class="glass club-hero">' +
         '<button type="button" class="club-crest-btn" data-action="open-photo" data-photo="' + this.clubMark() + '" data-photo-save="1" data-photo-name="Metalist-Shtuttgart.png" title="Емблема на весь екран">' +
         '<img class="club-crest" src="' + this.clubMark() + '" alt="Емблема Металіст Штуттгарт"/></button>' +
-        '<div class="club-hero-copy"><div class="club-kicker">Одна команда</div><h1>Металіст Штуттгарт</h1>' +
-        '<p>Гість бачить активність, ріст акаунтів і медіа клубу. Тап по емблемі відкриває її на весь екран — її можна зберегти.</p>' +
-        '<button type="button" class="btn btn-s btn-sm" data-action="enter-server-code">Код клубу</button></div></div>' +
+        '<div class="club-hero-copy"><div class="club-kicker">Клуб</div><h1>' + sanitize(clubName) + '</h1>' +
+        '<p>Жива головна: матчі, моменти і ріст команди.</p>' +
+        '<button type="button" class="btn btn-s btn-sm" data-action="enter-server-code">Код клубу</button></div></section>' +
       '<div class="club-kpis">' +
-        '<div><b>' + players.length + '</b><span>гравців</span></div>' +
-        '<div><b>' + done.length + '</b><span>сесій</span></div>' +
-        '<div><b>' + avg + '%</b><span>явка</span></div>' +
-        '<div><b>' + (next ? sanitize(next.date || '') : '—') + '</b><span>наступне</span></div>' +
+        '<div class="glass"><b>' + players.length + '</b><span>гравців</span></div>' +
+        '<div class="glass"><b>' + done.length + '</b><span>сесій</span></div>' +
+        '<div class="glass"><b>' + avg + '%</b><span>явка</span></div>' +
+        '<div class="glass"><b>' + (next ? sanitize(next.date || '') : '—') + '</b><span>наступне</span></div>' +
       '</div>' +
       this._matchHub({ role: 'guest' }) +
+      '<section class="glass club-block"><h2>Останні моменти</h2>' + this._momentsRail(set.moments) + '</section>' +
       this._clubForgeHtml() +
-      '<section class="club-block"><h2>Активність</h2><ul class="club-feed">' +
+      '<section class="glass club-block"><h2>Активність</h2><ul class="club-feed">' +
         (activity.join('') || '<li class="club-act"><span>Поки немає відмічених сесій.</span></li>') +
       '</ul></section>' +
-      '<section class="club-block"><h2>Ріст команди</h2>' + spark +
-        '<div class="club-grow-list">' + growth + '</div></section>' +
-      '<section class="club-block"><h2>Медіа</h2>' +
+      '<section class="glass club-block"><h2>Ріст команди</h2>' + spark +
+        '<div class="club-grow-list">' + (growth || '<p class="note-sm">Гравці з’являться тут.</p>') + '</div></section>' +
+      '<section class="glass club-block"><h2>Склад і посилання</h2>' +
         '<div class="club-photos">' + (photos || '<p class="note-sm">Фото гравців з’являться тут.</p>') + '</div>' +
-        (mediaHtml ? ('<div class="club-links">' + mediaHtml + '</div>') : '<p class="note-sm">Посилання на клубні матеріали тренер додає в налаштуваннях.</p>') +
+        (mediaHtml ? ('<div class="club-links">' + mediaHtml + '</div>') : '') +
       '</section></div>';
+  },
+
+  _momentsRail(list) {
+    const moments = (Array.isArray(list) ? list : []).filter(m => m && (m.src || m.url));
+    if (!moments.length) return '<p class="note-sm">Тренер ще не додав моментів. Фото, GIF і відео до 20 секунд з’являться тут.</p>';
+    return '<div class="moments-rail">' + moments.map(m => {
+      const src = m.src || m.url || '';
+      const kind = m.kind === 'video' ? 'video' : (m.kind === 'gif' ? 'gif' : 'photo');
+      const badge = kind === 'video' ? 'Відео' : (kind === 'gif' ? 'GIF' : 'Фото');
+      const title = m.title ? ('<figcaption>' + sanitize(m.title) + '</figcaption>') : '';
+      const media = kind === 'video'
+        ? '<video src="' + sanitize(src) + '" controls playsinline preload="metadata"></video>'
+        : '<img src="' + sanitize(src) + '" alt="" loading="lazy"/>';
+      return '<figure class="moment-card" data-action="open-moment" data-moment-id="' + sanitize(m.id || '') + '" data-moment-kind="' + kind + '">' +
+        media + '<span class="moment-badge">' + badge + '</span>' + title + '</figure>';
+    }).join('') + '</div>';
+  },
+
+  _momentsSettings(set, canEdit) {
+    const list = Array.isArray(set && set.moments) ? set.moments : [];
+    const rows = list.map(m => {
+      const kind = m.kind === 'video' ? 'Відео' : (m.kind === 'gif' ? 'GIF' : 'Фото');
+      const extra = m.kind === 'video' && m.duration ? (' · ' + m.duration + ' с') : '';
+      const label = (m.title ? (m.title + ' · ') : '') + kind + extra;
+      return '<div class="moment-set-row"><span>' + sanitize(label) + '</span>' +
+        (canEdit ? '<button type="button" class="btn btn-s btn-sm" data-action="remove-club-moment" data-moment-id="' + sanitize(m.id || '') + '">Прибрати</button>' : '') +
+        '</div>';
+    }).join('');
+    const form = canEdit
+      ? '<label class="fl"><span class="fl-label">Підпис</span><input type="text" id="momentTitle" class="fl-input" maxlength="80" placeholder="Гол, тренування, свято"></label>' +
+        '<label class="fl"><span class="fl-label">Фото, GIF або відео до 20 секунд</span><input type="file" id="momentFile" accept="image/*,image/gif,video/mp4,video/webm,video/quicktime"></label>' +
+        '<button type="button" class="btn btn-p btn-sm" data-action="add-club-moment">Додати момент</button>'
+      : '';
+    return '<div class="card glass settings-card"><div class="ct">Останні моменти</div>' +
+      '<p class="note-sm">Гість бачить їх на головній. Відео — не довше 20 секунд.</p>' +
+      (rows || '<p class="note-sm">Поки порожньо.</p>') + form + '</div>';
   },
 
 
@@ -3993,6 +4031,18 @@ trainings() {
       '</div>';
   },
 
+  playerSheetButtons(p) {
+    const coach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+    if (!coach || !p) return '';
+    const id = sanitize(String(p.id));
+    const t = (key, fb) => (typeof I18n !== 'undefined' ? I18n.t(key, fb) : fb);
+    return '<button type="button" class="tg-sheet-btn" data-psheet="edit" data-pid="' + id + '">✏️ ' + t('sheet_edit', 'Редагувати') + '</button>' +
+      '<button type="button" class="tg-sheet-btn" data-psheet="board" data-pid="' + id + '">⚽ ' + t('sheet_attach', 'Прикріпити поточну дошку') + '</button>' +
+      '<button type="button" class="tg-sheet-btn" data-psheet="diary" data-pid="' + id + '">📓 ' + t('diary_title', 'Запис у щоденник') + '</button>' +
+      '<button type="button" class="tg-sheet-btn" data-psheet="starter" data-pid="' + id + '">⭐ ' + t('starter', 'Основа') + ' / ' + t('reserve', 'Резерв') + '</button>' +
+      '<button type="button" class="tg-sheet-btn tg-sheet-danger" data-psheet="delete" data-pid="' + id + '">🗑 ' + t('sheet_delete', 'Видалити') + '</button>';
+  },
+
   playerMiniStats(p) {
     if (!p) return '';
     let st = { attPct: null, avgRpe: null, load28: null, present: 0, absent: 0 };
@@ -4185,8 +4235,9 @@ trainings() {
           ${canEdit ? '' : '<p class="note-sm">Змінює лише тренер. Ваш екран підхопить їх сам.</p>'}
         </div>
       </div>
+      ${this._momentsSettings(set, canEdit)}
       <div class="card glass settings-card">
-        <div class="ct">Гості: соцмережі і медіа</div>
+        <div class="ct">Гості: соцмережі і посилання</div>
         <div class="settings-form">
           <label class="fl"><span class="fl-label">Telegram</span>
             <input type="url" id="setTgChannel" class="fl-input" value="${sanitize(social.telegram || set.telegramChannel || '')}" ${ro}>
@@ -4197,7 +4248,7 @@ trainings() {
           <label class="fl"><span class="fl-label">YouTube</span>
             <input type="url" id="setYt" class="fl-input" value="${sanitize(social.youtube || set.youtube || '')}" ${ro}>
           </label>
-          <label class="fl"><span class="fl-label">Медіа для гостей, одне посилання на рядок</span>
+          <label class="fl"><span class="fl-label">Посилання, одне на рядок</span>
             <textarea id="setGuestMedia" class="fl-input" rows="4" ${ro}>${sanitize(mediaLines)}</textarea>
           </label>
         </div>

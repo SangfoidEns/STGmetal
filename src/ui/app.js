@@ -2377,16 +2377,14 @@ const App = {
     backdrop.className = 'tg-sheet-backdrop';
     const name = ((p.number != null ? '#' + p.number + ' ' : '') + (p.firstName || '') + ' ' + (p.lastName || '')).trim();
     const title = (typeof sanitize === 'function') ? sanitize(name) : name;
+    const coach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+    const actions = (typeof Views !== 'undefined' && Views.playerSheetButtons) ? Views.playerSheetButtons(p) : '';
     backdrop.innerHTML = '<div class="tg-sheet" role="dialog">' +
       '<div class="tg-sheet-handle"></div>' +
       '<div class="tg-sheet-title">' + title + '</div>' +
-      '<div class="tg-sheet-sub">' + (p.position || '') + ' · ' + (p.status || 'available') + '</div>' +
+      '<div class="tg-sheet-sub">' + (p.position || '') + ' · ' + (p.status || 'available') + (coach ? '' : ' · лише перегляд') + '</div>' +
       ((typeof Views !== 'undefined' && Views.playerMiniStats) ? Views.playerMiniStats(p) : '') +
-      '<button type="button" class="tg-sheet-btn" data-psheet="edit" data-pid="' + p.id + '">✏️ ' + (typeof I18n!=='undefined'?I18n.t('sheet_edit','Редагувати'):'Редагувати') + '</button>' +
-      '<button type="button" class="tg-sheet-btn" data-psheet="board" data-pid="' + p.id + '">⚽ ' + (typeof I18n!=='undefined'?I18n.t('sheet_attach','Прикріпити поточну дошку'):'Прикріпити поточну дошку') + '</button>' +
-      '<button type="button" class="tg-sheet-btn" data-psheet="diary" data-pid="' + p.id + '">📓 ' + (typeof I18n!=='undefined'?I18n.t('diary_title','Запис у щоденник'):'Запис у щоденник') + '</button>' +
-      '<button type="button" class="tg-sheet-btn" data-psheet="starter" data-pid="' + p.id + '">⭐ ' + (typeof I18n!=='undefined'?I18n.t('starter','Основа'):'Основа') + ' / ' + (typeof I18n!=='undefined'?I18n.t('reserve','Резерв'):'Резерв') + '</button>' +
-      '<button type="button" class="tg-sheet-btn tg-sheet-danger" data-psheet="delete" data-pid="' + p.id + '">🗑 ' + (typeof I18n!=='undefined'?I18n.t('sheet_delete','Видалити'):'Видалити') + '</button>' +
+      actions +
       '<button type="button" class="tg-sheet-btn tg-sheet-cancel" data-psheet="close">' + (typeof I18n!=='undefined'?I18n.t('close','Закрити'):'Закрити') + '</button></div>';
     document.body.appendChild(backdrop);
     this._roundSheet(backdrop);
@@ -2401,6 +2399,10 @@ const App = {
       const pid = btn.dataset.pid;
       close();
       if (act === 'close') return;
+      if (!coach) {
+        try { Toast.show('Це може лише тренер', 'warn'); } catch (_) {}
+        return;
+      }
       if (act === 'edit') return Actions.editPlayer(pid);
       if (act === 'board') {
         const pl = Store.get().players.find(x => x.id === pid);
@@ -4712,6 +4714,25 @@ const App = {
         Toast.show('Памʼятний момент додається лише з подарунком — оберіть подарунок вище', 'warn');
         return;
       }
+      if (action === 'add-club-moment') {
+        e.preventDefault(); e.stopPropagation();
+        if (typeof Actions !== 'undefined' && Actions.addClubMoment) Actions.addClubMoment();
+        return;
+      }
+      if (action === 'remove-club-moment') {
+        e.preventDefault(); e.stopPropagation();
+        if (typeof Actions !== 'undefined' && Actions.removeClubMoment) Actions.removeClubMoment(t.dataset.momentId);
+        return;
+      }
+      if (action === 'open-moment') {
+        if (e.target && e.target.closest && e.target.closest('video')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const img = t.querySelector && t.querySelector('img');
+        const src = img && (img.getAttribute('src') || img.src);
+        if (src) this.openPhoto(src, { save: false });
+        return;
+      }
       if (action === 'attach-gift') {
         e.preventDefault(); e.stopPropagation();
         const gid = t.dataset.giftId;
@@ -5120,7 +5141,13 @@ const App = {
         if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
         return Actions.editPlayer(t.dataset.editPlayer);
       }
-      if (t.dataset.delPlayer) return Modal.confirm('Видалити гравця?', () => { if (typeof Actions !== 'undefined' && Actions.dropPlayer) Actions.dropPlayer(t.dataset.delPlayer); else Store.get().players = Store.get().players.filter(x => x.id !== t.dataset.delPlayer); StorageManager.save(); App.renderCurrent(); });
+      if (t.dataset.delPlayer) {
+        if (typeof AuthManager !== 'undefined' && AuthManager.isCoach && !AuthManager.isCoach()) {
+          try { Toast.show('Гравця змінює лише тренер', 'warn'); } catch (_) {}
+          return;
+        }
+        return Modal.confirm('Видалити гравця?', () => { if (typeof Actions !== 'undefined' && Actions.dropPlayer) Actions.dropPlayer(t.dataset.delPlayer); else Store.get().players = Store.get().players.filter(x => x.id !== t.dataset.delPlayer); StorageManager.save(); App.renderCurrent(); });
+      }
       if (t.dataset.scheme) {
         e.preventDefault(); e.stopPropagation();
         BoardEngine.applyScheme(t.dataset.scheme);

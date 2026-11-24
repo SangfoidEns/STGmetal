@@ -212,6 +212,10 @@ const Actions = {
   },
 
   dropPlayer(id) {
+    if (typeof AuthManager !== 'undefined' && AuthManager.isCoach && !AuthManager.isCoach()) {
+      try { Toast.show('Гравця змінює лише тренер', 'warn'); } catch (_) {}
+      return;
+    }
     const s = Store.get();
     const key = String(id || '');
     if (!s || !key) return;
@@ -898,6 +902,10 @@ const Actions = {
   },
 
   editPlayer(id) {
+    if (typeof AuthManager !== 'undefined' && AuthManager.isCoach && !AuthManager.isCoach()) {
+      try { Toast.show('Гість лише дивиться. Гравця змінює тренер.', 'warn'); } catch (_) {}
+      return;
+    }
     const p = Store.get().players.find(x => x.id === id);
     if (!p) return;
     const st = p.status || 'available';
@@ -949,6 +957,10 @@ const Actions = {
   },
 
   savePlayer(id) {
+    if (typeof AuthManager !== 'undefined' && AuthManager.isCoach && !AuthManager.isCoach()) {
+      try { Toast.show('Гравця змінює лише тренер', 'warn'); } catch (_) {}
+      return;
+    }
     const p = Store.get().players.find(x => x.id === id);
     if (!p) return;
     const before = {
@@ -2646,6 +2658,125 @@ const Actions = {
       return;
     }
     return Actions.saveServerCode(el.value);
+  },
+
+  addClubMoment() {
+    if (typeof AuthManager !== 'undefined' && AuthManager.isCoach && !AuthManager.isCoach()) {
+      try { Toast.show('Моменти додає тренер', 'warn'); } catch (_) {}
+      return;
+    }
+    const input = document.getElementById('momentFile');
+    const file = input && input.files && input.files[0];
+    if (!file) {
+      try { Toast.show('Обери фото, GIF або відео', 'warn'); } catch (_) {}
+      return;
+    }
+    const title = String((document.getElementById('momentTitle') || {}).value || '').trim().slice(0, 80);
+    const type = String(file.type || '');
+    const isVideo = type.indexOf('video/') === 0;
+    const isGif = type === 'image/gif' || /\.gif$/i.test(file.name || '');
+    const isImage = type.indexOf('image/') === 0 || isGif;
+    if (!isVideo && !isImage) {
+      try { Toast.show('Потрібне фото, GIF або відео', 'warn'); } catch (_) {}
+      return;
+    }
+    if (isVideo && file.size > 18 * 1024 * 1024) {
+      try { Toast.show('Відео завелике. Зніми коротше, до 20 секунд.', 'warn'); } catch (_) {}
+      return;
+    }
+    if (!isVideo && file.size > 8 * 1024 * 1024) {
+      try { Toast.show('Файл завеликий', 'warn'); } catch (_) {}
+      return;
+    }
+    const s0 = Store.get().settings || {};
+    const have = Array.isArray(s0.moments) ? s0.moments.length : 0;
+    if (have >= 30) {
+      try { Toast.show('Вже 30 моментів. Прибери старий.', 'warn'); } catch (_) {}
+      return;
+    }
+    const probe = !isVideo ? Promise.resolve(0) : new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.onloadedmetadata = () => {
+        const dur = video.duration;
+        URL.revokeObjectURL(url);
+        resolve(dur);
+      };
+      video.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('video'));
+      };
+      video.src = url;
+    });
+    probe.then(async (dur) => {
+      if (isVideo && (!isFinite(dur) || dur > 20.4)) {
+        try { Toast.show('Відео має бути до 20 секунд', 'warn'); } catch (_) {}
+        return;
+      }
+      try { Toast.show('Завантажую момент…', ''); } catch (_) {}
+      let src = '';
+      try {
+        if (typeof SupabaseClub !== 'undefined' && SupabaseClub.enabled && SupabaseClub.enabled() && SupabaseClub.upload) {
+          const rawExt = String(file.name || '').split('.').pop() || '';
+          const ext = (isGif ? 'gif' : (isVideo ? rawExt : 'jpg')).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 4) || (isVideo ? 'mp4' : 'jpg');
+          const path = 'media/moment-' + Date.now().toString(36) + '.' + ext;
+          const ok = await SupabaseClub.upload(path, file, file.type || 'application/octet-stream');
+          if (ok) src = SupabaseClub.URL + '/storage/v1/object/public/club-media/' + path;
+        }
+      } catch (_) {}
+      if (!src) {
+        if (isVideo || file.size > 450000) {
+          try { Toast.show('Для цього файлу потрібен сервер клубу. Підключи його внизу.', 'warn'); } catch (_) {}
+          return;
+        }
+        src = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ''));
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        });
+      }
+      if (!src) {
+        try { Toast.show('Не вдалося зберегти файл', 'warn'); } catch (_) {}
+        return;
+      }
+      const s = Store.get().settings;
+      if (!Array.isArray(s.moments)) s.moments = [];
+      const now = new Date().toISOString();
+      s.moments.unshift({
+        id: 'mom_' + Date.now().toString(36),
+        kind: isVideo ? 'video' : (isGif ? 'gif' : 'photo'),
+        src: src,
+        title: title,
+        duration: isVideo ? Math.round(dur * 10) / 10 : 0,
+        createdAt: now
+      });
+      s.stamps = Object.assign({}, s.stamps || {}, { moments: now });
+      s.updatedAt = now;
+      StorageManager.save();
+      try { Toast.show('Момент на головній гостя', 'ok'); } catch (_) {}
+      try { App.renderCurrent(); } catch (_) {}
+    }).catch(() => {
+      try { Toast.show('Не вдалося прочитати файл', 'warn'); } catch (_) {}
+    });
+  },
+
+  removeClubMoment(id) {
+    if (typeof AuthManager !== 'undefined' && AuthManager.isCoach && !AuthManager.isCoach()) {
+      try { Toast.show('Моменти змінює тренер', 'warn'); } catch (_) {}
+      return;
+    }
+    const s = Store.get().settings;
+    if (!s || !Array.isArray(s.moments)) return;
+    const key = String(id || '');
+    s.moments = s.moments.filter(m => m && String(m.id) !== key);
+    const now = new Date().toISOString();
+    s.stamps = Object.assign({}, s.stamps || {}, { moments: now });
+    s.updatedAt = now;
+    StorageManager.save();
+    try { Toast.show('Момент прибрано', 'ok'); } catch (_) {}
+    try { App.renderCurrent(); } catch (_) {}
   },
 
   saveSettings() {
