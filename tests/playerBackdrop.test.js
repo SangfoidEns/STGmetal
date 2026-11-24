@@ -85,7 +85,10 @@ describe('player collectible backgrounds', () => {
     assert.equal(drawn.patternId, 'penalty');
     assert.equal(drawn.svg.includes('<text'), false);
     assert.equal(drawn.svg.includes('rotate('), false);
-    assert.match(drawn.svg, /#d5ff3f/);
-    assert.match(drawn.svg, /#e8c547/);
+    assert.match(drawn.svg, /<path/);
+    assert.ok(ctx.CoachTools._kitPatterns.length >= 8);
+    const other = ctx.CoachTools.giftPatternSvg({ uid: 'other-gift', seed: 88, hue: 200 });
+    assert.notEqual(other.svg, drawn.svg);
+    assert.notEqual(other.patternId, 'penalty');
   });
 });

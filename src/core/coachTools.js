@@ -529,44 +529,211 @@ CoachTools._footballSymbolTile = function (id, ink) {
   }
   return parts.join('');
 };
+CoachTools._kitRand = function (seed) {
+  let x = (seed || 1) >>> 0;
+  return function () {
+    x = Math.imul(x ^ (x >>> 16), 0x7feb352d) >>> 0;
+    x = Math.imul(x ^ (x >>> 15), 0x846ca68b) >>> 0;
+    return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+  };
+};
+CoachTools._kitInk = function (rand, alpha) {
+  const tone = Math.round(176 + rand() * 64);
+  const a = alpha == null ? (0.16 + rand() * 0.18) : alpha;
+  return 'rgba(' + tone + ',' + Math.min(255, tone + 3) + ',' + Math.min(255, tone + 8) + ',' + a.toFixed(2) + ')';
+};
+CoachTools._kitStripe = function (x, w, amp, freq, phase, shear) {
+  const steps = 6;
+  const left = [];
+  const right = [];
+  const lean = shear || 0;
+  for (let i = 0; i <= steps; i++) {
+    const y = 168 * i / steps;
+    const sway = Math.sin(y / freq + phase) * amp;
+    left.push([x + sway + y * lean, y]);
+    right.push([x + w + sway * 0.72 + y * lean, y]);
+  }
+  const curve = function (from, to) {
+    const my = (from[1] + to[1]) / 2;
+    return ' C' + from[0].toFixed(1) + ',' + my.toFixed(1) + ' ' + to[0].toFixed(1) + ',' + my.toFixed(1) + ' ' + to[0].toFixed(1) + ',' + to[1].toFixed(1);
+  };
+  let d = 'M' + left[0][0].toFixed(1) + ',' + left[0][1].toFixed(1);
+  for (let i = 1; i < left.length; i++) d += curve(left[i - 1], left[i]);
+  for (let i = right.length - 1; i >= 0; i--) {
+    const from = i === right.length - 1 ? left[left.length - 1] : right[i + 1];
+    d += curve(from, right[i]);
+  }
+  return d + ' Z';
+};
+CoachTools._kitPatterns = [
+  { id: 'kit', label: 'Форма', draw: function (rand) {
+    let out = '';
+    let x = -18;
+    const n = 5 + Math.floor(rand() * 3);
+    for (let i = 0; i < n; i++) {
+      const w = 12 + rand() * 18;
+      out += '<path d="' + CoachTools._kitStripe(x, w, 8 + rand() * 16, 26 + rand() * 24, rand() * 6, 0) + '" fill="' + CoachTools._kitInk(rand) + '"/>';
+      x += w + 8 + rand() * 14;
+    }
+    return out;
+  } },
+  { id: 'fine', label: 'Тонкі хвилі', draw: function (rand) {
+    let out = '';
+    for (let i = 0; i < 14; i++) {
+      const x = -10 + i * (188 / 14) + rand() * 4;
+      out += '<path d="' + CoachTools._kitStripe(x, 2.2 + rand() * 2.4, 6 + rand() * 10, 18 + rand() * 16, rand() * 6, 0) + '" fill="' + CoachTools._kitInk(rand, 0.22 + rand() * 0.2) + '"/>';
+    }
+    return out;
+  } },
+  { id: 'slash', label: 'Косий друк', draw: function (rand) {
+    let out = '';
+    let x = -40;
+    for (let i = 0; i < 7; i++) {
+      const w = 10 + rand() * 12;
+      out += '<path d="' + CoachTools._kitStripe(x, w, 6 + rand() * 10, 30 + rand() * 20, rand() * 5, 0.18 + rand() * 0.12) + '" fill="' + CoachTools._kitInk(rand) + '"/>';
+      x += w + 16 + rand() * 10;
+    }
+    return out;
+  } },
+  { id: 'tide', label: 'Приплив', draw: function (rand) {
+    let out = '';
+    let y = -16;
+    for (let i = 0; i < 6; i++) {
+      const h = 10 + rand() * 14;
+      const amp = 8 + rand() * 12;
+      const phase = rand() * 6;
+      const freq = 24 + rand() * 18;
+      let d = '';
+      const top = [];
+      const bot = [];
+      for (let s = 0; s <= 6; s++) {
+        const x = 168 * s / 6;
+        const sway = Math.sin(x / freq + phase) * amp;
+        top.push([x, y + sway]);
+        bot.push([x, y + h + sway * 0.7]);
+      }
+      d = 'M' + top[0][0].toFixed(1) + ',' + top[0][1].toFixed(1);
+      for (let s = 1; s < top.length; s++) {
+        const mx = (top[s - 1][0] + top[s][0]) / 2;
+        d += ' C' + mx.toFixed(1) + ',' + top[s - 1][1].toFixed(1) + ' ' + mx.toFixed(1) + ',' + top[s][1].toFixed(1) + ' ' + top[s][0].toFixed(1) + ',' + top[s][1].toFixed(1);
+      }
+      for (let s = bot.length - 1; s >= 0; s--) {
+        const from = s === bot.length - 1 ? top[top.length - 1] : bot[s + 1];
+        const mx = (from[0] + bot[s][0]) / 2;
+        d += ' C' + mx.toFixed(1) + ',' + from[1].toFixed(1) + ' ' + mx.toFixed(1) + ',' + bot[s][1].toFixed(1) + ' ' + bot[s][0].toFixed(1) + ',' + bot[s][1].toFixed(1);
+      }
+      out += '<path d="' + d + ' Z" fill="' + CoachTools._kitInk(rand) + '"/>';
+      y += h + 10 + rand() * 12;
+    }
+    return out;
+  } },
+  { id: 'twin', label: 'Парні смуги', draw: function (rand) {
+    let out = '';
+    let x = -8;
+    for (let i = 0; i < 6; i++) {
+      const amp = 7 + rand() * 12;
+      const freq = 22 + rand() * 18;
+      const phase = rand() * 6;
+      out += '<path d="' + CoachTools._kitStripe(x, 3.5, amp, freq, phase, 0) + '" fill="' + CoachTools._kitInk(rand, 0.34) + '"/>';
+      out += '<path d="' + CoachTools._kitStripe(x + 7, 2.4, amp, freq, phase + 0.2, 0) + '" fill="' + CoachTools._kitInk(rand, 0.22) + '"/>';
+      x += 26 + rand() * 10;
+    }
+    return out;
+  } },
+  { id: 'veil', label: 'Широкі хвилі', draw: function (rand) {
+    let out = '';
+    let x = -24;
+    for (let i = 0; i < 3; i++) {
+      const w = 28 + rand() * 22;
+      out += '<path d="' + CoachTools._kitStripe(x, w, 14 + rand() * 12, 40 + rand() * 16, rand() * 6, 0) + '" fill="' + CoachTools._kitInk(rand, 0.12 + rand() * 0.1) + '"/>';
+      x += w + 18 + rand() * 16;
+    }
+    return out;
+  } },
+  { id: 'scratch', label: 'Риски', draw: function (rand) {
+    let out = '';
+    for (let i = 0; i < 28; i++) {
+      const x = rand() * 168;
+      const y = rand() * 140;
+      const len = 18 + rand() * 36;
+      const bend = (rand() - 0.5) * 16;
+      const ink = CoachTools._kitInk(rand, 0.28 + rand() * 0.25);
+      out += '<path d="M' + x.toFixed(1) + ',' + y.toFixed(1) + ' C' + (x + bend).toFixed(1) + ',' + (y + len * 0.4).toFixed(1) + ' ' + (x - bend).toFixed(1) + ',' + (y + len * 0.7).toFixed(1) + ' ' + x.toFixed(1) + ',' + (y + len).toFixed(1) + '" fill="none" stroke="' + ink + '" stroke-width="' + (1.1 + rand() * 1.6).toFixed(1) + '" stroke-linecap="round"/>';
+    }
+    return out;
+  } },
+  { id: 'marble', label: 'Мармур', draw: function (rand) {
+    let out = '';
+    for (let i = 0; i < 5; i++) {
+      const x = rand() * 140;
+      const ink = CoachTools._kitInk(rand, 0.2 + rand() * 0.18);
+      out += '<path d="M' + (x - 30).toFixed(1) + ',-8 C' + (x + 40).toFixed(1) + ',30 ' + (x - 50).toFixed(1) + ',80 ' + (x + 10).toFixed(1) + ',120 C' + (x + 50).toFixed(1) + ',150 ' + (x - 10).toFixed(1) + ',176 ' + (x + 24).toFixed(1) + ',188" fill="none" stroke="' + ink + '" stroke-width="' + (3 + rand() * 7).toFixed(1) + '" stroke-linecap="round"/>';
+    }
+    return out;
+  } },
+  { id: 'contour', label: 'Рельєф', draw: function (rand) {
+    let out = '';
+    for (let i = 0; i < 4; i++) {
+      const cx = 30 + rand() * 100;
+      const cy = 24 + rand() * 110;
+      const rx = 18 + rand() * 36;
+      const ry = 12 + rand() * 28;
+      const ink = CoachTools._kitInk(rand, 0.28);
+      out += '<path d="M' + (cx - rx).toFixed(1) + ',' + cy.toFixed(1) +
+        ' C' + (cx - rx).toFixed(1) + ',' + (cy - ry).toFixed(1) + ' ' + (cx + rx).toFixed(1) + ',' + (cy - ry).toFixed(1) + ' ' + (cx + rx).toFixed(1) + ',' + cy.toFixed(1) +
+        ' C' + (cx + rx * 0.6).toFixed(1) + ',' + (cy + ry).toFixed(1) + ' ' + (cx - rx * 0.8).toFixed(1) + ',' + (cy + ry * 0.8).toFixed(1) + ' ' + (cx - rx).toFixed(1) + ',' + cy.toFixed(1) +
+        ' Z" fill="none" stroke="' + ink + '" stroke-width="' + (1.2 + rand()).toFixed(1) + '"/>';
+    }
+    return out;
+  } },
+  { id: 'rain', label: 'Струмені', draw: function (rand) {
+    let out = '';
+    for (let i = 0; i < 18; i++) {
+      const x = -6 + i * 10 + rand() * 4;
+      const y = rand() * 40;
+      const len = 36 + rand() * 70;
+      const bend = (rand() - 0.5) * 10;
+      out += '<path d="M' + x.toFixed(1) + ',' + y.toFixed(1) + ' C' + (x + bend).toFixed(1) + ',' + (y + len * 0.45).toFixed(1) + ' ' + (x - bend).toFixed(1) + ',' + (y + len * 0.7).toFixed(1) + ' ' + (x + bend * 0.3).toFixed(1) + ',' + (y + len).toFixed(1) + '" fill="none" stroke="' + CoachTools._kitInk(rand, 0.3) + '" stroke-width="' + (1.4 + rand() * 1.8).toFixed(1) + '" stroke-linecap="round"/>';
+    }
+    return out;
+  } },
+  { id: 'cross', label: 'Перетин', draw: function (rand) {
+    let out = CoachTools._kitPatterns[0].draw(rand);
+    let y = 36 + rand() * 20;
+    for (let i = 0; i < 2; i++) {
+      out += '<path d="' + CoachTools._kitStripe(y, 8 + rand() * 6, 6, 30, rand() * 4, 0).replace(/(\d+\.?\d*),(\d+\.?\d*)/g, function (_, a, b) { return b + ',' + a; }) + '" fill="' + CoachTools._kitInk(rand, 0.14) + '"/>';
+      y += 50 + rand() * 20;
+    }
+    return out;
+  } },
+  { id: 'edge', label: 'Край форми', draw: function (rand) {
+    let out = '';
+    let x = -12;
+    for (let i = 0; i < 6; i++) {
+      const fade = Math.max(0.05, 0.34 - i * 0.045);
+      const w = 8 + rand() * 12;
+      out += '<path d="' + CoachTools._kitStripe(x, w, 10 + rand() * 8, 24 + rand() * 14, rand() * 6, 0) + '" fill="' + CoachTools._kitInk(rand, fade) + '"/>';
+      x += w + 6 + rand() * 8;
+    }
+    return out;
+  } }
+];
 CoachTools.giftPatternSvg = function (g) {
   const seed = g ? CoachTools.giftSeed(g) : 0x4d4554;
   const hue = g ? CoachTools.giftHue(g) : 42;
-  const idx = CoachTools.footballPatternIndex(g);
-  const defs = CoachTools.FOOTBALL_PATTERNS || [];
-  let def = defs[idx] || defs[0];
-  const gid = (g && g.giftId) || '';
-  if (gid === 'first_saved_penalty' || (g && g.special === 'penalty-save')) {
-    def = defs.find(function (item) { return item.id === 'penalty'; }) || def;
-  }
-  const ink = 'hsl(' + hue + ' 16% 94%)';
-  const lime = '#d5ff3f';
-  const gold = '#e8c547';
-  const ox = (seed % 20) * 0.35;
-  const oy = ((seed >>> 6) % 20) * 0.35;
-  const glyph = CoachTools._footballSymbol(def.id, ink, 0.2);
-  const tiles = [];
-  const gap = 56;
-  for (let row = 0; row <= 3; row++) {
-    for (let col = -1; col <= 3; col++) {
-      const x = ox + col * gap + (row % 2 ? gap / 2 : 0);
-      const y = oy + row * gap;
-      tiles.push('<g transform="translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ') scale(0.62)">' + glyph + '</g>');
-    }
-  }
-  const grid = [];
-  for (let i = 14; i < 168; i += 28) {
-    grid.push('<path d="M' + i + ',0 V168" stroke="' + lime + '" stroke-opacity="0.16" stroke-width="0.45"/>');
-    grid.push('<path d="M0,' + i + ' H168" stroke="' + gold + '" stroke-opacity="0.12" stroke-width="0.4"/>');
-  }
-  const orbits = '<circle cx="84" cy="78" r="58" fill="none" stroke="' + lime + '" stroke-opacity="0.42" stroke-width="0.7"/>' +
-    '<circle cx="84" cy="78" r="34" fill="none" stroke="' + gold + '" stroke-opacity="0.5" stroke-width="0.55"/>' +
-    '<circle cx="84" cy="78" r="3.2" fill="' + lime + '" fill-opacity="0.85"/>' +
-    '<path d="M16,146 C48,36 126,18 158,96" fill="none" stroke="' + lime + '" stroke-opacity="0.55" stroke-width="0.85"/>' +
-    '<path d="M10,46 C72,6 148,58 160,146" fill="none" stroke="' + gold + '" stroke-opacity="0.4" stroke-width="0.7"/>';
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="168" height="168" viewBox="0 0 168 168">' +
-    grid.join('') + orbits + tiles.join('') + '</svg>';
-  return { svg: svg, hue: hue, seed: seed, patternId: def.id, patternLabel: def.label };
+  const families = CoachTools._kitPatterns;
+  const penalty = g && (g.giftId === 'first_saved_penalty' || g.special === 'penalty-save');
+  const pick = penalty ? 0 : (CoachTools.footballPatternIndex(g) % families.length);
+  const fam = families[pick] || families[0];
+  const body = fam.draw(CoachTools._kitRand(seed ^ (pick * 997)));
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="168" height="168" viewBox="0 0 168 168">' + body + '</svg>';
+  return {
+    svg: svg,
+    hue: hue,
+    seed: seed,
+    patternId: penalty ? 'penalty' : fam.id,
+    patternLabel: penalty ? 'Пенальті' : fam.label
+  };
 };
 /** Колір картки футболіста — як раніше, від головного подарунка. */
 CoachTools.playerFieldAccent = function (player) {
