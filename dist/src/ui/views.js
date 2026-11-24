@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z141',
+  APP_BUILD: 'z142',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -4032,7 +4032,14 @@ trainings() {
   },
 
   playerSheetButtons(p) {
-    const coach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
+    let coach = false;
+    try {
+      coach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach()
+        && !(AuthManager.isPlayer && AuthManager.isPlayer())
+        && !(AuthManager.isGuest && AuthManager.isGuest());
+      const body = (typeof document !== 'undefined' && document.body && document.body.classList) ? document.body.classList : null;
+      if (body && (body.contains('role-player') || body.contains('role-guest'))) coach = false;
+    } catch (_) { coach = false; }
     if (!coach || !p) return '';
     const id = sanitize(String(p.id));
     const t = (key, fb) => (typeof I18n !== 'undefined' ? I18n.t(key, fb) : fb);

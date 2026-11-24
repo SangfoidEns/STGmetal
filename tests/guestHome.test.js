@@ -46,6 +46,14 @@ describe('guest home', () => {
     assert.match(home, /<video /);
     assert.match(home, /Гол/);
     assert.equal(views.playerSheetButtons(store.players[0]), '');
+    const player = loadViews({
+      isCoach() { return false; },
+      isPlayer() { return true; },
+      isGuest() { return false; },
+      isAssistant() { return false; },
+      _canWriteClub() { return false; }
+    }, store);
+    assert.equal(player.playerSheetButtons(store.players[0]), '');
     const settings = views.settings();
     assert.match(settings, /Останні моменти/);
     assert.equal(settings.includes('id="momentFile"'), false);

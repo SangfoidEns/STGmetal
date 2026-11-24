@@ -13883,3 +13883,20 @@ body.sb-open #sbBackdrop {
   background: rgba(255, 255, 255, 0.05);
 }
 .moment-set-row span { min-width: 0; font-size: 13px; }
+
+body.role-player [data-psheet="edit"],
+body.role-player [data-psheet="board"],
+body.role-player [data-psheet="diary"],
+body.role-player [data-psheet="starter"],
+body.role-player [data-psheet="delete"],
+body.role-guest [data-psheet="edit"],
+body.role-guest [data-psheet="board"],
+body.role-guest [data-psheet="diary"],
+body.role-guest [data-psheet="starter"],
+body.role-guest [data-psheet="delete"],
+body.role-player [data-edit-player],
+body.role-guest [data-edit-player],
+body.role-player [data-del-player],
+body.role-guest [data-del-player] {
+  display: none !important;
+}

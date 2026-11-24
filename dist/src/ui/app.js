@@ -2369,16 +2369,34 @@ const App = {
     try { TelegramManager.haptic && TelegramManager.haptic('medium'); } catch (_) {}
   },
 
+  _viewerIsCoach() {
+    try {
+      if (typeof AuthManager === 'undefined' || !AuthManager.isCoach || !AuthManager.isCoach()) return false;
+      if (AuthManager.isPlayer && AuthManager.isPlayer()) return false;
+      if (AuthManager.isGuest && AuthManager.isGuest()) return false;
+      const body = document.body && document.body.classList;
+      if (body && (body.contains('role-player') || body.contains('role-guest'))) return false;
+      return true;
+    } catch (_) { return false; }
+  },
+
   openPlayerActionSheet(playerId) {
     const p = (Store.get().players || []).find(x => x.id === playerId);
     if (!p) return;
+    if (!this._viewerIsCoach()) {
+      const who = [p.firstName, p.lastName].filter(Boolean).join(' ') || 'Гравець';
+      if (typeof Views !== 'undefined' && Views._playerProfileCard && typeof Modal !== 'undefined' && Modal.open) {
+        Modal.open('Акаунт · ' + who, '<div class="player-profile-modal" data-player-id="' + p.id + '">' + Views._playerProfileCard(p) + '</div>', [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
+      }
+      return;
+    }
     document.querySelectorAll('.tg-sheet-backdrop').forEach(el => el.remove());
     const backdrop = document.createElement('div');
     backdrop.className = 'tg-sheet-backdrop';
     const name = ((p.number != null ? '#' + p.number + ' ' : '') + (p.firstName || '') + ' ' + (p.lastName || '')).trim();
     const title = (typeof sanitize === 'function') ? sanitize(name) : name;
-    const coach = typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach();
-    const actions = (typeof Views !== 'undefined' && Views.playerSheetButtons) ? Views.playerSheetButtons(p) : '';
+    const coach = this._viewerIsCoach();
+    const actions = coach && typeof Views !== 'undefined' && Views.playerSheetButtons ? Views.playerSheetButtons(p) : '';
     backdrop.innerHTML = '<div class="tg-sheet" role="dialog">' +
       '<div class="tg-sheet-handle"></div>' +
       '<div class="tg-sheet-title">' + title + '</div>' +
