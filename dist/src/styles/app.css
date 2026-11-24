@@ -13408,12 +13408,12 @@ body:not(.board-on):not(.mode-board-focus):not(.board-only-mode) .app > .main {
   border-radius: 999px !important;
   overflow: hidden !important;
   isolation: isolate;
-  background: rgba(8, 10, 14, 0.82) !important;
+  background: rgba(14, 16, 22, 0.46) !important;
   background-image: none !important;
-  border: 0.5px solid rgba(255, 255, 255, 0.16) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 10px 30px rgba(0, 0, 0, 0.4) !important;
-  backdrop-filter: blur(40px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(40px) saturate(160%) !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.28) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 10px 30px rgba(0, 0, 0, 0.28) !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
   clip-path: inset(0 round 999px);
 }
 .header.header-tg.glass-pill-hdr .tg-hdr-pill::before {
@@ -13421,7 +13421,7 @@ body:not(.board-on):not(.mode-board-focus):not(.board-only-mode) .app > .main {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 36%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 42%);
   border: 0;
   box-shadow: none;
   backdrop-filter: none;
@@ -13447,13 +13447,13 @@ body.tg-mini-app .mn {
   border-radius: 999px !important;
   overflow: hidden !important;
   clip-path: inset(0 round 999px) !important;
-  background: rgba(8, 10, 14, 0.82) !important;
+  background: rgba(14, 16, 22, 0.46) !important;
   background-image: none !important;
-  backdrop-filter: blur(40px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(40px) saturate(160%) !important;
-  border: 0.5px solid rgba(255, 255, 255, 0.16) !important;
-  border-top: 0.5px solid rgba(255, 255, 255, 0.16) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.28) !important;
+  border-top: 0.5px solid rgba(255, 255, 255, 0.28) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 10px 30px rgba(0, 0, 0, 0.28) !important;
 }
 body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-active) .app > .main,
 body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-active) #main,
@@ -13470,7 +13470,7 @@ body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-acti
   justify-content: center !important;
   padding: 16px 14px calc(112px + env(safe-area-inset-bottom, 0px)) !important;
   overflow: hidden !important;
-  background: rgba(0, 0, 0, 0.42) !important;
+  background: rgba(0, 0, 0, 0.22) !important;
   box-sizing: border-box !important;
 }
 .mo.show,
@@ -13495,12 +13495,12 @@ body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-acti
   border-bottom-left-radius: 32px !important;
   border-bottom-right-radius: 32px !important;
   clip-path: inset(0 round 32px) !important;
-  background: rgba(8, 10, 14, 0.86) !important;
+  background: rgba(14, 16, 22, 0.5) !important;
   background-image: none !important;
-  backdrop-filter: blur(40px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(40px) saturate(160%) !important;
-  border: 0.5px solid rgba(255, 255, 255, 0.14) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 18px 48px rgba(0, 0, 0, 0.45) !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.26) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 18px 48px rgba(0, 0, 0, 0.32) !important;
   transform: none !important;
   animation: none !important;
   position: relative !important;
@@ -13516,7 +13516,7 @@ body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-acti
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 28%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 34%);
   border: 0;
   box-shadow: none;
   backdrop-filter: none;
@@ -13586,11 +13586,11 @@ body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-acti
   overflow: hidden !important;
   border-radius: 28px !important;
   clip-path: inset(0 round 28px) !important;
-  background: rgba(8, 10, 14, 0.86) !important;
-  border: 0.5px solid rgba(255, 255, 255, 0.14) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 18px 48px rgba(0, 0, 0, 0.45) !important;
-  backdrop-filter: blur(40px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(40px) saturate(160%) !important;
+  background: rgba(14, 16, 22, 0.5) !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.26) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 18px 48px rgba(0, 0, 0, 0.32) !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
 }
 .match-toolbar::before {
   content: "";
