@@ -13639,13 +13639,14 @@ html {
 }
 body {
   background: transparent !important;
+  isolation: isolate;
 }
 body::before,
 body::after {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: -1;
   pointer-events: none;
 }
 body::before {
@@ -13690,9 +13691,16 @@ body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-acti
 body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-active) #main,
 body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-active) .page,
 body:not(.board-on):not(.mode-board-focus):not(.board-only-mode):not(.board-active) .pt {
-  position: relative;
-  z-index: 1;
   background: transparent !important;
+}
+body.sb-open .app > .sidebar,
+body.sb-open nav.sidebar#sidebar {
+  z-index: 10050 !important;
+  pointer-events: auto !important;
+}
+body.sb-open .sb-backdrop,
+body.sb-open #sbBackdrop {
+  z-index: 10040 !important;
 }
 
 /* Every plaque uses the same dark glass as the header. */
