@@ -937,13 +937,24 @@ const StorageManager = {
     if (profilePhoto.length > 1200000) profilePhoto = '';
     const srcProfile = (p.profile && typeof p.profile === 'object') ? p.profile : null;
     const birth = p.birthDate || p.birthday || (srcProfile && srcProfile.birthDate) || '';
+    const readMeasure = function (primary, fallback, min, max) {
+      const raw = primary != null && primary !== '' ? primary : fallback;
+      if (raw == null || raw === '') return '';
+      const n = Number(String(raw).replace(',', '.'));
+      if (!Number.isFinite(n) || n < min || n > max) return '';
+      return Math.round(n * 10) / 10;
+    };
+    const heightCm = readMeasure(p.heightCm, srcProfile && srcProfile.heightCm, 120, 230);
+    const weightKg = readMeasure(p.weightKg, srcProfile && srcProfile.weightKg, 30, 160);
     const profile = srcProfile ? Object.assign({}, srcProfile, {
       phone: srcProfile.phone || p.phone || '',
       social: srcProfile.social || '',
       status: srcProfile.status || '',
       bio: srcProfile.bio || p.bio || '',
-      birthDate: birth
-    }) : (birth ? { birthDate: birth } : null);
+      birthDate: birth,
+      heightCm: heightCm,
+      weightKg: weightKg
+    }) : ((birth || heightCm || weightKg) ? { birthDate: birth, heightCm: heightCm, weightKg: weightKg } : null);
     return Object.assign({}, p, {
       id: p.id || uid(),
       firstName: p.firstName || '',
@@ -967,6 +978,8 @@ const StorageManager = {
       photoUrl: photoUrl || '',
       profilePhoto: profilePhoto || '',
       birthDate: birth,
+      heightCm: heightCm,
+      weightKg: weightKg,
       bio: p.bio || (profile && profile.bio) || '',
       statusText: p.statusText || (profile && profile.status) || '',
       profile: profile || undefined,

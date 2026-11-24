@@ -837,6 +837,8 @@ const Actions = {
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_number','Номер'):'Номер')}</label><input type="number" id="plN" min="1" max="99"></div>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_position','Позиція'):'Позиція')}</label><select id="plP">${['GK','CB','LB','RB','DM','CM','AM','LW','RW','ST'].map(p=>`<option>${p}</option>`).join('')}</select></div>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_age','Вік'):'Вік')}</label><input type="number" id="plA" value="24"></div>
+        <div class="fgr"><label>Зріст, см</label><input type="number" id="plH" min="120" max="230" inputmode="decimal" placeholder="178"></div>
+        <div class="fgr"><label>Вага, кг</label><input type="number" id="plW" min="30" max="160" step="0.1" inputmode="decimal" placeholder="72"></div>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_status','Статус'):'Статус')}</label><select id="plS">
           <option value="available">${(typeof I18n!=='undefined'?I18n.t('healthy','Здоровий'):'Здоровий')}</option>
           <option value="injured">${(typeof I18n!=='undefined'?I18n.t('status_injured','Травмований'):'Травмований')}</option>
@@ -878,6 +880,8 @@ const Actions = {
       telegramUsername: (document.getElementById('plTg')?.value || '').replace(/^@/, '').trim(),
       phone: (document.getElementById('plPhone')?.value || '').trim(),
       birthDate: document.getElementById('plBirth')?.value || '',
+      heightCm: Actions._bodyMeasure(document.getElementById('plH')?.value, 120, 230),
+      weightKg: Actions._bodyMeasure(document.getElementById('plW')?.value, 30, 160),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       stamps: {
@@ -907,6 +911,8 @@ const Actions = {
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_number','Номер'):'Номер')}</label><input type="number" id="peN" value="${p.number}"></div>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_position','Позиція'):'Позиція')}</label><select id="peP">${['GK','CB','LB','RB','DM','CM','AM','LW','RW','ST'].map(pos=>`<option ${p.position===pos?'selected':''}>${pos}</option>`).join('')}</select></div>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_age','Вік'):'Вік')}</label><input type="number" id="peA" value="${p.age}"></div>
+        <div class="fgr"><label>Зріст, см</label><input type="number" id="peH" min="120" max="230" inputmode="decimal" value="${sanitize(p.heightCm || (p.profile && p.profile.heightCm) || '')}"></div>
+        <div class="fgr"><label>Вага, кг</label><input type="number" id="peW" min="30" max="160" step="0.1" inputmode="decimal" value="${sanitize(p.weightKg || (p.profile && p.profile.weightKg) || '')}"></div>
         <div class="fgr"><label>${(typeof I18n!=='undefined'?I18n.t('label_health','Статус здоров’я'):'Статус здоров\u2019я')}</label><select id="peS">
           <option value="available" ${stHealthy?'selected':''}>Здоровий</option>
           <option value="injured" ${stInj?'selected':''}>Травмований</option>
@@ -956,6 +962,11 @@ const Actions = {
     p.number = +document.getElementById('peN')?.value || p.number;
     p.position = document.getElementById('peP')?.value || p.position;
     p.age = +document.getElementById('peA')?.value || p.age;
+    p.heightCm = Actions._bodyMeasure(document.getElementById('peH')?.value, 120, 230);
+    p.weightKg = Actions._bodyMeasure(document.getElementById('peW')?.value, 30, 160);
+    if (!p.profile) p.profile = {};
+    p.profile.heightCm = p.heightCm;
+    p.profile.weightKg = p.weightKg;
     p.status = document.getElementById('peS')?.value || p.status;
     if (p.status === 'healthy') p.status = 'available';
     if (p.status === 'recovery') p.status = 'rehab';
@@ -1041,6 +1052,13 @@ const Actions = {
     // якщо в полі URL вже data: — теж зберігаємо
     if (pePhotoVal && pePhotoVal.indexOf('data:image') === 0) p.photoUrl = pePhotoVal;
     finish();
+  },
+
+  _bodyMeasure(raw, min, max) {
+    if (raw == null || String(raw).trim() === '') return '';
+    const n = Number(String(raw).replace(',', '.'));
+    if (!Number.isFinite(n) || n < min || n > max) return '';
+    return Math.round(n * 10) / 10;
   },
 
   /** Стиснення фото до JPEG dataURL (макс. side px, quality 0..1) */

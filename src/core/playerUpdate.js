@@ -111,6 +111,8 @@ const PlayerUpdate = {
         firstName: player.firstName || '',
         lastName: player.lastName || '',
         birthDate: player.birthDate || profile.birthDate || '',
+        heightCm: player.heightCm || profile.heightCm || '',
+        weightKg: player.weightKg || profile.weightKg || '',
         phone: player.phone || profile.phone || '',
         telegramUsername: player.telegramUsername || '',
         profilePhoto: player.profilePhoto || '',
@@ -125,6 +127,8 @@ const PlayerUpdate = {
           phone: profile.phone || player.phone || '',
           social: profile.social || '',
           birthDate: profile.birthDate || player.birthDate || '',
+          heightCm: profile.heightCm || player.heightCm || '',
+          weightKg: profile.weightKg || player.weightKg || '',
           themeHue: profile.themeHue != null ? profile.themeHue : (player.themeHue != null ? player.themeHue : null)
         }
       },
@@ -149,6 +153,20 @@ const PlayerUpdate = {
     ['bio', 'status', 'phone', 'social', 'birthDate'].forEach(key => {
       if (prof[key] != null) player.profile[key] = String(prof[key]).slice(0, key === 'bio' ? 400 : 200);
     });
+    const bodyMeasure = function (raw, min, max) {
+      if (raw == null || String(raw).trim() === '') return '';
+      const n = Number(String(raw).replace(',', '.'));
+      if (!Number.isFinite(n) || n < min || n > max) return '';
+      return Math.round(n * 10) / 10;
+    };
+    if (prof.heightCm != null || src.heightCm != null) {
+      player.heightCm = bodyMeasure(prof.heightCm != null ? prof.heightCm : src.heightCm, 120, 230);
+      player.profile.heightCm = player.heightCm;
+    }
+    if (prof.weightKg != null || src.weightKg != null) {
+      player.weightKg = bodyMeasure(prof.weightKg != null ? prof.weightKg : src.weightKg, 30, 160);
+      player.profile.weightKg = player.weightKg;
+    }
     if (prof.themeHue != null) player.profile.themeHue = prof.themeHue;
     if (src.birthDate) player.birthDate = String(src.birthDate).slice(0, 20);
     if (player.profile.birthDate) player.birthDate = player.profile.birthDate;

@@ -167,4 +167,29 @@ describe('automatic load from ratings', () => {
     assert.equal(LM.avgPlayerRpe(LM._trainings(), 'yehor'), 5);
     assert.equal(LM.avgPlayerRpe(LM._trainings(), 'other'), 4.5);
   });
+
+  it('builds a personal number and does not copy the planned intensity', () => {
+    const sessions = [0, 1, 2, 3].map(i => ({
+      id: 't' + i,
+      date: iso(-i - 1),
+      status: 'done',
+      duration: 80,
+      intensity: 9,
+      attendance: {
+        yehor: { present: true },
+        adult: { present: true, rpe: 5 },
+        teen: { present: true, rpe: 5 }
+      }
+    }));
+    const LM = boot({ trainings: sessions, matches: [] });
+    const adult = { id: 'adult', age: 25, heightCm: 185, weightKg: 80, readiness: 90, status: 'available' };
+    const teen = { id: 'teen', age: 14, heightCm: 165, weightKg: 55, readiness: 90, status: 'available' };
+    const yehor = { id: 'yehor', age: 25, heightCm: 185, weightKg: 80, readiness: 90, status: 'available' };
+    const adultScore = LM.personalRpe(adult);
+    const teenScore = LM.personalRpe(teen);
+    const yehorScore = LM.personalRpe(yehor);
+    assert.ok(teenScore > adultScore + 0.4);
+    assert.ok(Math.abs(yehorScore - adultScore) < 0.4);
+    assert.ok(yehorScore < 8);
+  });
 });

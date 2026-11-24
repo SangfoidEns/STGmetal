@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z134',
+  APP_BUILD: 'z135',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -919,6 +919,8 @@ const Views = {
           <div class="fifa-stat"><b>${load}</b><span>Load 28д</span></div>
           <div class="fifa-stat"><b>${loadNow != null ? this._fmtLoad(loadNow) : '—'}</b><span>Лоад</span></div>
           <div class="fifa-stat"><b>${p.age || '—'}</b><span>Вік</span></div>
+          <div class="fifa-stat"><b>${(typeof LoadModel !== 'undefined' && LoadModel.playerCm && LoadModel.playerCm(p)) || '—'}</b><span>Зріст</span></div>
+          <div class="fifa-stat"><b>${(typeof LoadModel !== 'undefined' && LoadModel.playerKg && LoadModel.playerKg(p)) || '—'}</b><span>Вага</span></div>
         </div>
         ${(() => {
           try {
@@ -1145,7 +1147,7 @@ const Views = {
       });
       return {
         attPct: LM && LM.attendanceRate ? LM.attendanceRate(s.trainings, playerId) : null,
-        avgRpe: LM && LM.avgPlayerRpe ? LM.avgPlayerRpe(s.trainings, playerId) : null,
+        avgRpe: LM && LM.personalRpe ? LM.personalRpe((s.players || []).find(p => p && String(p.id) === String(playerId)) || { id: playerId }, s.trainings, s.matches) : null,
         load28: LM && LM.playerLoad ? LM.playerLoad(s.trainings, playerId, 28) : null,
         cancelled, present, absent
       };
@@ -3820,7 +3822,7 @@ trainings() {
       card('RPE сесій', 'Середня інтенсивність. День матчу — лаймовий.', line(plotStats.map(x => x.avgRpe), '#e8c547', 'anRpe', 10, plotStats)) +
       card('Навантаження сесій', 'Тренування: хв × RPE. Матч: 90 хв × оцінка × 1.7. День матчу — лаймовий.', bars(plotStats.map(x => x.load), '#3b82f6', plotStats)) +
       card('Відвідуваність гравців', 'Хто тримає ритм сезону', hbars(names.map(n => ({ label: n.label, value: n.st.attPct || 0, text: (n.st.attPct != null ? n.st.attPct + '%' : '—'), color: n.color })), r => r.color)) +
-      card('RPE гравців', 'Середня власна оцінка важкості тренувань, від 1 до 10. Вище означає, що гравцю було важче. Це не рейтинг сили.', hbars(names.map(n => ({ label: n.label, value: n.st.avgRpe || 0, text: n.st.avgRpe != null ? n.st.avgRpe : '—', color: n.color })), r => r.color)) +
+      card('RPE гравців', 'Особисте навантаження від 0 до 10. Сюди входять власна оцінка, явка, хвилини, матчі, голи, вік, зріст, вага і готовність. Однакове тренування важче легшому і молодшому. Вище означає важче саме цій людині.', hbars(names.map(n => ({ label: n.label, value: n.st.avgRpe || 0, text: n.st.avgRpe != null ? n.st.avgRpe : '—', color: n.color })), r => r.color)) +
       card('Навантаження 28 днів', 'Тренування: хв × RPE. Матч: 90 хв × оцінка × ' + ((typeof LoadModel !== 'undefined' && LoadModel.MATCH_WEIGHT) || 1.7), hbars(names.map(n => ({ label: n.label, value: n.st.load28 || 0, color: n.color })), r => r.color)) +
       card('XP гравців', 'Тренування, матчі, голи й оцінка', hbars(names.map(n => {
         let xp = 0;

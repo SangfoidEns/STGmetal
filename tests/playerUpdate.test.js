@@ -26,6 +26,11 @@ describe('player questionnaire for the coach', () => {
     const packet = PlayerUpdate.build(state, state.players[0]);
     assert.equal(packet.type, 'metalist_player_update');
     assert.equal(packet.player.profile.bio, 'лівий');
+    state.players[0].heightCm = 178;
+    state.players[0].weightKg = 71;
+    const sized = PlayerUpdate.build(state, state.players[0]);
+    assert.equal(sized.player.heightCm, 178);
+    assert.equal(sized.player.profile.weightKg, 71);
     assert.equal(packet.player.number, undefined);
     assert.equal(packet.stamps.length, 0);
     assert.equal(packet.featuredGiftKey, 'g1');
@@ -69,7 +74,7 @@ describe('player questionnaire for the coach', () => {
         id: 'other-phone',
         telegramUsername: '@Koval',
         firstName: 'Іванко',
-        profile: { bio: 'оновив анкету', phone: '+49123' }
+        profile: { bio: 'оновив анкету', phone: '+49123', heightCm: 176, weightKg: 68 }
       },
       featuredGiftKey: 'g1',
       stamps: [{ trainingId: 'gone', name: '5/11 вечір', date: '2026-11-06', claimedAt: '2026-11-06T19:00:00.000Z' }]
@@ -81,6 +86,8 @@ describe('player questionnaire for the coach', () => {
     assert.equal(state.players[0].position, 'CM');
     assert.equal(state.players[0].firstName, 'Іванко');
     assert.equal(state.players[0].profile.bio, 'оновив анкету');
+    assert.equal(state.players[0].heightCm, 176);
+    assert.equal(state.players[0].weightKg, 68);
     assert.equal(state.trainings[0].attendance.p1, undefined);
     assert.equal(state.trainings[0].attendance.p2.present, true);
     assert.equal(state.gifts[0].featured, true);

@@ -404,6 +404,128 @@ const LoadModel = {
     return Math.round((present / total) * 100);
   },
 
+  playerAge(player) {
+    if (!player) return null;
+    const raw = String(player.birthDate || (player.profile && player.profile.birthDate) || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      const born = new Date(raw + 'T12:00:00');
+      if (!isNaN(born.getTime())) {
+        const now = new Date();
+        let age = now.getFullYear() - born.getFullYear();
+        const month = now.getMonth() - born.getMonth();
+        if (month < 0 || (month === 0 && now.getDate() < born.getDate())) age -= 1;
+        if (age >= 8 && age <= 60) return age;
+      }
+    }
+    const n = Number(player.age);
+    if (Number.isFinite(n) && n >= 8 && n <= 60) return Math.round(n);
+    return null;
+  },
+
+  _measure(player, key, min, max) {
+    if (!player) return null;
+    const profile = player.profile || {};
+    const raw = player[key] != null && player[key] !== '' ? player[key] : profile[key];
+    const n = Number(String(raw == null ? '' : raw).replace(',', '.'));
+    if (!Number.isFinite(n) || n < min || n > max) return null;
+    return Math.round(n * 10) / 10;
+  },
+
+  playerCm(player) { return this._measure(player, 'heightCm', 120, 230); },
+  playerKg(player) { return this._measure(player, 'weightKg', 30, 160); },
+
+  /**
+   * 1 — дорослий близько 180 см і 75 кг.
+   * Менше 1 — те саме навантаження важче: легший, нижчий, підліток або відновлення.
+   */
+  bodyFactor(player) {
+    let factor = 1;
+    const age = this.playerAge(player);
+    const height = this.playerCm(player);
+    const weight = this.playerKg(player);
+    if (age != null) {
+      if (age <= 14) factor *= 0.78;
+      else if (age <= 16) factor *= 0.86;
+      else if (age <= 18) factor *= 0.93;
+      else if (age >= 36) factor *= 0.9;
+      else if (age >= 32) factor *= 0.95;
+    }
+    if (weight != null) factor *= Math.max(0.72, Math.min(1.2, weight / 75));
+    if (height != null) factor *= Math.max(0.88, Math.min(1.1, Math.pow(height / 180, 0.5)));
+    const readyRaw = player && (player.readiness != null ? player.readiness : player.condition);
+    const ready = Number(readyRaw);
+    if (Number.isFinite(ready)) factor *= 0.88 + 0.16 * (Math.max(0, Math.min(100, ready)) / 100);
+    const status = String((player && player.status) || '');
+    if (status === 'injured' || status === 'rehab' || status === 'recovery') factor *= 0.9;
+    return Math.max(0.62, Math.min(1.25, factor));
+  },
+
+  /**
+   * Особисте навантаження 0–10.
+   * Власна оцінка, явка, хвилини, матчі, голи, вік, зріст, вага і готовність.
+   * Запланована інтенсивність тренера без власної оцінки гравця сюди не потрапляє.
+   */
+  personalRpe(player, trainings, matches) {
+    if (!player || player.id == null) return null;
+    const id = player.id;
+    const self = this;
+    const days = 28;
+    const list = this._trainings(trainings);
+    const done = this.completedTrainings(list).filter(function (t) { return self._inWindow(t.date, days); });
+    const played = this.playedMatches(this._matches(matches)).filter(function (m) { return self._inWindow(m.date, days); });
+    let came = 0;
+    let feltSum = 0;
+    let feltN = 0;
+    let load = 0;
+    let expected = 0;
+    done.forEach(function (t) {
+      const minutes = Math.max(1, Number(t.duration) || 75);
+      expected += minutes * 6;
+      const mark = self._attEntry(list, id, t);
+      if (self._isPresent(mark) !== true) return;
+      came += 1;
+      const own = mark && mark.rpe != null && mark.rpe !== '' ? +mark.rpe
+        : (mark && mark.intensity != null && mark.intensity !== '' ? +mark.intensity : null);
+      const used = own != null && !isNaN(own) ? own : 5;
+      feltSum += used;
+      feltN += 1;
+      load += self.sessionLoad(minutes, used);
+    });
+    let matchN = 0;
+    let goals = 0;
+    played.forEach(function (m) {
+      const minutes = Math.max(1, Number(m.minutes) || 90);
+      expected += minutes * 6 * (self.MATCH_WEIGHT || 1);
+      const cell = m.attendance && (m.attendance[id] != null ? m.attendance[id] : m.attendance[String(id)]);
+      const present = cell && (cell.present === true || cell.present === 1 || cell.present === '1');
+      if (!present) return;
+      matchN += 1;
+      const rating = self._clampRating(cell.rating != null && cell.rating !== '' ? cell.rating : 6);
+      const mins = self.playerMinutes(m, id) || minutes;
+      load += Math.round(self.sessionLoad(mins, rating == null ? 6 : rating) * (self.MATCH_WEIGHT || 1));
+      const scored = Number(cell.goals);
+      if (Number.isFinite(scored) && scored > 0) goals += scored;
+    });
+    if (!done.length && !played.length) return null;
+    const felt = feltN ? (feltSum / feltN) : null;
+    const att = done.length ? (came / done.length) : 0;
+    const play = played.length ? (matchN / played.length) : 0;
+    const loadN = expected ? Math.min(1, load / expected) : 0;
+    const goalsN = Math.min(1, goals / 2);
+    const parts = [
+      { w: felt != null ? 3 : 0, v: felt != null ? Math.max(0, Math.min(10, felt)) / 10 : 0 },
+      { w: 2.5, v: att },
+      { w: 2, v: loadN },
+      { w: played.length ? 2 : 0, v: play },
+      { w: 1, v: goalsN }
+    ];
+    const wsum = parts.reduce(function (sum, part) { return sum + part.w; }, 0);
+    if (!wsum) return null;
+    const raw = parts.reduce(function (sum, part) { return sum + part.w * part.v; }, 0) / wsum * 10;
+    const score = Math.max(0, Math.min(10, raw / this.bodyFactor(player)));
+    return Math.round(score * 10) / 10;
+  },
+
   avgPlayerRpe(trainings, playerId) {
     const vals = [];
     this.pastTrainings(trainings).forEach(t => {

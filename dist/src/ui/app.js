@@ -119,6 +119,8 @@ const App = {
         '<label class="fld"><span>Ім\'я</span><input id="ppFirst" class="inp" value="' + sanitize(me.firstName || '') + '"/></label>' +
         '<label class="fld"><span>Прізвище</span><input id="ppLast" class="inp" value="' + sanitize(me.lastName || '') + '"/></label>' +
         '<label class="fld"><span>Дата народження</span><input id="ppBirth" class="inp" type="date" value="' + sanitize(me.birthDate || pr.birthDate || '') + '"/></label>' +
+        '<label class="fld"><span>Зріст, см</span><input id="ppHeight" class="inp" type="number" min="120" max="230" inputmode="decimal" placeholder="178" value="' + sanitize(me.heightCm || pr.heightCm || '') + '"/></label>' +
+        '<label class="fld"><span>Вага, кг</span><input id="ppWeight" class="inp" type="number" min="30" max="160" step="0.1" inputmode="decimal" placeholder="72" value="' + sanitize(me.weightKg || pr.weightKg || '') + '"/></label>' +
         '<label class="fld"><span>Телефон (необов\'язково)</span><input id="ppPhone" class="inp" value="' + sanitize(pr.phone || me.phone || '') + '"/></label>' +
         '<label class="fld"><span>Соцмережі (посилання)</span><input id="ppSocial" class="inp" placeholder="https://…" value="' + sanitize(pr.social || '') + '"/></label>' +
         '<label class="fld"><span>Статус</span><input id="ppStatus" class="inp" maxlength="80" value="' + sanitize(pr.status || me.statusText || '') + '"/></label>' +
@@ -846,6 +848,17 @@ const App = {
       p.stamps.birthDate = now;
       try { if (typeof Views !== 'undefined' && Views.syncBirthdays) Views.syncBirthdays(); } catch (_) {}
     }
+    const measure = function (id, min, max) {
+      const raw = field(id);
+      if (raw == null || String(raw).trim() === '') return '';
+      const n = Number(String(raw).replace(',', '.'));
+      if (!Number.isFinite(n) || n < min || n > max) return '';
+      return Math.round(n * 10) / 10;
+    };
+    p.heightCm = measure('ppHeight', 120, 230);
+    p.weightKg = measure('ppWeight', 30, 160);
+    p.profile.heightCm = p.heightCm;
+    p.profile.weightKg = p.weightKg;
     p.profile.phone = String(field('ppPhone') || '').slice(0, 40);
     p.profile.social = String(field('ppSocial') || '').slice(0, 200);
     p.profile.status = String(field('ppStatus') || '').slice(0, 80);
