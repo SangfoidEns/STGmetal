@@ -29,11 +29,11 @@ describe('calendar weekday letters', () => {
     assert.match(html, /title="Субота">Сб</);
     assert.match(html, /title="Неділя">Нд</);
     assert.equal(html.includes('>А<'), false);
-    assert.equal(context.Views.APP_BUILD, 'z160');
-    assert.equal(context.Views.versionLabel(), '160');
+    assert.equal(context.Views.APP_BUILD, 'z161');
+    assert.equal(context.Views.versionLabel(), '161');
     const settings = context.Views.settings();
-    assert.match(settings, /Версія 160/);
-    assert.equal(settings.includes('z160'), false);
+    assert.match(settings, /Версія 161/);
+    assert.equal(settings.includes('z161'), false);
     const library = context.Views.tactics();
     assert.match(library, /Всі альбоми/);
     assert.match(library, /open-scheme-archive/);
@@ -173,6 +173,9 @@ describe('calendar weekday letters', () => {
     vm.runInContext(readFileSync(new URL('../src/ui/views.js', import.meta.url), 'utf8') + '\nthis.Views = Views;', context);
     const settings = context.Views.settings();
     assert.equal((settings.match(/data-action="save-settings"/g) || []).length, 1);
+    assert.match(settings, /id="serverStatsStore"/);
+    assert.match(settings, /id="serverStatsDb"/);
+    assert.match(settings, /data-action="server-rebuild"/);
     assert.match(settings, /id="setClubName"/);
     assert.match(settings, /id="setClubShort"/);
     assert.equal(settings.includes('Зберегти склад'), false);

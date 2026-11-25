@@ -99,12 +99,12 @@ const SupabaseClub = {
         return false;
       }
       this._ready = true;
-      if (remote.payload) {
+      if (!this._rebuilding && remote.payload) {
         try { await this.sweep(remote.path || '', remote.payload); } catch (_) {}
       }
       await this.pull({ quiet: true, known: remote });
       let sent = true;
-      if (this._canWrite(sm)) sent = await this.push();
+      if (this._canWrite(sm) && !this._rebuilding) sent = await this.push();
       this._armPoll();
       return sent !== false;
     } catch (err) {
@@ -249,6 +249,7 @@ const SupabaseClub = {
   },
 
   async push() {
+    if (this._rebuilding && !this._allowPush) return false;
     if (!this.enabled() || !this._sm || !this._canWrite(this._sm)) return false;
     if (this._pushing) {
       this._again = true;
@@ -410,7 +411,7 @@ const SupabaseClub = {
 
   async listFolder(folder) {
     const names = [];
-    for (let offset = 0; offset < 5000; offset += 100) {
+    for (let offset = 0; offset < 20000; offset += 100) {
       const res = await fetch(this.URL + '/storage/v1/object/list/club-media', {
         method: 'POST',
         headers: this.headers(),
@@ -461,8 +462,135 @@ const SupabaseClub = {
     return keep;
   },
 
+  _sizeText(bytes) {
+    const value = Math.max(0, Number(bytes) || 0);
+    const num = (n, digits) => {
+      const p = Math.pow(10, digits);
+      return String(Math.round(n * p) / p).replace('.', ',');
+    };
+    if (value < 1000) return value + ' Б';
+    if (value < 1000000) return num(value / 1000, 0) + ' КБ';
+    if (value < 1000000000) return num(value / 1000000, 1) + ' МБ';
+    return num(value / 1000000000, 2) + ' ГБ';
+  },
+
+  async serverStats() {
+    if (!this.enabled()) return null;
+    try {
+      const res = await fetch(this.URL + '/rest/v1/rpc/club_server_stats', {
+        method: 'POST',
+        headers: this.headers(),
+        body: '{}'
+      });
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data && typeof data === 'object' && !Array.isArray(data) && data.files != null) {
+          return {
+            source: 'database',
+            files: Number(data.files) || 0,
+            bytes: Number(data.bytes) || 0,
+            dbBytes: data.db_bytes == null ? null : (Number(data.db_bytes) || 0)
+          };
+        }
+      }
+    } catch (_) {}
+    const files = await this.inventory();
+    if (!files) return null;
+    return {
+      source: 'list',
+      files: files.length,
+      bytes: files.reduce((sum, file) => sum + (Number(file.size) || 0), 0),
+      dbBytes: null
+    };
+  },
+
+  async _fetchObject(path) {
+    const safe = String(path || '').replace(/^\/+/, '');
+    let res = await fetch(this.URL + '/storage/v1/object/public/club-media/' + safe);
+    if (!res.ok) {
+      res = await fetch(this.URL + '/storage/v1/object/club-media/' + safe, {
+        headers: this.headers({ Accept: '*/*' }, { json: false })
+      });
+    }
+    return res;
+  },
+
+  async _dataUrl(blob) {
+    if (!blob || typeof FileReader === 'undefined') return '';
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(blob);
+    });
+  },
+
+  /** Копія клубу з фото всередині і файли, які треба повернути після очищення. */
+  async collectRestore(payload) {
+    const backup = JSON.parse(JSON.stringify(payload || {}));
+    const jobs = [];
+    this._walk(backup, (value) => {
+      const path = this._mediaPath(value);
+      if (path && jobs.indexOf(path) < 0) jobs.push(path);
+    });
+    const files = [];
+    const inline = new Map();
+    for (let i = 0; i < jobs.length; i++) {
+      const path = jobs[i];
+      let res = null;
+      try { res = await this._fetchObject(path); } catch (_) { return null; }
+      if (!res || !res.ok || !res.blob) return null;
+      let blob = null;
+      try { blob = await res.blob(); } catch (_) { return null; }
+      if (!blob) return null;
+      if (blob.size > 180 * 1024) {
+        const small = await this._shrinkBlob(blob, 960, 0.66);
+        if (small && small.size < blob.size) blob = small;
+      }
+      files.push({ path: path, body: blob, type: blob.type || 'application/octet-stream' });
+      if (blob.size <= 2500000 && String(blob.type || '').indexOf('image/') === 0) {
+        const data = await this._dataUrl(blob);
+        if (data) inline.set(path, data);
+      }
+    }
+    if (inline.size) {
+      this._walk(backup, (value, set) => {
+        const path = this._mediaPath(value);
+        if (path && inline.has(path)) set(inline.get(path));
+      });
+    }
+    return { backup: backup, files: files };
+  },
+
+  async wipeAndRestore(files) {
+    if (this._wiping) return false;
+    this._wiping = true;
+    try {
+      for (let pass = 0; pass < 8; pass++) {
+        const listed = await this.inventory();
+        if (!listed) return false;
+        const drop = listed.map(file => file && file.path).filter(Boolean);
+        if (!drop.length) break;
+        const ok = await this.removePaths(drop);
+        if (!ok) return false;
+        if (drop.length < 20000) break;
+      }
+      const back = files || [];
+      for (let i = 0; i < back.length; i++) {
+        const file = back[i];
+        if (!file || !file.path) continue;
+        const ok = await this.upload(file.path, file.body, file.type || 'application/octet-stream');
+        if (!ok) return false;
+      }
+      return true;
+    } finally {
+      this._wiping = false;
+    }
+  },
+
   async sweep(keepPath, payload) {
     try {
+      if (this._rebuilding && !this._allowPush) return 0;
       if (!payload) return 0;
       const keep = this.usedMedia(payload);
       if (keepPath) keep.add(String(keepPath));
@@ -550,7 +678,7 @@ const SupabaseClub = {
   async listRaw(folder) {
     const rows = [];
     const seen = new Set();
-    for (let offset = 0; offset < 5000; offset += 100) {
+    for (let offset = 0; offset < 20000; offset += 100) {
       const res = await fetch(this.URL + '/storage/v1/object/list/club-media', {
         method: 'POST',
         headers: this.headers(),

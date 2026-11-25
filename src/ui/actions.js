@@ -2654,6 +2654,100 @@ const Actions = {
     });
   },
 
+  refreshServerStats() {
+    const storeEl = document.getElementById('serverStatsStore');
+    const dbEl = document.getElementById('serverStatsDb');
+    if (!storeEl || !dbEl) return;
+    if (typeof SupabaseClub === 'undefined' || !SupabaseClub.enabled || !SupabaseClub.enabled()) {
+      storeEl.innerHTML = '<span>Сховище</span>Сервер не підключений';
+      dbEl.innerHTML = '<span>База</span>Потрібен код клубу';
+      return;
+    }
+    storeEl.innerHTML = '<span>Сховище</span>Читаю…';
+    dbEl.innerHTML = '<span>База</span>Читаю…';
+    SupabaseClub.serverStats().then(stats => {
+      const liveStore = document.getElementById('serverStatsStore');
+      const liveDb = document.getElementById('serverStatsDb');
+      if (!liveStore || !liveDb) return;
+      if (!stats) {
+        liveStore.innerHTML = '<span>Сховище</span>Не вдалося прочитати';
+        liveDb.innerHTML = '<span>База</span>Не вдалося прочитати';
+        return;
+      }
+      const size = SupabaseClub._sizeText ? SupabaseClub._sizeText(stats.bytes) : String(stats.bytes);
+      liveStore.innerHTML = '<span>Сховище</span>' + size + ' · ' + stats.files + ' файлів';
+      liveDb.innerHTML = '<span>База</span>' + (stats.dbBytes == null ? 'Ще немає цифри з бази' : SupabaseClub._sizeText(stats.dbBytes));
+    }).catch(() => {
+      const liveStore = document.getElementById('serverStatsStore');
+      const liveDb = document.getElementById('serverStatsDb');
+      if (liveStore) liveStore.innerHTML = '<span>Сховище</span>Не вдалося прочитати';
+      if (liveDb) liveDb.innerHTML = '<span>База</span>Не вдалося прочитати';
+    });
+  },
+
+  rebuildServer() {
+    if (typeof AuthManager !== 'undefined' && AuthManager.isCoach && !AuthManager.isCoach()) {
+      try { Toast.show('Це робить лише тренер', 'warn'); } catch (_) {}
+      return;
+    }
+    if (typeof SupabaseClub === 'undefined' || !SupabaseClub.enabled || !SupabaseClub.enabled()) {
+      try { Toast.show('Спочатку підключи сервер', 'warn'); } catch (_) {}
+      return;
+    }
+    if (this._rebuilding) return;
+    this._rebuilding = true;
+    try { Toast.show('Роблю копію…', ''); } catch (_) {}
+    let live = null;
+    try { live = StorageManager.buildExportPayload(); } catch (_) {}
+    if (!live) {
+      this._rebuilding = false;
+      try { Toast.show('Не вдалося зібрати копію. Сервер не чіпав.', 'warn'); } catch (_) {}
+      return;
+    }
+    SupabaseClub.collectRestore(live).then(packed => {
+      this._rebuilding = false;
+      if (!packed) {
+        try { Toast.show('Не вдалося зібрати копію. Сервер не чіпав.', 'warn'); } catch (_) {}
+        return;
+      }
+      const filename = 'metalist_stuttgart_' + (typeof today === 'function' ? today() : new Date().toISOString().slice(0, 10)) + '.json';
+      try { StorageManager.createBackup(); } catch (_) {}
+      try { StorageManager._downloadExport(JSON.stringify(packed.backup, null, 2), filename); } catch (_) {}
+      Modal.confirm('Копія зберігається на телефон. Стерти все сховище і завантажити клуб знову? Зайві файли не повернуться.', () => {
+        if (this._rebuilding) return;
+        this._rebuilding = true;
+        SupabaseClub._rebuilding = true;
+        SupabaseClub.wipeAndRestore(packed.files).then(ok => {
+          if (!ok) {
+            SupabaseClub._rebuilding = false;
+            this._rebuilding = false;
+            try { Toast.show('Не вдалося очистити сервер. Копія на телефоні.', 'err'); } catch (_) {}
+            return;
+          }
+          SupabaseClub._allowPush = true;
+          const done = (sent) => {
+            SupabaseClub._allowPush = false;
+            SupabaseClub._rebuilding = false;
+            this._rebuilding = false;
+            try {
+              Toast.show(sent ? 'Сервер очищено. Клуб завантажено знову.' : 'Сховище чисте. Клуб ще не підтвердив запис. Копія на телефоні.', sent ? 'ok' : 'warn');
+            } catch (_) {}
+            this.refreshServerStats();
+          };
+          SupabaseClub.push().then(done, () => done(false));
+        }).catch(() => {
+          SupabaseClub._allowPush = false;
+          SupabaseClub._rebuilding = false;
+          this._rebuilding = false;
+          try { Toast.show('Очищення перервалось. Копія на телефоні.', 'err'); } catch (_) {}
+        });
+      });
+    }).catch(() => {
+      this._rebuilding = false;
+      try { Toast.show('Не вдалося зібрати копію. Сервер не чіпав.', 'warn'); } catch (_) {}
+    });
+  },
+
   saveSupabaseKey() {
     const el = document.getElementById('setSbKey');
     if (!el) {

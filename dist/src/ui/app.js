@@ -2131,6 +2131,9 @@ const App = {
             me.textContent = AuthManager.displayName() + ' · ' + AuthManager.roleLabel();
           }
         } catch (_) {}
+        if (view === 'settings') {
+          try { Actions.refreshServerStats && Actions.refreshServerStats(); } catch (_) {}
+        }
       }
     } catch (e) {
       console.error('[renderCurrent]', view, e);
@@ -4190,6 +4193,8 @@ const App = {
       if (action === 'reject-change') return Actions.rejectChange(t.dataset.approvalId);
       if (action === 'enter-server-code') return this.askClubCode();
       if (action === 'save-supabase-key') return Actions.saveSupabaseKey();
+      if (action === 'server-stats') return Actions.refreshServerStats();
+      if (action === 'server-rebuild') return Actions.rebuildServer();
       if (action === 'staff-add') {
         e.preventDefault(); e.stopPropagation();
         const role = t.dataset.staffRole || '';

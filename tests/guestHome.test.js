@@ -58,6 +58,7 @@ describe('guest home', () => {
     const settings = views.settings();
     assert.match(settings, /Останні моменти/);
     assert.equal(settings.includes('id="momentFile"'), false);
+    assert.equal(settings.includes('server-rebuild'), false);
   });
 
   it('lets the coach add a photo, gif or short video', () => {
@@ -74,6 +75,7 @@ describe('guest home', () => {
     assert.match(buttons, /data-psheet="edit"/);
     const settings = views.settings();
     assert.match(settings, /id="momentFile"/);
+    assert.match(settings, /data-action="server-rebuild"/);
     assert.match(settings, /відео до 20 секунд/i);
     assert.match(settings, /Прибрати/);
   });

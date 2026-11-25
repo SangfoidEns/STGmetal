@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z160',
+  APP_BUILD: 'z161',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -4284,6 +4284,16 @@ trainings() {
       </div>
       ${canEdit ? '<div class="settings-savebar"><button type="button" class="btn btn-p" data-action="save-settings">Зберегти</button><p class="note-sm">Одна кнопка записує назву, коротку назву, кольори, логотип, тренера, президента, тренування, посилання і код сервера.</p></div>' : ''}
       ${this._approvalsBanner()}
+      ${canEdit ? `<div class="card glass settings-card">
+        <div class="ct">Сервер</div>
+        <p class="server-stat" id="serverStatsStore"><span>Сховище</span>Читаю…</p>
+        <p class="server-stat" id="serverStatsDb"><span>База</span>Читаю…</p>
+        <div class="settings-actions">
+          <button type="button" class="btn btn-s btn-sm" data-action="server-stats">Оновити</button>
+          <button type="button" class="btn btn-s btn-sm" data-action="server-rebuild">Копія, очистити і завантажити знову</button>
+        </div>
+        <p class="note-sm">Спочатку файл копії лягає на телефон. Потім сховище стирається повністю, і клуб завантажується назад. Зайві файли не повертаються.</p>
+      </div>` : ''}
       <div class="card glass settings-card">
         <div class="ct">Дані клубу</div>
         <p class="note-sm">Клуб ходить тільки через сервер. Гравець і гість файл не пересилають.</p>

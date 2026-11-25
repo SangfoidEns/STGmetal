@@ -44,4 +44,27 @@ create policy club_media_update on storage.objects
 create policy club_media_delete on storage.objects
   for delete to anon, authenticated using (bucket_id = 'club-media');
 
+create or replace function public.club_server_stats()
+returns json
+language sql
+stable
+security definer
+set search_path = public, storage
+as $$
+  select json_build_object(
+    'files', (select count(*)::int from storage.objects where bucket_id = 'club-media'),
+    'bytes', (
+      select coalesce(sum(
+        coalesce((metadata->>'size')::bigint, (metadata->>'contentLength')::bigint, 0)
+      ), 0)
+      from storage.objects
+      where bucket_id = 'club-media'
+    ),
+    'db_bytes', pg_database_size(current_database())
+  );
+$$;
+
+revoke all on function public.club_server_stats() from public;
+grant execute on function public.club_server_stats() to anon, authenticated;
+
 notify pgrst, 'reload schema';

@@ -182,6 +182,75 @@ describe('supabase club sync', () => {
     assert.match(listed.opts.body, /"column":"name"/);
   });
 
+  it('reads storage and database size from the server', async () => {
+    const ctx = boot();
+    ctx.SupabaseClub.KEY = 'anon-public';
+    ctx.fetch.next.push(jsonRes(200, { files: 4, bytes: 1110000000, db_bytes: 30000000 }));
+    const stats = await ctx.SupabaseClub.serverStats();
+    assert.equal(stats.source, 'database');
+    assert.equal(stats.files, 4);
+    assert.equal(stats.bytes, 1110000000);
+    assert.equal(stats.dbBytes, 30000000);
+    assert.equal(ctx.SupabaseClub._sizeText(1110000000), '1,11 ГБ');
+  });
+
+  it('counts files itself when the database function is missing', async () => {
+    const ctx = boot();
+    ctx.SupabaseClub.KEY = 'anon-public';
+    ctx.fetch.next.push(jsonRes(404, { code: 'PGRST202' }));
+    ctx.fetch.next.push(jsonRes(200, [
+      { name: 'media', id: null }
+    ]));
+    ctx.fetch.next.push(jsonRes(200, [
+      { name: 'keep.png', id: 'c', metadata: { size: 2048 } },
+      { name: 'old.jpg', id: 'd', metadata: { size: 4096 } }
+    ]));
+    const stats = await ctx.SupabaseClub.serverStats();
+    assert.equal(stats.source, 'list');
+    assert.equal(stats.files, 2);
+    assert.equal(stats.bytes, 6144);
+    assert.equal(stats.dbBytes, null);
+  });
+
+  it('saves the photo and can put it back after a full wipe', async () => {
+    const ctx = boot();
+    ctx.SupabaseClub.KEY = 'anon-public';
+    const payload = {
+      settings: { moments: [{ src: ctx.SupabaseClub.URL + '/storage/v1/object/public/club-media/media/keep.png' }] }
+    };
+    ctx.fetch.next.push({
+      ok: true,
+      status: 200,
+      blob() { return Promise.resolve(new Blob(['img'], { type: 'image/png' })); }
+    });
+    const packed = await ctx.SupabaseClub.collectRestore(payload);
+    assert.equal(packed.files.length, 1);
+    assert.equal(packed.files[0].path, 'media/keep.png');
+    ctx.fetch.next.push(jsonRes(200, [
+      { name: 'state', id: null },
+      { name: 'media', id: null },
+      { name: 'loose.jpg', id: 'x', metadata: { size: 10 } }
+    ]));
+    ctx.fetch.next.push(jsonRes(200, [
+      { name: 'current.json', id: 'a', metadata: { size: 10 } }
+    ]));
+    ctx.fetch.next.push(jsonRes(200, [
+      { name: 'keep.png', id: 'c', metadata: { size: 10 } },
+      { name: 'gone.jpg', id: 'd', metadata: { size: 10 } }
+    ]));
+    ctx.fetch.next.push(jsonRes(200, []));
+    ctx.fetch.next.push(jsonRes(200, { Key: 'media/keep.png' }));
+    const ok = await ctx.SupabaseClub.wipeAndRestore(packed.files);
+    assert.equal(ok, true);
+    const prefixes = ctx.calls
+      .filter(call => call.opts.method === 'DELETE')
+      .flatMap(call => JSON.parse(call.opts.body).prefixes)
+      .sort();
+    assert.deepEqual(prefixes, ['loose.jpg', 'media/gone.jpg', 'media/keep.png', 'state/current.json']);
+    const upload = ctx.calls.find(call => call.opts.method === 'POST' && String(call.url).indexOf('/object/club-media/media/keep.png') >= 0);
+    assert.ok(upload);
+  });
+
   it('does not download photos again when there is no page to shrink them', async () => {
     const ctx = boot();
     const payload = {
