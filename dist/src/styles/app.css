@@ -12196,10 +12196,33 @@ body.role-guest .team-chat { display: none !important; }
   box-shadow: 0 0 0 1px var(--gift-ring, #e8c547), 0 0 26px var(--gift-ring, #e8c547), 0 12px 28px rgba(0,0,0,0.4) !important;
   color: #f4efe2 !important;
 }
-.pl-cards.fifa-stack {
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  gap: 10px;
+.pl-cards .pl-card.fifa-plaque {
+  background:
+    linear-gradient(180deg, rgba(16,12,6,0.5) 0%, rgba(8,10,16,0.9) 72%),
+    repeating-linear-gradient(90deg, #16315c 0 12px, #d4b15e 12px 24px) !important;
+  background-size: 100% 100%, auto !important;
+  border: 1.5px solid var(--acc-ring, #e8c547) !important;
+  box-shadow: 0 0 0 1px var(--acc-ring, #e8c547), 0 0 12px var(--acc-ring, #e8c547) !important;
+  color: #f4efe2 !important;
 }
+.pl-cards .pl-card.fifa-plaque::before,
+.pl-cards .pl-card.fifa-plaque::after {
+  content: none !important;
+  background: none !important;
+}
+.pl-cards .coach-squad-card {
+  grid-column: span 2;
+  flex-direction: row !important;
+  align-items: center !important;
+  text-align: left !important;
+  gap: 12px;
+  padding: 12px 14px !important;
+}
+.pl-cards .coach-squad-card .pl-card-body,
+.pl-cards .coach-squad-card .pl-card-name,
+.pl-cards .coach-squad-card .pl-card-meta,
+.pl-cards .coach-squad-card .pl-card-att { text-align: left !important; width: auto; }
+.pl-cards .coach-squad-card .pl-card-av-wrap { margin: 0 !important; }
 .fifa-compact.club-player-card.fifa-classic {
   padding: 8px 8px 10px !important;
   border-radius: 16px !important;
