@@ -155,7 +155,7 @@ const SupabaseClub = {
     const row = rows[0];
     let payload = !light && row.payload && typeof row.payload === 'object' ? row.payload : null;
     if (!light && row.path) {
-      const file = await this.download(row.path);
+      const file = await this.download(row.path, row.updated_at);
       if (file) payload = file;
     }
     return {
@@ -167,14 +167,14 @@ const SupabaseClub = {
     };
   },
 
-  async download(path) {
+  async download(path, stamp) {
     const safe = String(path || '').replace(/^\/+/, '');
     if (!safe) return null;
-    let res = await fetch(this.URL + '/storage/v1/object/public/club-media/' + safe, { cache: 'no-store' });
+    const q = stamp ? ('?v=' + encodeURIComponent(String(stamp))) : '';
+    let res = await fetch(this.URL + '/storage/v1/object/public/club-media/' + safe + q);
     if (!res.ok) {
-      res = await fetch(this.URL + '/storage/v1/object/club-media/' + safe, {
-        headers: this.headers(),
-        cache: 'no-store'
+      res = await fetch(this.URL + '/storage/v1/object/club-media/' + safe + q, {
+        headers: this.headers()
       });
     }
     if (!res.ok) return null;
@@ -187,6 +187,7 @@ const SupabaseClub = {
       headers: this.headers({ 'Content-Type': type || 'application/octet-stream', 'x-upsert': 'true' }),
       body: body
     });
+    this._lastUploadStatus = res.status;
     return res.ok;
   },
 
@@ -263,6 +264,7 @@ const SupabaseClub = {
           local = ClubMerge.mergePayload(remote.payload, local);
         }
         const off = await this.offload(local);
+        const slim = this.withoutInline(off.payload);
         const remember = (updatedAt) => {
           if (!stillMine() || !this._sm.applyClubPayload) return;
           try {
@@ -276,20 +278,20 @@ const SupabaseClub = {
             this._sm._clubDirty = false;
           } catch (_) {}
         };
-        const fits = JSON.stringify(off.payload).length <= this.ROW_LIMIT;
+        const fits = JSON.stringify(slim).length <= this.ROW_LIMIT;
         const placed = fits ? !remote.path : remote.path === 'state/current.json';
-        if (remote.payload && this.same(remote.payload, off.payload) && placed) {
+        if (remote.payload && this.same(remote.payload, slim) && placed) {
           this.paintUrls(off.map);
           remember(remote.updated_at);
           this._line('Клуб на сервері');
           if (stillMine()) this._sm._clubDirty = false;
           else this._again = true;
           if (remote.updated_at) this._sm._clubUpdatedAt = remote.updated_at;
-          await this.sweep(fits ? '' : 'state/current.json', off.payload);
+          await this.sweep(fits ? '' : 'state/current.json', slim);
           return true;
         }
         const rev = remote.empty ? 0 : (remote.rev || 0);
-        const wrote = await this.commit(off.payload, rev, !remote.empty);
+        const wrote = await this.commit(slim, rev, !remote.empty);
         if (wrote === 'conflict') continue;
         if (wrote !== true) {
           this._line('Не вдалося викласти клуб на сервер');
@@ -437,8 +439,9 @@ const SupabaseClub = {
       const mark = '/club-media/';
       const at = text.indexOf(mark);
       if (at < 0) return;
-      const name = text.slice(at + mark.length).split('?')[0].split('#')[0];
-      if (name.indexOf('media/') === 0) keep.add(name);
+      let name = text.slice(at + mark.length).split('?')[0].split('#')[0];
+      try { name = decodeURIComponent(name); } catch (_) {}
+      if (name && name.indexOf('..') < 0) keep.add(name);
     });
     return keep;
   },
@@ -451,12 +454,59 @@ const SupabaseClub = {
         if (drop.length) await this.removePaths(drop);
       }
       const media = payload ? await this.listFolder('media') : null;
+      const keep = payload ? this.usedMedia(payload) : new Set();
       if (media) {
-        const keep = this.usedMedia(payload);
         const drop = media.filter(path => !keep.has(path));
         if (drop.length) await this.removePaths(drop);
       }
+      if (payload) await this.sweepRest(keepPath, keep);
     } catch (_) {}
+  },
+
+  async sweepRest(keepPath, keep) {
+    const rows = await this.listRaw('');
+    if (!rows) return;
+    const extra = [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || !row.name) continue;
+      const name = String(row.name).replace(/^\/+/, '');
+      if (row.id == null) {
+        if (name === 'media' || name === 'state') continue;
+        const nested = await this.listFolder(name);
+        if (nested) nested.forEach(path => {
+          if (path !== keepPath && !keep.has(path)) extra.push(path);
+        });
+      } else if (name.indexOf('.') >= 0 && name !== keepPath && !keep.has(name)) {
+        extra.push(name);
+      }
+    }
+    if (extra.length) await this.removePaths(extra);
+  },
+
+  async listRaw(folder) {
+    const rows = [];
+    for (let offset = 0; offset < 5000; offset += 100) {
+      const res = await fetch(this.URL + '/storage/v1/object/list/club-media', {
+        method: 'POST',
+        headers: this.headers(),
+        body: JSON.stringify({ prefix: folder, limit: 100, offset: offset, sortBy: { column: 'name', order: 'asc' } })
+      });
+      if (!res.ok) return null;
+      const page = await res.json().catch(() => null);
+      if (!Array.isArray(page)) return null;
+      page.forEach(row => { if (row) rows.push(row); });
+      if (page.length < 100) break;
+    }
+    return rows;
+  },
+
+  withoutInline(payload) {
+    const copy = JSON.parse(JSON.stringify(payload || {}));
+    this._walk(copy, (value, set) => {
+      if (typeof value === 'string' && value.indexOf('data:') === 0 && value.length > 200) set('');
+    });
+    return copy;
   },
 
   async offload(payload) {

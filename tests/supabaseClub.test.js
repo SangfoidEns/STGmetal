@@ -121,6 +121,20 @@ describe('supabase club sync', () => {
     assert.equal(body.payload.players[0].id, 'yehor');
   });
 
+  it('keeps a photo address and drops a photo that never left the phone', () => {
+    const ctx = boot();
+    const slim = ctx.SupabaseClub.withoutInline({
+      players: [{ photoUrl: 'data:image/png;base64,' + 'a'.repeat(300) }],
+      settings: { clubName: 'Металіст' }
+    });
+    assert.equal(slim.players[0].photoUrl, '');
+    assert.equal(slim.settings.clubName, 'Металіст');
+    const keep = ctx.SupabaseClub.usedMedia({
+      settings: { moments: [{ src: ctx.SupabaseClub.URL + '/storage/v1/object/public/club-media/media/goal.jpg?v=1' }] }
+    });
+    assert.equal(keep.has('media/goal.jpg'), true);
+  });
+
   it('drops old club copies and photos the club no longer uses', async () => {
     const ctx = boot();
     ctx.SupabaseClub.KEY = 'anon-public';

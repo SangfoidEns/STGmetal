@@ -14350,3 +14350,35 @@ body.board-only-mode #boardToolbarBottom.btb-bottom {
 }
 .eq { filter: drop-shadow(0 6px 8px rgba(0,0,0,0.35)); }
 .scheme-collapse { margin-top: 8px; }
+
+.club-poster {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 16px 14px;
+  border-radius: 22px;
+  background:
+    linear-gradient(160deg, rgba(232,197,71,0.16), rgba(14,16,22,0.2) 42%),
+    rgba(14, 16, 22, 0.42);
+}
+.club-poster-k {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #e8c547;
+}
+.club-poster b { font-size: 26px; letter-spacing: -0.03em; line-height: 1.1; }
+.club-poster span, .club-poster small { color: rgba(244,239,226,0.78); font-size: 13px; }
+.moment-miss {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  padding: 16px;
+  text-align: center;
+  color: #e8c547;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.moment-miss[hidden] { display: none !important; }

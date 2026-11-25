@@ -2680,11 +2680,11 @@ const Actions = {
       try { Toast.show('Потрібне фото, GIF або відео', 'warn'); } catch (_) {}
       return;
     }
-    if (isVideo && file.size > 18 * 1024 * 1024) {
-      try { Toast.show('Відео завелике. Зніми коротше, до 20 секунд.', 'warn'); } catch (_) {}
+    if (isVideo && file.size > 4 * 1024 * 1024) {
+      try { Toast.show('Відео завелике. Зніми коротше, до 20 секунд і легше за 4 МБ.', 'warn'); } catch (_) {}
       return;
     }
-    if (!isVideo && file.size > 8 * 1024 * 1024) {
+    if (!isVideo && file.size > 12 * 1024 * 1024) {
       try { Toast.show('Файл завеликий', 'warn'); } catch (_) {}
       return;
     }
@@ -2716,13 +2716,30 @@ const Actions = {
       }
       try { Toast.show('Завантажую момент…', ''); } catch (_) {}
       let src = '';
+      let uploadBody = file;
+      let uploadType = file.type || 'application/octet-stream';
+      if (!isVideo && !isGif && this._compressImageFile) {
+        try {
+          const data = await this._compressImageFile(file, 1280, 0.72);
+          const blob = (data && typeof SupabaseClub !== 'undefined' && SupabaseClub._blob) ? SupabaseClub._blob(data) : null;
+          if (blob && String(data).indexOf('data:image/jpeg') === 0) {
+            uploadBody = blob;
+            uploadType = 'image/jpeg';
+          }
+        } catch (_) {}
+      }
       try {
         if (typeof SupabaseClub !== 'undefined' && SupabaseClub.enabled && SupabaseClub.enabled() && SupabaseClub.upload) {
           const rawExt = String(file.name || '').split('.').pop() || '';
           const ext = (isGif ? 'gif' : (isVideo ? rawExt : 'jpg')).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 4) || (isVideo ? 'mp4' : 'jpg');
-          const path = 'media/moment-' + Date.now().toString(36) + '.' + ext;
-          const ok = await SupabaseClub.upload(path, file, file.type || 'application/octet-stream');
+          const stamp = String(file.size || '') + '|' + String(file.lastModified || '') + '|' + String(file.name || '');
+          const hash = SupabaseClub._hash ? SupabaseClub._hash(stamp) : Date.now().toString(36);
+          const path = 'media/m' + hash + '.' + ext;
+          const ok = await SupabaseClub.upload(path, uploadBody, uploadType);
           if (ok) src = SupabaseClub.URL + '/storage/v1/object/public/club-media/' + path;
+          else if (SupabaseClub._lastUploadStatus === 413 || SupabaseClub._lastUploadStatus === 507 || SupabaseClub._lastUploadStatus === 400) {
+            try { Toast.show('Сховище сервера повне. Прибери старі моменти — файл зникне і звідти.', 'warn'); } catch (_) {}
+          }
         }
       } catch (_) {}
       if (!src) {
@@ -2770,7 +2787,17 @@ const Actions = {
     const s = Store.get().settings;
     if (!s || !Array.isArray(s.moments)) return;
     const key = String(id || '');
+    const gone = s.moments.find(m => m && String(m.id) === key);
     s.moments = s.moments.filter(m => m && String(m.id) !== key);
+    try {
+      const src = gone && (gone.src || gone.url) || '';
+      const mark = '/club-media/';
+      const at = String(src).indexOf(mark);
+      if (at >= 0 && typeof SupabaseClub !== 'undefined' && SupabaseClub.removePaths) {
+        const path = decodeURIComponent(String(src).slice(at + mark.length).split('?')[0].split('#')[0]);
+        if (path) SupabaseClub.removePaths([path]);
+      }
+    } catch (_) {}
     const now = new Date().toISOString();
     s.stamps = Object.assign({}, s.stamps || {}, { moments: now });
     s.updatedAt = now;

@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z154',
+  APP_BUILD: 'z155',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -1491,32 +1491,36 @@ const Views = {
     }).join('') + links.map(url => '<a class="club-media-link" href="' + sanitize(url) + '" target="_blank" rel="noopener">' + sanitize(url) + '</a>').join('');
     const next = this._nextPlanned(s.trainings);
     const clubName = set.clubName || 'Металіст Штуттгарт';
+    const moments = (Array.isArray(set.moments) && set.moments.length) ? set.moments : (s.moments || []);
+    const todayStr = (typeof today === 'function') ? today() : '';
+    const upcoming = (s.matches || []).filter(m => m && m.date && m.status !== 'cancelled' && String(m.date) >= todayStr)
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+    const poster = upcoming
+      ? '<section class="glass club-poster"><div class="club-poster-k">Далі на полі</div><b>' + sanitize(upcoming.opponent || 'Суперник') + '</b><span>' + sanitize([upcoming.date, upcoming.time].filter(Boolean).join(' · ')) + '</span><small>' + sanitize(upcoming.competition || 'Матч') + (upcoming.place ? (' · ' + upcoming.place) : '') + '</small></section>'
+      : '';
+    const sessionCard = next
+      ? '<section class="glass club-poster club-poster-train"><div class="club-poster-k">Наступне тренування</div><b>' + sanitize(next.name || 'Тренування') + '</b><span>' + sanitize([next.date, next.time].filter(Boolean).join(' · ')) + '</span></section>'
+      : '';
 
     return '<div class="club-public">' +
       '<section class="glass club-hero">' +
         '<button type="button" class="club-crest-btn" data-action="open-photo" data-photo="' + this.clubMark() + '" data-photo-save="1" data-photo-name="Metalist-Shtuttgart.png" title="Емблема на весь екран">' +
         '<img class="club-crest" src="' + this.clubMark() + '" alt="Емблема Металіст Штуттгарт"/></button>' +
         '<div class="club-hero-copy"><div class="club-kicker">Клуб</div><h1>' + sanitize(clubName) + '</h1>' +
-        '<p>Жива головна: матчі, моменти і ріст команди.</p>' +
+        '<p>' + players.length + ' гравців у складі' + (avg ? (', явка ' + avg + '%') : '') + '.</p>' +
         '<button type="button" class="btn btn-s btn-sm" data-action="enter-server-code">Код клубу</button></div></section>' +
-      '<div class="club-kpis">' +
-        '<div class="glass"><b>' + players.length + '</b><span>гравців</span></div>' +
-        '<div class="glass"><b>' + done.length + '</b><span>сесій</span></div>' +
-        '<div class="glass"><b>' + avg + '%</b><span>явка</span></div>' +
-        '<div class="glass"><b>' + (next ? sanitize(next.date || '') : '—') + '</b><span>наступне</span></div>' +
-      '</div>' +
-      this._matchHub({ role: 'guest' }) +
-      '<section class="glass club-block"><h2>Останні моменти</h2>' + this._momentsRail(set.moments) + '</section>' +
-      this._clubForgeHtml() +
-      '<section class="glass club-block"><h2>Активність</h2><ul class="club-feed">' +
-        (activity.join('') || '<li class="club-act"><span>Поки немає відмічених сесій.</span></li>') +
-      '</ul></section>' +
-      '<section class="glass club-block"><h2>Ріст команди</h2>' + spark +
-        '<div class="club-grow-list">' + (growth || '<p class="note-sm">Гравці з’являться тут.</p>') + '</div></section>' +
-      '<section class="glass club-block"><h2>Склад і посилання</h2>' +
+      poster + sessionCard +
+      '<section class="glass club-block"><h2>Останні моменти</h2>' + this._momentsRail(moments) + '</section>' +
+      '<section class="glass club-block"><h2>Склад</h2>' +
         '<div class="club-photos">' + (photos || '<p class="note-sm">Фото гравців з’являться тут.</p>') + '</div>' +
         (mediaHtml ? ('<div class="club-links">' + mediaHtml + '</div>') : '') +
-      '</section></div>';
+      '</section>' +
+      this._clubForgeHtml() +
+      '<section class="glass club-block"><h2>Ріст команди</h2>' + spark +
+        '<div class="club-grow-list">' + (growth || '<p class="note-sm">Гравці з’являться тут.</p>') + '</div></section>' +
+      '<section class="glass club-block"><h2>Активність</h2><ul class="club-feed">' +
+        (activity.join('') || '<li class="club-act"><span>Поки немає відмічених сесій.</span></li>') +
+      '</ul></section></div>';
   },
 
   _momentsRail(list) {
@@ -1528,10 +1532,10 @@ const Views = {
       const badge = kind === 'video' ? 'Відео' : (kind === 'gif' ? 'GIF' : 'Фото');
       const title = m.title ? ('<figcaption>' + sanitize(m.title) + '</figcaption>') : '';
       const media = kind === 'video'
-        ? '<video src="' + sanitize(src) + '" controls playsinline preload="metadata"></video>'
-        : '<img src="' + sanitize(src) + '" alt="" loading="lazy"/>';
+        ? '<video src="' + sanitize(src) + '" controls playsinline preload="metadata" onerror="App.reviveMedia&&App.reviveMedia(this)"></video>'
+        : '<img src="' + sanitize(src) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="App.reviveMedia&&App.reviveMedia(this)"/>';
       return '<figure class="moment-card" data-action="open-moment" data-moment-id="' + sanitize(m.id || '') + '" data-moment-kind="' + kind + '">' +
-        media + '<span class="moment-badge">' + badge + '</span>' + title + '</figure>';
+        media + '<span class="moment-miss" hidden>Фото не відкрилось. Тренер може додати його ще раз.</span><span class="moment-badge">' + badge + '</span>' + title + '</figure>';
     }).join('') + '</div>';
   },
 

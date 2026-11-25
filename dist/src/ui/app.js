@@ -1143,6 +1143,29 @@ const App = {
     this._boardNavToken = reason || 'explicit';
   },
 
+  reviveMedia(el) {
+    if (!el) return;
+    const reveal = () => {
+      const miss = el.parentNode && el.parentNode.querySelector && el.parentNode.querySelector('.moment-miss');
+      if (miss) miss.hidden = false;
+      try { el.remove(); } catch (_) {}
+    };
+    if (el.dataset && el.dataset.tried) { reveal(); return; }
+    const raw = String(el.getAttribute('src') || el.currentSrc || '');
+    if (raw.indexOf('/club-media/') < 0 || typeof SupabaseClub === 'undefined' || !SupabaseClub.enabled || !SupabaseClub.enabled()) {
+      reveal();
+      return;
+    }
+    if (el.dataset) el.dataset.tried = '1';
+    const src = raw.replace('/object/public/', '/object/');
+    fetch(src, { headers: SupabaseClub.headers() }).then(res => res.ok ? res.blob() : null).then(blob => {
+      if (!blob) { reveal(); return; }
+      const url = URL.createObjectURL(blob);
+      el.onerror = () => reveal();
+      el.src = url;
+    }).catch(() => reveal());
+  },
+
   _bindPlayerCompare() {
     const sel = document.getElementById('playerCompareSel');
     if (!sel) return;
