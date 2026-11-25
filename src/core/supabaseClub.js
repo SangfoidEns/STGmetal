@@ -188,6 +188,10 @@ const SupabaseClub = {
       body: body
     });
     this._lastUploadStatus = res.status;
+    if (res.ok) {
+      this._fresh = this._fresh || new Set();
+      this._fresh.add(String(path || ''));
+    }
     return res.ok;
   },
 
@@ -265,6 +269,7 @@ const SupabaseClub = {
         }
         const off = await this.offload(local);
         const slim = this.withoutInline(off.payload);
+        await this.slimStored(slim);
         const remember = (updatedAt) => {
           if (!stillMine() || !this._sm.applyClubPayload) return;
           try {
@@ -403,17 +408,21 @@ const SupabaseClub = {
       const res = await fetch(this.URL + '/storage/v1/object/list/club-media', {
         method: 'POST',
         headers: this.headers(),
-        body: JSON.stringify({ prefix: folder, limit: 100, offset: offset })
+        body: JSON.stringify({ prefix: folder, limit: 100, offset: offset, sortBy: { column: 'name', order: 'asc' } })
       });
       if (!res.ok) return null;
       const rows = await res.json().catch(() => null);
       if (!Array.isArray(rows)) return null;
+      let fresh = 0;
       rows.forEach(row => {
         if (!row || row.id == null || !row.name || String(row.name).indexOf('.') < 0) return;
         const raw = String(row.name).replace(/^\/+/, '');
-        names.push(raw.indexOf(folder + '/') === 0 ? raw : (folder + '/' + raw));
+        const path = raw.indexOf(folder + '/') === 0 ? raw : (folder + '/' + raw);
+        if (names.indexOf(path) >= 0) return;
+        names.push(path);
+        fresh++;
       });
-      if (rows.length < 100) break;
+      if (!fresh || rows.length < 100) break;
     }
     return names;
   },
@@ -448,24 +457,26 @@ const SupabaseClub = {
 
   async sweep(keepPath, payload) {
     try {
+      let gone = 0;
+      const dropSome = async (paths) => {
+        const todo = (paths || []).filter(Boolean);
+        if (!todo.length) return;
+        const ok = await this.removePaths(todo);
+        if (ok) gone += todo.length;
+      };
       const state = await this.listFolder('state');
-      if (state) {
-        const drop = state.filter(path => path !== keepPath);
-        if (drop.length) await this.removePaths(drop);
-      }
+      if (state) await dropSome(state.filter(path => path !== keepPath));
       const media = payload ? await this.listFolder('media') : null;
       const keep = payload ? this.usedMedia(payload) : new Set();
-      if (media) {
-        const drop = media.filter(path => !keep.has(path));
-        if (drop.length) await this.removePaths(drop);
-      }
-      if (payload) await this.sweepRest(keepPath, keep);
+      if (media) await dropSome(media.filter(path => !keep.has(path)));
+      if (payload) gone += await this.sweepRest(keepPath, keep);
+      if (gone) this._line('Прибрав ' + gone + ' зайвих файлів зі сховища.');
     } catch (_) {}
   },
 
   async sweepRest(keepPath, keep) {
     const rows = await this.listRaw('');
-    if (!rows) return;
+    if (!rows) return 0;
     const extra = [];
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -481,11 +492,14 @@ const SupabaseClub = {
         extra.push(name);
       }
     }
-    if (extra.length) await this.removePaths(extra);
+    if (!extra.length) return 0;
+    const ok = await this.removePaths(extra);
+    return ok ? extra.length : 0;
   },
 
   async listRaw(folder) {
     const rows = [];
+    const seen = new Set();
     for (let offset = 0; offset < 5000; offset += 100) {
       const res = await fetch(this.URL + '/storage/v1/object/list/club-media', {
         method: 'POST',
@@ -495,8 +509,16 @@ const SupabaseClub = {
       if (!res.ok) return null;
       const page = await res.json().catch(() => null);
       if (!Array.isArray(page)) return null;
-      page.forEach(row => { if (row) rows.push(row); });
-      if (page.length < 100) break;
+      let fresh = 0;
+      page.forEach(row => {
+        if (!row) return;
+        const key = String(row.id || '') + '|' + String(row.name || '');
+        if (seen.has(key)) return;
+        seen.add(key);
+        rows.push(row);
+        fresh++;
+      });
+      if (!fresh || page.length < 100) break;
     }
     return rows;
   },
@@ -532,12 +554,109 @@ const SupabaseClub = {
   },
 
   async uploadData(dataUrl) {
-    const blob = this._blob(dataUrl);
+    let blob = this._blob(dataUrl);
     if (!blob) return '';
+    if (blob.size > 180 * 1024) {
+      const small = await this._shrinkBlob(blob, 960, 0.66);
+      if (small && small.size < blob.size) blob = small;
+    }
     const path = 'media/' + this._hash(dataUrl) + '.' + this._ext(blob.type);
     const ok = await this.upload(path, blob, blob.type || 'application/octet-stream');
     if (!ok) return '';
     return this.URL + '/storage/v1/object/public/club-media/' + path;
+  },
+
+  _mediaPath(url) {
+    const text = String(url || '');
+    const mark = '/club-media/';
+    const at = text.indexOf(mark);
+    if (at < 0) return '';
+    let name = text.slice(at + mark.length).split('?')[0].split('#')[0];
+    try { name = decodeURIComponent(name); } catch (_) {}
+    if (!name || name.indexOf('..') >= 0) return '';
+    return name;
+  },
+
+  /** Важкі фото на сервері замінюються легшою копією. Старий файл потім зникає як зайвий. */
+  async slimStored(payload) {
+    if (!payload || typeof document === 'undefined') return 0;
+    const found = [];
+    this._walk(payload, (value) => {
+      const text = String(value || '').split('#')[0];
+      if (text.indexOf('/club-media/') >= 0 && found.indexOf(text) < 0) found.push(text);
+    });
+    const replace = new Map();
+    let done = 0;
+    for (let i = 0; i < found.length && done < 30; i++) {
+      const url = found[i];
+      const path = this._mediaPath(url);
+      if (!path || path.indexOf('media/') !== 0) continue;
+      if (this._fresh && this._fresh.has(path)) continue;
+      if (this._slimDone && this._slimDone.has(path)) continue;
+      this._slimDone = this._slimDone || new Set();
+      let size = 0;
+      let kind = '';
+      try {
+        const head = await fetch(url, { method: 'HEAD' });
+        if (head.ok) {
+          size = Number(head.headers.get('content-length') || 0);
+          kind = String(head.headers.get('content-type') || '');
+        }
+      } catch (_) {}
+      if (!size || size < 280 * 1024 || kind.indexOf('image/') !== 0 || kind.indexOf('gif') >= 0) {
+        if (size || kind) this._slimDone.add(path);
+        continue;
+      }
+      let blob = null;
+      try {
+        const res = await fetch(url);
+        if (res.ok) blob = await res.blob();
+      } catch (_) {}
+      const small = blob ? await this._shrinkBlob(blob, 960, 0.66) : null;
+      if (!small || small.size >= size * 0.85) {
+        this._slimDone.add(path);
+        continue;
+      }
+      const nextPath = 'media/s' + this._hash(path + '|' + String(small.size)) + '.jpg';
+      const ok = await this.upload(nextPath, small, 'image/jpeg');
+      if (!ok) continue;
+      replace.set(url, this.URL + '/storage/v1/object/public/club-media/' + nextPath);
+      this._slimDone.add(path);
+      done++;
+    }
+    if (!replace.size) return 0;
+    this._walk(payload, (value, set) => {
+      const text = String(value || '').split('#')[0];
+      if (replace.has(text)) set(replace.get(text));
+    });
+    this._line('Важкі фото стиснуті. Зайве зі сховища прибирається.');
+    return done;
+  },
+
+  async _shrinkBlob(blob, maxSide, quality) {
+    if (!blob || typeof document === 'undefined' || typeof createImageBitmap !== 'function') return null;
+    const type = String(blob.type || '');
+    if (type.indexOf('image/') !== 0 || type.indexOf('gif') >= 0) return null;
+    let bmp = null;
+    try {
+      bmp = await createImageBitmap(blob);
+      const longest = Math.max(bmp.width || 1, bmp.height || 1);
+      const scale = Math.min(1, maxSide / longest);
+      const w = Math.max(1, Math.round((bmp.width || 1) * scale));
+      const h = Math.max(1, Math.round((bmp.height || 1) * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      ctx.drawImage(bmp, 0, 0, w, h);
+      const out = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+      return out || null;
+    } catch (_) {
+      return null;
+    } finally {
+      try { if (bmp && bmp.close) bmp.close(); } catch (_) {}
+    }
   },
 
   paintUrls(map) {

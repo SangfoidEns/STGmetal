@@ -158,5 +158,18 @@ describe('supabase club sync', () => {
       .flatMap(call => JSON.parse(call.opts.body).prefixes)
       .sort();
     assert.deepEqual(prefixes, ['media/gone.jpg', 'state/1-old.json']);
+    const listed = ctx.calls.find(call => String(call.url).indexOf('/object/list/') >= 0);
+    assert.match(listed.opts.body, /"column":"name"/);
+  });
+
+  it('does not download photos again when there is no page to shrink them', async () => {
+    const ctx = boot();
+    const payload = {
+      players: [{ photoUrl: ctx.SupabaseClub.URL + '/storage/v1/object/public/club-media/media/big.jpg' }]
+    };
+    const n = await ctx.SupabaseClub.slimStored(payload);
+    assert.equal(n, 0);
+    assert.match(payload.players[0].photoUrl, /big\.jpg$/);
+    assert.equal(ctx.calls.length, 0);
   });
 });
