@@ -1527,12 +1527,15 @@ const StorageManager = {
       const finish = () => { this._holdRemote = false; };
       this.pushClub({ force: true }).then(finish, finish);
     };
-    const applyMerged = (payload) => {
+    const applyMerged = (payload, file) => {
       const current = Store.get() || {};
       const ui = current.ui;
       let next = payload;
       if (typeof ClubMerge !== 'undefined' && ClubMerge.mergePayload) {
         next = ClubMerge.mergePayload(current, payload);
+      }
+      if (file && typeof ClubMerge !== 'undefined' && ClubMerge.restoreListedBoards) {
+        try { ClubMerge.restoreListedBoards(next, file); } catch (_) {}
       }
       if (ui) next.ui = Object.assign({}, next.ui || {}, ui);
       Store.set(next, { keepStamp: true });
@@ -1634,7 +1637,7 @@ const StorageManager = {
             localStorage.setItem('metalist_roster_migration', snapshot);
           } catch (_) {}
 
-          applyMerged(packed);
+          applyMerged(packed, data);
           try { if (typeof AuthManager !== 'undefined') AuthManager.afterDataImport(); } catch (_) {}
           try { if (typeof CoachTools !== 'undefined' && CoachTools.loadCustomArtifacts) CoachTools.loadCustomArtifacts(); } catch (_) {}
           try { App.applyBranding && App.applyBranding(); } catch (_) {}
@@ -1647,10 +1650,11 @@ const StorageManager = {
             if (typeof GiftFX !== 'undefined' && GiftFX.celebrateRecent) GiftFX.celebrateRecent();
           } catch (_) {}
 
-          const nP = (packed.players || []).length;
-          const nT = (packed.trainings || []).length;
-          const nB = (packed.boards || []).length;
-          const nG = (packed.gifts || []).length;
+          const live = Store.get() || packed;
+          const nP = (live.players || []).length;
+          const nT = (live.trainings || []).length;
+          const nB = (live.boards || []).length;
+          const nG = (live.gifts || []).length;
           const gained = Math.max(0, photosAfter - photosBefore);
           Toast.show('Злито без дублів: ' + nP + ' гравців · ' + nT + ' тренувань · ' + nB + ' схем · ' + nG + ' подарунків · фото ' + photosAfter + (gained ? (' · повернулось ' + gained) : ''), 'ok');
           return true;
@@ -1663,7 +1667,7 @@ const StorageManager = {
         }
         this.createBackup();
         const migrated = this.migrate(data, data.schemaVersion || 1);
-        applyMerged(migrated);
+        applyMerged(migrated, data);
         // Telegram CloudStorage (якщо є)
         try {
           if (typeof TelegramManager !== 'undefined' && TelegramManager.tg && TelegramManager.tg.CloudStorage) {

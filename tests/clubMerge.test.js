@@ -7,7 +7,7 @@ const context = {};
 context.globalThis = context;
 vm.createContext(context);
 vm.runInContext(readFileSync(new URL('../src/core/clubMerge.js', import.meta.url), 'utf8'), context);
-const { mergePayload } = context.ClubMerge;
+const { mergePayload, restoreListedBoards } = context.ClubMerge;
 
 describe('club snapshot merge', () => {
   it('keeps the newer attendance mark and does not duplicate the player', () => {
@@ -148,6 +148,58 @@ describe('club snapshot merge', () => {
     assert.equal(merged.boards.length, 0);
     assert.deepEqual(merged.schemeAlbums[0].boardIds, []);
     assert.ok(merged.settings.removedBoardIds.indexOf('old') >= 0);
+  });
+
+  it('a loaded file adds the missing scheme and does not duplicate what is already here', () => {
+    const club = {
+      settings: { removedBoardIds: ['lost'], updatedAt: '2026-11-24T08:00:00.000Z' },
+      players: [{ id: 'p1', firstName: 'Єгор', updatedAt: '2026-11-24T08:00:00.000Z' }],
+      boards: [{ id: 'keep', name: 'Прес', objects: [{ type: 'ball' }], updatedAt: '2026-11-24T08:00:00.000Z' }],
+      schemeAlbums: [{ id: 'a1', name: 'Матч', boardIds: ['keep'], updatedAt: '2026-11-24T08:00:00.000Z' }]
+    };
+    const file = {
+      type: 'metalist_full_migration',
+      settings: { updatedAt: '2026-11-20T08:00:00.000Z' },
+      players: [{ id: 'p1', firstName: 'Єгор', updatedAt: '2026-11-20T08:00:00.000Z' }],
+      boards: [
+        { id: 'keep', name: 'Прес', objects: [{ type: 'cone' }], updatedAt: '2026-11-20T08:00:00.000Z' },
+        { id: 'lost', name: 'Важлива', objects: [{ type: 'player' }, { type: 'arrow' }], updatedAt: '2026-11-20T08:00:00.000Z' }
+      ],
+      schemes: [{ id: 'lost', name: 'Важлива', objects: [{ type: 'player' }] }],
+      schemeAlbums: [{ id: 'a1', name: 'Матч', boardIds: ['keep', 'lost'], updatedAt: '2026-11-20T08:00:00.000Z' }]
+    };
+    const merged = mergePayload(club, file);
+    assert.equal(merged.boards.length, 1);
+    const added = restoreListedBoards(merged, file);
+    assert.equal(added, 1);
+    assert.equal(merged.boards.length, 2);
+    assert.equal(merged.boards.filter(function (board) { return board.id === 'lost'; }).length, 1);
+    assert.equal(merged.boards.find(function (board) { return board.id === 'keep'; }).objects[0].type, 'ball');
+    assert.equal(merged.boards.find(function (board) { return board.id === 'lost'; }).objects.length, 2);
+    assert.equal(merged.settings.removedBoardIds.indexOf('lost'), -1);
+    assert.ok(merged.settings.boardRestoredAt.lost);
+    assert.ok(merged.schemeAlbums[0].boardIds.indexOf('lost') >= 0);
+    assert.equal(restoreListedBoards(merged, file), 0);
+    assert.equal(merged.boards.length, 2);
+
+    const again = mergePayload({
+      settings: { removedBoardIds: ['lost'], updatedAt: '2026-11-24T09:00:00.000Z' },
+      boards: [],
+      schemeAlbums: [{ id: 'a1', name: 'Матч', boardIds: [], updatedAt: '2026-11-24T09:00:00.000Z' }]
+    }, merged);
+    assert.equal(again.boards.filter(function (board) { return board.id === 'lost'; }).length, 1);
+    assert.ok(again.schemeAlbums[0].boardIds.indexOf('lost') >= 0);
+
+    const dropped = mergePayload(again, {
+      settings: {
+        removedBoardIds: ['lost'],
+        boardDroppedAt: { lost: '2099-01-01T00:00:00.000Z' },
+        updatedAt: '2099-01-01T00:00:00.000Z'
+      },
+      boards: [],
+      schemeAlbums: [{ id: 'a1', name: 'Матч', boardIds: [], updatedAt: '2026-11-25T12:00:00.000Z' }]
+    });
+    assert.equal(dropped.boards.filter(function (board) { return board.id === 'lost'; }).length, 0);
   });
 
   it('does not bring back an album the coach deleted', () => {

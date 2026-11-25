@@ -260,6 +260,9 @@ const Actions = {
     const key = String(id || '');
     if (!s || !key) return;
     this.forget('removedBoardIds', key);
+    s.settings.boardDroppedAt = s.settings.boardDroppedAt || {};
+    s.settings.boardDroppedAt[key] = s.settings.updatedAt || new Date().toISOString();
+    if (s.settings.boardRestoredAt) delete s.settings.boardRestoredAt[key];
     s.boards = (s.boards || []).filter(x => String(x.id) !== key);
     (s.schemeAlbums || []).forEach(album => {
       if (!album || !Array.isArray(album.boardIds)) return;

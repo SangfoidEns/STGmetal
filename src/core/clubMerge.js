@@ -497,8 +497,34 @@ function applyStampedFields(merged, a, b) {
       'removedMatchIds', 'removedPlayerIds', 'removedSectionIds', 'removedDiaryIds',
       'removedExerciseIds', 'removedMyExerciseIds', 'removedCalendarIds'
     ].forEach(function (key) { unionIds(base, extra, key, out); });
+    out.boardDroppedAt = mergeTimeMap(base.boardDroppedAt, extra.boardDroppedAt);
+    out.boardRestoredAt = mergeTimeMap(base.boardRestoredAt, extra.boardRestoredAt);
     unionApprovals(base, extra, out);
     return out;
+  }
+
+  function mergeTimeMap(a, b) {
+    const out = Object.assign({}, a || {});
+    Object.keys(b || {}).forEach(function (id) {
+      const token = String(id || '');
+      if (!token) return;
+      if (!out[token] || stamp(b[id]) >= stamp(out[token])) out[token] = b[id];
+    });
+    return out;
+  }
+
+  /** Свіже повернення з файлу перемагає стару позначку «схему видалено». Звичайне видалення лишається видаленням. */
+  function revivedBoardIds(settings) {
+    const set = new Set();
+    const restored = (settings && settings.boardRestoredAt) || {};
+    const dropped = (settings && settings.boardDroppedAt) || {};
+    Object.keys(restored).forEach(function (id) {
+      const token = String(id || '');
+      const back = stamp(restored[id]);
+      if (!token || !back) return;
+      if (back > stamp(dropped[token])) set.add(token);
+    });
+    return set;
   }
 
   function takeStampedSetting(out, base, extra, field) {
@@ -834,7 +860,27 @@ function collapseTrainings(payload) {
         return !keys.some(function (k) { return gone.has(k); });
       });
     }
+    const albumLinks = {};
+    [base && base.schemeAlbums, extra && extra.schemeAlbums].forEach(function (list) {
+      (Array.isArray(list) ? list : []).forEach(function (album) {
+        if (!album || album.id == null || !Array.isArray(album.boardIds)) return;
+        const key = String(album.id);
+        if (!albumLinks[key]) albumLinks[key] = [];
+        album.boardIds.forEach(function (id) {
+          const token = String(id || '');
+          if (!token) return;
+          if (!albumLinks[key].some(function (have) { return String(have) === token; })) albumLinks[key].push(id);
+        });
+      });
+    });
+    const revived = revivedBoardIds(out.settings);
     const droppedBoards = new Set(((out.settings && out.settings.removedBoardIds) || []).map(function (id) { return String(id || ''); }));
+    revived.forEach(function (id) { droppedBoards.delete(id); });
+    if (revived.size && out.settings && Array.isArray(out.settings.removedBoardIds)) {
+      out.settings.removedBoardIds = out.settings.removedBoardIds.filter(function (id) {
+        return !revived.has(String(id || ''));
+      });
+    }
     if (droppedBoards.size) {
       if (Array.isArray(out.boards)) {
         out.boards = out.boards.filter(function (board) {
@@ -847,6 +893,18 @@ function collapseTrainings(payload) {
           album.boardIds = album.boardIds.filter(function (id) { return !droppedBoards.has(String(id || '')); });
         });
       }
+    }
+    if (revived.size && Array.isArray(out.schemeAlbums)) {
+      out.schemeAlbums.forEach(function (album) {
+        if (!album || album.id == null) return;
+        const wanted = albumLinks[String(album.id)] || [];
+        if (!Array.isArray(album.boardIds)) album.boardIds = [];
+        wanted.forEach(function (id) {
+          const token = String(id || '');
+          if (!revived.has(token)) return;
+          if (!album.boardIds.some(function (have) { return String(have) === token; })) album.boardIds.push(id);
+        });
+      });
     }
     const droppedAlbums = new Set(((out.settings && out.settings.removedAlbumIds) || []).map(function (id) { return String(id || ''); }));
     if (droppedAlbums.size) {
@@ -983,8 +1041,93 @@ function collapseTrainings(payload) {
     return (unique.join(', ') || 'зміна') + extra;
   }
 
+  function boardTitle(board) {
+    return String((board && (board.name || board.title)) || '').trim().toLowerCase();
+  }
+
+  function copyBoard(board) {
+    try { return JSON.parse(JSON.stringify(board)); } catch (_) { return Object.assign({}, board); }
+  }
+
+  /**
+   * Ручне завантаження файлу додає схеми, яких зараз немає.
+   * Ту саму схему (той самий id) не копіює вдруге і не затирає те, що вже є.
+   * Повернення діє лише для цього імпорту: звичайний обмін клубу далі не воскрешає те, що тренер видалив.
+   */
+  function restoreListedBoards(out, file) {
+    const incoming = [];
+    ['boards', 'schemes'].forEach(function (key) {
+      const list = file && file[key];
+      if (!Array.isArray(list)) return;
+      list.forEach(function (board) {
+        if (board && typeof board === 'object') incoming.push(board);
+      });
+    });
+    const active = file && file.activeBoard;
+    if (active && typeof active === 'object' && active.id != null && Array.isArray(active.objects) && active.objects.length) {
+      const activeId = String(active.id);
+      const named = boardTitle(active);
+      const listed = incoming.some(function (board) {
+        return String(board.id || '') === activeId || (named && boardTitle(board) === named);
+      });
+      if (!listed) incoming.push(active);
+    }
+    if (!incoming.length || !out) return 0;
+    if (!Array.isArray(out.boards)) out.boards = [];
+    if (!out.settings) out.settings = {};
+    const have = {};
+    out.boards.forEach(function (board) {
+      if (board && board.id != null) have[String(board.id)] = true;
+    });
+    const restored = [];
+    const now = new Date().toISOString();
+    incoming.forEach(function (board) {
+      const id = board.id != null ? String(board.id) : '';
+      if (id && have[id]) return;
+      const copy = copyBoard(board);
+      if (copy.id == null || copy.id === '') {
+        const name = boardTitle(copy);
+        if (name && out.boards.some(function (item) { return boardTitle(item) === name; })) return;
+        copy.id = 'restored-' + Math.random().toString(36).slice(2, 8);
+      }
+      out.boards.push(copy);
+      have[String(copy.id)] = true;
+      restored.push(String(copy.id));
+    });
+    if (!restored.length) return 0;
+    const back = {};
+    restored.forEach(function (id) { back[id] = true; });
+    if (Array.isArray(out.settings.removedBoardIds)) {
+      out.settings.removedBoardIds = out.settings.removedBoardIds.filter(function (id) {
+        return !back[String(id || '')];
+      });
+    }
+    out.settings.boardRestoredAt = out.settings.boardRestoredAt || {};
+    out.settings.boardDroppedAt = out.settings.boardDroppedAt || {};
+    restored.forEach(function (id) {
+      out.settings.boardRestoredAt[id] = now;
+      delete out.settings.boardDroppedAt[id];
+    });
+    const albums = file && file.schemeAlbums;
+    if (Array.isArray(albums) && Array.isArray(out.schemeAlbums)) {
+      albums.forEach(function (album) {
+        if (!album || album.id == null || !Array.isArray(album.boardIds)) return;
+        const local = out.schemeAlbums.find(function (item) { return item && String(item.id) === String(album.id); });
+        if (!local) return;
+        if (!Array.isArray(local.boardIds)) local.boardIds = [];
+        album.boardIds.forEach(function (id) {
+          const key = String(id || '');
+          if (!back[key]) return;
+          if (!local.boardIds.some(function (haveId) { return String(haveId) === key; })) local.boardIds.push(id);
+        });
+      });
+    }
+    return restored.length;
+  }
+
   root.ClubMerge = {
     mergePayload: mergePayload,
+    restoreListedBoards: restoreListedBoards,
     mergeAttendance: mergeAttendance,
     mergeCoachStats: mergeCoachStats,
     mergePlayerUsage: mergePlayerUsage,
