@@ -12197,9 +12197,36 @@ body.role-guest .team-chat { display: none !important; }
   color: #f4efe2 !important;
 }
 .pl-cards.fifa-stack {
-  grid-template-columns: 1fr !important;
-  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px;
 }
+.fifa-compact.club-player-card.fifa-classic {
+  padding: 8px 8px 10px !important;
+  border-radius: 16px !important;
+  box-shadow: 0 0 0 1px var(--gift-ring, #e8c547), 0 0 10px var(--gift-ring, #e8c547), 0 6px 14px rgba(0,0,0,0.35) !important;
+}
+.fifa-compact .cpc-brand { margin-bottom: 4px; }
+.fifa-compact .cpc-brand-name { font-size: 8px; letter-spacing: 0.04em; }
+.fifa-compact .cpc-hero { gap: 6px; margin-bottom: 6px; }
+.fifa-compact .cpc-photo {
+  width: 52px !important;
+  height: 52px !important;
+  flex: 0 0 52px !important;
+  font-size: 14px;
+  border-width: 2px;
+}
+.fifa-compact .cpc-hero .fifa-club-logo {
+  width: 36px !important;
+  height: 36px !important;
+  flex: 0 0 36px !important;
+}
+.fifa-compact .cpc-num { font-size: 16px; }
+.fifa-compact .cpc-pos { margin-top: 1px; font-size: 10px; }
+.fifa-compact .cpc-ovr { margin-top: 2px; font-size: 14px; }
+.fifa-compact .cpc-ovr-label { font-size: 8px; }
+.fifa-compact .cpc-name { font-size: 13px; }
+.fifa-compact .cpc-name-txt { display: block; }
+.fifa-compact .cpc-meta { margin: 2px 0 0; font-size: 10px; }
 .squad-fifa { min-width: 0; cursor: pointer; }
 .squad-fifa .club-player-card { width: 100%; box-sizing: border-box; }
 .club-player-card.fifa-classic::before,

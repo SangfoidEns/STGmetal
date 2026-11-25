@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z149',
+  APP_BUILD: 'z150',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -833,9 +833,10 @@ const Views = {
       '</div>' +
       '</div>';
   },
-  _fifaCard(p, stats) {
+  _fifaCard(p, stats, opts) {
     if (!p) return '';
     stats = stats || {};
+    const compact = !!(opts && opts.compact);
     const st = p.status || 'available';
     const stLabel = ({ available: 'Здоровий', healthy: 'Здоровий', injured: 'Травмований', rehab: 'Відновлення', recovery: 'Відновлення' })[st] || st;
     const pos = p.position || '—';
@@ -881,9 +882,8 @@ const Views = {
         }).join('') + '</div>')
       : '<div class="fifa-gifts fifa-gifts-empty"><span class="note-sm">Артефактів ще немає</span></div>';
 
-    // Порівняння — ТІЛЬКИ всередині FIFA-картки
     const otherId = (typeof window !== 'undefined' && (window.__fifaCompareId || window.__coachCompareId || window.__playerCompareId)) || '';
-    const compareHtml = this._compareBlock(p, otherId);
+    const compareHtml = compact ? '' : this._compareBlock(p, otherId);
 
     const clubLogo = this.clubMark();
     const logoTag = clubLogo
@@ -892,17 +892,45 @@ const Views = {
     const gs = this._playerGiftStyle ? this._playerGiftStyle(p.id) : { ring: posColor, bg: 'linear-gradient(165deg,#241c10,#12100c)', hue: 42 };
     const giftHue = gs.hue != null ? gs.hue : 42;
     const giftRing = 'hsl(' + giftHue + ' 78% 58%)';
-    const photoAction = photo ? ' data-action="open-photo" data-player-id="' + p.id + '"' : '';
+    const photoAction = (!compact && photo) ? ' data-action="open-photo" data-player-id="' + p.id + '"' : '';
+    const photoOpen = compact
+      ? '<div class="cpc-photo" style="border-color:' + giftRing + '">'
+      : '<button type="button" class="cpc-photo"' + photoAction + ' style="border-color:' + giftRing + '">';
+    const photoClose = compact ? '</div>' : '</button>';
+    const detail = compact ? '' : (
+      ((typeof SessionPlay !== 'undefined') ? SessionPlay.sealHtml(p.id) : '') +
+      '<div class="fifa-stats">' +
+        '<div class="fifa-stat"><b>' + cond + '%</b><span>Готовність</span></div>' +
+        '<div class="fifa-stat"><b>' + att + '</b><span>' + (typeof t === 'function' ? t('longpress_attendance') : 'Відвідування') + '</span></div>' +
+        '<div class="fifa-stat"><b>' + rpe + '</b><span>Сер. RPE</span></div>' +
+        '<div class="fifa-stat"><b>' + load + '</b><span>Load 28д</span></div>' +
+        '<div class="fifa-stat"><b>' + (loadNow != null ? this._fmtLoad(loadNow) : '—') + '</b><span>Лоад</span></div>' +
+        '<div class="fifa-stat"><b>' + (p.age || '—') + '</b><span>Вік</span></div>' +
+        '<div class="fifa-stat"><b>' + ((typeof LoadModel !== 'undefined' && LoadModel.playerCm && LoadModel.playerCm(p)) || '—') + '</b><span>Зріст</span></div>' +
+        '<div class="fifa-stat"><b>' + ((typeof LoadModel !== 'undefined' && LoadModel.playerKg && LoadModel.playerKg(p)) || '—') + '</b><span>Вага</span></div>' +
+      '</div>' +
+      (() => {
+        try {
+          const pr = (typeof PlayerProgress !== 'undefined') ? PlayerProgress.compute(p.id) : null;
+          if (!pr || !pr.history) return '';
+          const series = pr.history.slice().reverse().map(h => Math.max(0, h.delta || 0));
+          return '<div class="fifa-xp-graph"><div class="fifa-gifts-title">Досвід (XP)</div>' +
+            this._sparkline(series.length > 1 ? series : [0, pr.xp || 0], { w: 200, h: 44, color: '#f5c542', fill: 'rgba(245,197,66,.15)' }) +
+            '<div class="note-sm">LVL ' + (pr.level || 1) + ' · ' + (pr.xp || 0) + ' XP</div></div>';
+        } catch (_) { return ''; }
+      })() +
+      compareHtml
+    );
     return `
-      <div class="fifa-card club-player-card fifa-classic" style="--pos-color:${posColor};--gift-ring:${giftRing};--acc-ring:${giftRing};--acc-h:${giftHue}" data-fifa-player="${p.id}" data-compare-host="${p.id}">
+      <div class="fifa-card club-player-card fifa-classic${compact ? ' fifa-compact' : ''}" style="--pos-color:${posColor};--gift-ring:${giftRing};--acc-ring:${giftRing};--acc-h:${giftHue}" data-fifa-player="${p.id}" data-compare-host="${p.id}">
         <div class="cpc-brand">
           <div class="cpc-brand-name"><span>МЕТАЛІСТ</span> <b>ШТУТТГАРТ</b></div>
         </div>
         <div class="cpc-hero">
-          <button type="button" class="cpc-photo"${photoAction} style="border-color:${giftRing}">
+          ${photoOpen}
             ${avatarInner}
             ${cap}
-          </button>
+          ${photoClose}
           <div class="cpc-id">
             <div class="cpc-num">#${p.number || '—'}</div>
             <div class="cpc-pos">${sanitize(pos)}</div>
@@ -913,28 +941,7 @@ const Views = {
         </div>
         <div class="cpc-name"><span class="cpc-name-txt">${sanitize(p.firstName || '')} <strong>${sanitize(p.lastName || '')}</strong></span>${this.appointmentHtml(p)}${this._giftStatusBadge(gifts, p.id)}</div>
         <div class="cpc-meta">${sanitize(stLabel)}${tg ? ' · ' + tg : ''}</div>
-        ${(typeof SessionPlay !== 'undefined') ? SessionPlay.sealHtml(p.id) : ''}
-        <div class="fifa-stats">
-          <div class="fifa-stat"><b>${cond}%</b><span>Готовність</span></div>
-          <div class="fifa-stat"><b>${att}</b><span>${typeof t==='function'?t('longpress_attendance'):'Відвідування'}</span></div>
-          <div class="fifa-stat"><b>${rpe}</b><span>Сер. RPE</span></div>
-          <div class="fifa-stat"><b>${load}</b><span>Load 28д</span></div>
-          <div class="fifa-stat"><b>${loadNow != null ? this._fmtLoad(loadNow) : '—'}</b><span>Лоад</span></div>
-          <div class="fifa-stat"><b>${p.age || '—'}</b><span>Вік</span></div>
-          <div class="fifa-stat"><b>${(typeof LoadModel !== 'undefined' && LoadModel.playerCm && LoadModel.playerCm(p)) || '—'}</b><span>Зріст</span></div>
-          <div class="fifa-stat"><b>${(typeof LoadModel !== 'undefined' && LoadModel.playerKg && LoadModel.playerKg(p)) || '—'}</b><span>Вага</span></div>
-        </div>
-        ${(() => {
-          try {
-            const pr = (typeof PlayerProgress !== 'undefined') ? PlayerProgress.compute(p.id) : null;
-            if (!pr || !pr.history) return '';
-            const series = pr.history.slice().reverse().map(h => Math.max(0, h.delta || 0));
-            return '<div class="fifa-xp-graph"><div class="fifa-gifts-title">Досвід (XP)</div>' +
-              this._sparkline(series.length > 1 ? series : [0, pr.xp || 0], { w: 200, h: 44, color: '#f5c542', fill: 'rgba(245,197,66,.15)' }) +
-              '<div class="note-sm">LVL ' + (pr.level||1) + ' · ' + (pr.xp||0) + ' XP</div></div>';
-          } catch(_) { return ''; }
-        })()}
-        ${compareHtml}
+        ${detail}
       </div>`;
   },
 
@@ -1888,10 +1895,8 @@ trainings() {
   },
 
   _squadFifa(p) {
-    let st = {};
-    try { st = this._playerStats ? (this._playerStats(p.id) || {}) : {}; } catch (_) {}
     return '<div class="squad-fifa" data-player-id="' + p.id + '" data-action="open-player-card" role="button" tabindex="0">' +
-      this._fifaCard(p, st) + '</div>';
+      this._fifaCard(p, {}, { compact: true }) + '</div>';
   },
 
   _fmtShort(ms) {
