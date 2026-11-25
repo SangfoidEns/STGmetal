@@ -1143,6 +1143,13 @@ const App = {
     this._boardNavToken = reason || 'explicit';
   },
 
+  fitMoment(el) {
+    if (!el) return;
+    const w = el.naturalWidth || el.videoWidth || 0;
+    const h = el.naturalHeight || el.videoHeight || 0;
+    if (w > 0 && h > 0) el.style.aspectRatio = w + ' / ' + h;
+  },
+
   reviveMedia(el) {
     if (!el) return;
     const reveal = () => {

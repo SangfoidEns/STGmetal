@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z156',
+  APP_BUILD: 'z157',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -1531,9 +1531,10 @@ const Views = {
       const kind = m.kind === 'video' ? 'video' : (m.kind === 'gif' ? 'gif' : 'photo');
       const badge = kind === 'video' ? 'Відео' : (kind === 'gif' ? 'GIF' : 'Фото');
       const title = m.title ? ('<figcaption>' + sanitize(m.title) + '</figcaption>') : '';
+      const fit = ' onload="App.fitMoment&&App.fitMoment(this)" onloadedmetadata="App.fitMoment&&App.fitMoment(this)"';
       const media = kind === 'video'
-        ? '<video src="' + sanitize(src) + '" controls playsinline preload="metadata" onerror="App.reviveMedia&&App.reviveMedia(this)"></video>'
-        : '<img src="' + sanitize(src) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="App.reviveMedia&&App.reviveMedia(this)"/>';
+        ? '<video src="' + sanitize(src) + '" controls playsinline preload="metadata"' + fit + ' onerror="App.reviveMedia&&App.reviveMedia(this)"></video>'
+        : '<img src="' + sanitize(src) + '" alt="" loading="lazy" referrerpolicy="no-referrer"' + fit + ' onerror="App.reviveMedia&&App.reviveMedia(this)"/>';
       return '<figure class="moment-card" data-action="open-moment" data-moment-id="' + sanitize(m.id || '') + '" data-moment-kind="' + kind + '">' +
         media + '<span class="moment-miss" hidden>Фото не відкрилось. Тренер може додати його ще раз.</span><span class="moment-badge">' + badge + '</span>' + title + '</figure>';
     }).join('') + '</div>';

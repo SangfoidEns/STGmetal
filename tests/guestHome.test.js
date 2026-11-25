@@ -44,6 +44,7 @@ describe('guest home', () => {
     assert.match(home, /Останні моменти/);
     assert.match(home, /club-public/);
     assert.match(home, /<video /);
+    assert.match(home, /fitMoment/);
     assert.match(home, /Гол/);
     assert.equal(views.playerSheetButtons(store.players[0]), '');
     const player = loadViews({
