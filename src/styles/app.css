@@ -14022,3 +14022,150 @@ body.role-guest [data-del-player] {
   text-transform: uppercase;
   color: #d5ff3f;
 }
+
+/* z152 — дошка в склі: панелі і кнопки як бульбашки додатка */
+#v-board #boardToolbarTop.btb,
+#v-board #boardToolbarBottom.btb,
+body.mode-board-focus #boardToolbarTop.btb,
+body.mode-board-focus #boardToolbarBottom.btb {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+#boardToolbarTop .btb-chrome,
+#boardToolbarBottom .btb-dock {
+  margin: 8px 10px !important;
+  width: calc(100% - 20px) !important;
+  max-width: none !important;
+  box-sizing: border-box !important;
+  border-radius: 22px !important;
+  background: rgba(16, 20, 28, 0.46) !important;
+  backdrop-filter: blur(22px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(180%) !important;
+  border: 1px solid rgba(255,255,255,0.16) !important;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.14) !important;
+  padding: 6px !important;
+}
+#boardToolbarTop .btb-chrome {
+  margin-top: max(8px, env(safe-area-inset-top, 0px)) !important;
+}
+#boardToolbarBottom.btb-bottom,
+body.mode-board-focus #boardToolbarBottom.btb-bottom {
+  padding: 0 0 env(safe-area-inset-bottom, 0px) !important;
+  background: transparent !important;
+}
+#boardToolbarTop .tb,
+#boardToolbarBottom .tb,
+.btb-tray-row .tb,
+.btb-primary .tb {
+  border-radius: 16px !important;
+  background: rgba(255,255,255,0.08) !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1) !important;
+}
+#boardToolbarTop .tb.on,
+#boardToolbarBottom .tb.on,
+.btb-tray-row .tb.on,
+.btb-bottom .tb.on {
+  background: rgba(232,197,71,0.28) !important;
+  color: #f4efe2 !important;
+  border-color: #e8c547 !important;
+  box-shadow: 0 0 0 1px #e8c547, 0 0 14px rgba(232,197,71,0.45) !important;
+}
+#boardToolbarTop .tb-more,
+#boardToolbarBottom .tb-more,
+.tb-more {
+  background: linear-gradient(160deg, #f0d878, #c9a227) !important;
+  color: #1a1408 !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 6px 16px rgba(201,162,39,0.4) !important;
+}
+#boardToolbarTop .board-scheme-bar {
+  margin: 0 10px 6px !important;
+  border-radius: 18px !important;
+  background: rgba(16, 20, 28, 0.46) !important;
+  backdrop-filter: blur(22px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(180%) !important;
+  border: 1px solid rgba(255,255,255,0.14) !important;
+  overflow: hidden !important;
+}
+#btbToolsTray,
+#boardToolbarBottom .btb-tray,
+.btb-tray {
+  left: 10px !important;
+  right: 10px !important;
+  border-radius: 22px !important;
+  background: rgba(14, 18, 26, 0.52) !important;
+  backdrop-filter: blur(26px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(26px) saturate(180%) !important;
+  border: 1px solid rgba(255,255,255,0.16) !important;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.14) !important;
+}
+.btb-tray-handle {
+  width: 42px !important;
+  height: 5px !important;
+  border-radius: 99px !important;
+  background: rgba(255,255,255,0.35) !important;
+}
+.btb-tray-label { color: #e8c547 !important; }
+.btb-tray select,
+.btb-tray-row-selects select {
+  border-radius: 16px !important;
+  background: rgba(255,255,255,0.08) !important;
+  border: 1px solid rgba(255,255,255,0.14) !important;
+  color: #f4efe2 !important;
+}
+body.mode-board-focus .bench-panel,
+.view-board .bench-panel,
+.bench-panel {
+  margin: 6px 0 6px 8px !important;
+  border-radius: 22px !important;
+  background: rgba(14, 18, 26, 0.42) !important;
+  backdrop-filter: blur(22px) saturate(170%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(170%) !important;
+  border: 1px solid rgba(255,255,255,0.16) !important;
+  border-right: 1px solid rgba(255,255,255,0.16) !important;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.12) !important;
+}
+body.bench-collapsed .bench-panel {
+  margin: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.bench-head {
+  color: #e8c547 !important;
+  border-bottom: 0 !important;
+}
+.bench-toggle,
+.bench-fab {
+  border-radius: 14px !important;
+  background: rgba(255,255,255,0.1) !important;
+  border: 1px solid rgba(255,255,255,0.16) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+.bench-sec {
+  color: rgba(232,197,71,0.85) !important;
+  border-top: 0 !important;
+}
+.bench-chip {
+  border-radius: 18px !important;
+  background: rgba(255,255,255,0.08) !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1) !important;
+}
+.bench-chip.on {
+  background: rgba(232,197,71,0.16) !important;
+  box-shadow: 0 0 0 1px #e8c547, 0 0 14px rgba(232,197,71,0.35) !important;
+}
+.bench-avatar {
+  box-shadow: 0 0 0 2px rgba(232,197,71,0.55);
+}
+.zoom-indicator {
+  border-radius: 999px !important;
+  background: rgba(14, 18, 26, 0.5) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255,255,255,0.16) !important;
+}
