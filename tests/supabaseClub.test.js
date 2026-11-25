@@ -161,6 +161,23 @@ describe('supabase club sync', () => {
       .flatMap(call => JSON.parse(call.opts.body).prefixes)
       .sort();
     assert.deepEqual(prefixes, ['loose.jpg', 'media/gone.jpg', 'state/1-old.json']);
+    ctx.fetch.next.push(jsonRes(200, [
+      { name: 'state', id: null },
+      { name: 'media', id: null }
+    ]));
+    ctx.fetch.next.push(jsonRes(200, [
+      { name: 'current.json', id: 'a', metadata: { size: 900000000 } }
+    ]));
+    ctx.fetch.next.push(jsonRes(200, [
+      { name: 'keep.png', id: 'c', metadata: { size: 1000 } }
+    ]));
+    ctx.fetch.next.push(jsonRes(200, []));
+    await ctx.SupabaseClub.sweep('', payload);
+    const freed = ctx.calls
+      .filter(call => call.opts.method === 'DELETE')
+      .flatMap(call => JSON.parse(call.opts.body).prefixes);
+    assert.equal(freed.indexOf('state/current.json') >= 0, true);
+    assert.equal(freed.indexOf('media/keep.png') >= 0, false);
     const listed = ctx.calls.find(call => String(call.url).indexOf('/object/list/') >= 0);
     assert.match(listed.opts.body, /"column":"name"/);
   });

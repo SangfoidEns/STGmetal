@@ -100,7 +100,7 @@ const SupabaseClub = {
       }
       this._ready = true;
       if (remote.payload) {
-        try { await this.sweep(remote.path || 'state/current.json', remote.payload); } catch (_) {}
+        try { await this.sweep(remote.path || '', remote.payload); } catch (_) {}
       }
       await this.pull({ quiet: true, known: remote });
       let sent = true;
@@ -156,16 +156,19 @@ const SupabaseClub = {
     const rows = await res.json();
     if (!Array.isArray(rows) || !rows.length) return { empty: true, rev: 0 };
     const row = rows[0];
-    let payload = !light && row.payload && typeof row.payload === 'object' ? row.payload : null;
-    if (!light && row.path) {
-      const file = await this.download(row.path, row.updated_at);
+    const inline = !light && row.payload && typeof row.payload === 'object' ? row.payload : null;
+    let payload = inline;
+    let path = row.path || '';
+    if (!light && !payload && path) {
+      const file = await this.download(path, row.updated_at);
       if (file) payload = file;
     }
+    if (inline) path = '';
     return {
       empty: !payload,
       rev: Number(row.rev) || 0,
       updated_at: row.updated_at || '',
-      path: row.path || '',
+      path: path,
       payload: payload
     };
   },
@@ -463,9 +466,11 @@ const SupabaseClub = {
       if (!payload) return 0;
       const keep = this.usedMedia(payload);
       if (keepPath) keep.add(String(keepPath));
-      keep.add('state/current.json');
       const files = await this.inventory();
-      if (!files) return 0;
+      if (!files) {
+        this._line('Не вдалося прочитати сховище.');
+        return 0;
+      }
       const drop = [];
       let bytes = 0;
       files.forEach(file => {
@@ -474,10 +479,7 @@ const SupabaseClub = {
         bytes += Number(file.size) || 0;
       });
       if (!drop.length) {
-        const videos = files.reduce((sum, file) => sum + (String(file.type).indexOf('video/') === 0 ? (file.size || 0) : 0), 0);
-        if (videos > 400 * 1048576) {
-          this._line('Сховище тримають великі відео. Прибери старий момент у налаштуваннях.');
-        }
+        this._line('Зайвих файлів немає.');
         return 0;
       }
       const ok = await this.removePaths(drop);
@@ -666,9 +668,14 @@ const SupabaseClub = {
         continue;
       }
       const nextPath = 'media/s' + this._hash(path + '|' + String(small.size)) + '.jpg';
-      const ok = await this.upload(nextPath, small, 'image/jpeg');
+      let storedPath = nextPath;
+      let ok = await this.upload(nextPath, small, 'image/jpeg');
+      if (!ok && this._lastUploadStatus === 413 && /\.jpe?g$/i.test(path)) {
+        ok = await this.upload(path, small, 'image/jpeg');
+        storedPath = path;
+      }
       if (!ok) continue;
-      replace.set(url, this.URL + '/storage/v1/object/public/club-media/' + nextPath);
+      if (storedPath !== path) replace.set(url, this.URL + '/storage/v1/object/public/club-media/' + storedPath);
       this._slimDone.add(path);
       done++;
     }
