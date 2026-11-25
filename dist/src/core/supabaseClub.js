@@ -99,6 +99,9 @@ const SupabaseClub = {
         return false;
       }
       this._ready = true;
+      if (remote.payload) {
+        try { await this.sweep(remote.path || 'state/current.json', remote.payload); } catch (_) {}
+      }
       await this.pull({ quiet: true, known: remote });
       let sent = true;
       if (this._canWrite(sm)) sent = await this.push();
@@ -274,11 +277,11 @@ const SupabaseClub = {
           if (!stillMine() || !this._sm.applyClubPayload) return;
           try {
             const now = this._sm.buildExportPayload ? this._sm.buildExportPayload() : null;
-            if (now && this.same(now, off.payload)) return;
+            if (now && this.same(now, slim)) return;
             this._sm.applyClubPayload({
               updatedAt: updatedAt || new Date().toISOString(),
               updatedBy: 'supabase',
-              payload: off.payload
+              payload: slim
             }, { force: true, quiet: true, replace: true });
             this._sm._clubDirty = false;
           } catch (_) {}
@@ -457,21 +460,66 @@ const SupabaseClub = {
 
   async sweep(keepPath, payload) {
     try {
-      let gone = 0;
-      const dropSome = async (paths) => {
-        const todo = (paths || []).filter(Boolean);
-        if (!todo.length) return;
-        const ok = await this.removePaths(todo);
-        if (ok) gone += todo.length;
-      };
-      const state = await this.listFolder('state');
-      if (state) await dropSome(state.filter(path => path !== keepPath));
-      const media = payload ? await this.listFolder('media') : null;
-      const keep = payload ? this.usedMedia(payload) : new Set();
-      if (media) await dropSome(media.filter(path => !keep.has(path)));
-      if (payload) gone += await this.sweepRest(keepPath, keep);
-      if (gone) this._line('Прибрав ' + gone + ' зайвих файлів зі сховища.');
-    } catch (_) {}
+      if (!payload) return 0;
+      const keep = this.usedMedia(payload);
+      if (keepPath) keep.add(String(keepPath));
+      keep.add('state/current.json');
+      const files = await this.inventory();
+      if (!files) return 0;
+      const drop = [];
+      let bytes = 0;
+      files.forEach(file => {
+        if (!file || !file.path || keep.has(file.path)) return;
+        drop.push(file.path);
+        bytes += Number(file.size) || 0;
+      });
+      if (!drop.length) {
+        const videos = files.reduce((sum, file) => sum + (String(file.type).indexOf('video/') === 0 ? (file.size || 0) : 0), 0);
+        if (videos > 400 * 1048576) {
+          this._line('Сховище тримають великі відео. Прибери старий момент у налаштуваннях.');
+        }
+        return 0;
+      }
+      const ok = await this.removePaths(drop);
+      if (!ok) return 0;
+      const mb = bytes ? (' (' + Math.max(1, Math.round(bytes / 1048576)) + ' МБ)') : '';
+      const text = 'Прибрав ' + drop.length + ' зайвих файлів зі сховища' + mb + '.';
+      this._line(text);
+      try { if (typeof Toast !== 'undefined' && Toast.show) Toast.show(text, 'ok'); } catch (_) {}
+      return drop.length;
+    } catch (_) { return 0; }
+  },
+
+  async inventory() {
+    const files = [];
+    const seenFolders = new Set();
+    const walk = async (folder) => {
+      const mark = folder || '';
+      if (seenFolders.has(mark)) return true;
+      seenFolders.add(mark);
+      const rows = await this.listRaw(folder);
+      if (!rows) return false;
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || !row.name) continue;
+        const raw = String(row.name).replace(/^\/+/, '');
+        const path = !folder ? raw : (raw.indexOf(folder + '/') === 0 ? raw : (folder + '/' + raw));
+        if (row.id == null) {
+          await walk(path);
+          continue;
+        }
+        if (path.indexOf('.') < 0) continue;
+        const meta = row.metadata || {};
+        files.push({
+          path: path,
+          size: Number(meta.size || meta.contentLength || 0) || 0,
+          type: String(meta.mimetype || '')
+        });
+      }
+      return true;
+    };
+    const ok = await walk('');
+    return ok ? files : null;
   },
 
   async sweepRest(keepPath, keep) {
@@ -587,7 +635,7 @@ const SupabaseClub = {
     });
     const replace = new Map();
     let done = 0;
-    for (let i = 0; i < found.length && done < 30; i++) {
+    for (let i = 0; i < found.length && done < 40; i++) {
       const url = found[i];
       const path = this._mediaPath(url);
       if (!path || path.indexOf('media/') !== 0) continue;
@@ -603,7 +651,7 @@ const SupabaseClub = {
           kind = String(head.headers.get('content-type') || '');
         }
       } catch (_) {}
-      if (!size || size < 280 * 1024 || kind.indexOf('image/') !== 0 || kind.indexOf('gif') >= 0) {
+      if (!size || size < 160 * 1024 || kind.indexOf('image/') !== 0 || kind.indexOf('gif') >= 0) {
         if (size || kind) this._slimDone.add(path);
         continue;
       }
@@ -630,6 +678,7 @@ const SupabaseClub = {
       if (replace.has(text)) set(replace.get(text));
     });
     this._line('Важкі фото стиснуті. Зайве зі сховища прибирається.');
+    try { if (typeof Toast !== 'undefined' && Toast.show) Toast.show('Важкі фото стиснуті', 'ok'); } catch (_) {}
     return done;
   },
 

@@ -142,14 +142,17 @@ describe('supabase club sync', () => {
       players: [{ photoUrl: ctx.SupabaseClub.URL + '/storage/v1/object/public/club-media/media/keep.png' }]
     };
     ctx.fetch.next.push(jsonRes(200, [
-      { name: 'current.json', id: 'a' },
-      { name: '1-old.json', id: 'b' },
-      { name: 'folder', id: null }
+      { name: 'state', id: null },
+      { name: 'media', id: null },
+      { name: 'loose.jpg', id: 'x', metadata: { size: 1048576 } }
     ]));
-    ctx.fetch.next.push(jsonRes(200, []));
     ctx.fetch.next.push(jsonRes(200, [
-      { name: 'keep.png', id: 'c' },
-      { name: 'gone.jpg', id: 'd' }
+      { name: 'current.json', id: 'a', metadata: { size: 100 } },
+      { name: '1-old.json', id: 'b', metadata: { size: 2097152 } }
+    ]));
+    ctx.fetch.next.push(jsonRes(200, [
+      { name: 'keep.png', id: 'c', metadata: { size: 1000 } },
+      { name: 'gone.jpg', id: 'd', metadata: { size: 3145728 } }
     ]));
     ctx.fetch.next.push(jsonRes(200, []));
     await ctx.SupabaseClub.sweep('state/current.json', payload);
@@ -157,7 +160,7 @@ describe('supabase club sync', () => {
       .filter(call => call.opts.method === 'DELETE')
       .flatMap(call => JSON.parse(call.opts.body).prefixes)
       .sort();
-    assert.deepEqual(prefixes, ['media/gone.jpg', 'state/1-old.json']);
+    assert.deepEqual(prefixes, ['loose.jpg', 'media/gone.jpg', 'state/1-old.json']);
     const listed = ctx.calls.find(call => String(call.url).indexOf('/object/list/') >= 0);
     assert.match(listed.opts.body, /"column":"name"/);
   });
