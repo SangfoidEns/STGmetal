@@ -4654,22 +4654,33 @@ const App = {
         } catch (err) { console.error('[squad-view]', err); }
         return;
       }
-      if (action === 'toggle-avatar-chips') {
+      if (action === 'toggle-avatar-chips' || action === 'set-chip-mode') {
         e.preventDefault(); e.stopPropagation();
         const s = Store.get();
         if (!s.activeBoard) s.activeBoard = {};
-        s.activeBoard.useAvatars = !s.activeBoard.useAvatars;
+        const order = ['std', 'photo', 'xl'];
+        const cur = (typeof BoardEngine !== 'undefined' && BoardEngine.chipMode) ? BoardEngine.chipMode() : 'std';
+        const picked = (e.target.closest('[data-mode]') || {}).getAttribute
+          ? e.target.closest('[data-mode]').getAttribute('data-mode')
+          : '';
+        const next = order.indexOf(picked) >= 0 ? picked : order[(order.indexOf(cur) + 1) % order.length];
+        s.activeBoard.chipMode = next;
+        s.activeBoard.useAvatars = next === 'photo';
         s.activeBoard.toolsTrayOpen = false;
         s.activeBoard.paletteOpen = false;
-        try { document.body.classList.toggle('board-avatars', !!s.activeBoard.useAvatars); } catch (_) {}
-        try { document.body.classList.remove('tools-tray-open'); } catch (_) {}
+        try {
+          document.body.classList.toggle('board-avatars', next === 'photo');
+          document.body.classList.toggle('board-chip-xl', next === 'xl');
+          document.body.classList.remove('tools-tray-open');
+        } catch (_) {}
         try { StorageManager.save(); } catch (_) {}
         if (typeof BoardEngine !== 'undefined') {
           if (BoardEngine.closeToolsTray) BoardEngine.closeToolsTray(true);
+          if (BoardEngine._tokenHtml != null) BoardEngine._tokenHtml = '';
           if (BoardEngine.renderTokens) BoardEngine.renderTokens();
           if (BoardEngine.renderToolbar) BoardEngine.renderToolbar();
         }
-        Toast.show(s.activeBoard.useAvatars ? 'Аватар-фішки увімкнено' : 'Звичайні фішки', 'ok');
+        Toast.show(next === 'photo' ? 'Фішки з фото' : (next === 'xl' ? 'Великі кольорові фішки' : 'Малі фішки'), 'ok');
         return;
       }
       if (action === 'all-to-bench' || action === 'rest-to-bench') {

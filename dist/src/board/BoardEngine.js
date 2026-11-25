@@ -2192,6 +2192,13 @@ const BoardEngine = {
       '';
   },
 
+  /** std — як зараз, photo — з фото, xl — той самий розмір, але кольором. */
+  chipMode() {
+    const ab = (typeof Store !== 'undefined' && Store.get && Store.get().activeBoard) || {};
+    if (ab.chipMode === 'photo' || ab.chipMode === 'xl' || ab.chipMode === 'std') return ab.chipMode;
+    return ab.useAvatars ? 'photo' : 'std';
+  },
+
   /** Розмір фішки = % ширини поля → масштабується разом із розміткою. */
   tokenMetrics() {
     const stage = document.getElementById('fieldStage');
@@ -2453,8 +2460,9 @@ const BoardEngine = {
     } catch (_) {}
     this.renderBenchPanel();
     try {
-      const av = !!(Store.get().activeBoard && Store.get().activeBoard.useAvatars);
-      document.body.classList.toggle('board-avatars', av);
+      const mode = this.chipMode();
+      document.body.classList.toggle('board-avatars', mode === 'photo');
+      document.body.classList.toggle('board-chip-xl', mode === 'xl');
     } catch (_) {}
     const layer = document.getElementById('playersLayer');
     if (!layer) return;
@@ -2663,9 +2671,10 @@ const BoardEngine = {
       if (isGk) customBg = this.GK_CHIP_COLOR;
       const bgStyle = customBg ? `background:${customBg} !important;` : '';
       // Контейнер 40×40 як bench-avatar-wrap; позиція — центр у % поля
-      const useAv = !!(Store.get().activeBoard && Store.get().activeBoard.useAvatars);
+      const chipMode = this.chipMode();
+      const big = chipMode === 'photo' || chipMode === 'xl';
       let photoUrl = '';
-      if (useAv && o.playerId) {
+      if (chipMode === 'photo' && o.playerId) {
         try {
           const pl = (Store.get().players || []).find(x => x.id === o.playerId);
           if (pl) {
@@ -2676,17 +2685,16 @@ const BoardEngine = {
           }
         } catch (_) {}
       }
-      if (useAv && !photoUrl && o.photoUrl) photoUrl = o.photoUrl;
-      const avCls = useAv ? ' pt-avatar-chip' : '';
-      // Always show number; photo when available
-      const avInner = (useAv && photoUrl)
+      if (chipMode === 'photo' && !photoUrl && o.photoUrl) photoUrl = o.photoUrl;
+      const avCls = big ? (' pt-avatar-chip' + (chipMode === 'xl' || !photoUrl ? ' pt-xl-chip' : ' pt-photo-chip')) : '';
+      const chipVar = customBg ? ('--chip:' + customBg + ';') : '';
+      const avInner = (chipMode === 'photo' && photoUrl)
         ? `<img class="pt-photo" src="${sanitize(photoUrl)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'"/><span class="pt-num">${o.number || ''}</span>`
-        : `<span class="pt-num">${o.number || ''}</span>`;
-      // Avatar mode: larger hit radius for drag; ring drawn around photo via CSS 72px + SVG r=17
-      html += `<div class="${cls}${extraCls} pt-bench-style${avCls}" data-id="${o.id}" data-r="${useAv ? 36 : 14}"${readyAttr} ` +
+        : `<span class="pt-shine"></span><span class="pt-num">${o.number || ''}</span>`;
+      html += `<div class="${cls}${extraCls} pt-bench-style${avCls}" data-id="${o.id}" data-r="${big ? 36 : 14}"${readyAttr} ` +
         `style="left:${pct.left}%;top:${pct.top}%" ` +
         `title="${sanitize(titleName + titleExtra)}">` +
-        `<div class="pt-wrap">${ringSvg}<div class="pt-avatar" style="${useAv && photoUrl ? '' : bgStyle}">${avInner}</div></div>` +
+        `<div class="pt-wrap">${ringSvg}<div class="pt-avatar" style="${chipMode === 'photo' && photoUrl ? '' : (bgStyle + chipVar)}">${avInner}</div></div>` +
         `${statusBadge}${label}</div>`;
     });
     if (html === this._tokenHtml && layer.childElementCount) return;
@@ -3006,7 +3014,7 @@ const BoardEngine = {
     const linked0 = (live.boards || []).find(x => x && String(x.id) === String(ab0.sourceBoardId || ''));
     const trayKey = [
       ab0.tool, ab0.toolsTrayOpen ? 1 : 0, ab0.paletteOpen ? 1 : 0, ab0.drawColor || '',
-      ab0.fieldView || '', ab0.scheme || '', ab0.sourceBoardId || '', ab0.useAvatars ? 1 : 0,
+      ab0.fieldView || '', ab0.scheme || '', ab0.sourceBoardId || '', this.chipMode(),
       sel0 ? sel0.type : '', sel0 ? (sel0.color || '') : '', linked0 ? (linked0.name || '') : ''
     ].join('|');
     const trayNow = document.getElementById('btbToolsTray');
@@ -3173,9 +3181,11 @@ const BoardEngine = {
             ${this._readySchemesHtml()}
           </div>
           <div class="btb-tray-sec">
-            <div class="btb-tray-label">Склад на полі</div>
+            <div class="btb-tray-label">Фішки</div>
             <div class="btb-tray-row">
-              <button type="button" class="tb ${(Store.get().activeBoard&&Store.get().activeBoard.useAvatars)?'on':''}" data-action="toggle-avatar-chips" title="Аватар-фішки (×2)">👤</button>
+              <button type="button" class="tb tb-chip-mode ${this.chipMode()==='std'?'on':''}" data-action="set-chip-mode" data-mode="std" title="Мала фішка">Мала</button>
+              <button type="button" class="tb tb-chip-mode ${this.chipMode()==='photo'?'on':''}" data-action="set-chip-mode" data-mode="photo" title="Фішка з фото">Фото</button>
+              <button type="button" class="tb tb-chip-mode ${this.chipMode()==='xl'?'on':''}" data-action="set-chip-mode" data-mode="xl" title="Велика кольорова, розмір як у фото">×2</button>
               <button type="button" class="tb" data-action="rest-to-bench" title="Вільних зі складу на лавку">⬇ список→лавка</button>
             </div>
           </div>
