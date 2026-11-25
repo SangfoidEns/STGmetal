@@ -209,7 +209,52 @@ const BoardEngine = {
       b = parseInt(hex.slice(4, 6), 16);
     }
     const stroke = hex.length === 6 ? ('#' + hex) : raw;
-    return { stroke: stroke, fill: 'rgba(' + r + ',' + g + ',' + b + ',0.28)' };
+    const a = this.penOpacity();
+    return { stroke: stroke, fill: 'rgba(' + r + ',' + g + ',' + b + ',' + (0.34 * a).toFixed(3) + ')', opacity: a };
+  },
+
+  penSize() {
+    const n = Number((Store.get().activeBoard || {}).drawSize);
+    return Math.max(1, Math.min(16, n || 3));
+  },
+
+  penOpacity() {
+    const n = Number((Store.get().activeBoard || {}).drawOpacity);
+    if (!isFinite(n) || n <= 0) return 1;
+    return Math.max(0.15, Math.min(1, n > 1 ? n / 100 : n));
+  },
+
+  setPen(kind, value) {
+    const ab = Store.get().activeBoard;
+    if (!ab) return;
+    if (kind === 'size') ab.drawSize = Math.max(1, Math.min(16, Number(value) || 3));
+    if (kind === 'opacity') ab.drawOpacity = Math.max(0.15, Math.min(1, (Number(value) || 100) / 100));
+    const sel = (ab.objects || []).find(o => o.id === ab.selectedId);
+    if (sel && sel.type !== 'text') {
+      if (kind === 'size') sel.strokeW = ab.drawSize;
+      if (kind === 'opacity') sel.opacity = ab.drawOpacity;
+      if (sel.type === 'zone') {
+        const paint = this.zonePaint(sel.color || sel.stroke || ab.drawColor);
+        sel.fill = paint.fill;
+        sel.opacity = paint.opacity;
+      }
+      this.renderDrawings();
+    }
+  },
+
+  bumpText(dir) {
+    const ab = Store.get().activeBoard;
+    if (!ab) return;
+    const next = Math.max(12, Math.min(72, (Number(ab.textSize) || 18) + (Number(dir) || 1) * 4));
+    ab.textSize = next;
+    const sel = (ab.objects || []).find(o => o.id === ab.selectedId && o.type === 'text');
+    if (sel) {
+      sel.fontSize = next;
+      if (ab.drawColor) sel.color = ab.drawColor;
+      this.renderDrawings();
+    }
+    this._toolbarKey = '';
+    this.renderToolbar();
   },
 
   strokeColorFor(type, explicit) {
@@ -757,7 +802,12 @@ const BoardEngine = {
       Modal.prompt('Текст', '', text => {
         if (text) {
           const tp = this.clampWorld(world.x, world.y);
-          const item = { id: uid(), type: 'text', x: tp.x, y: tp.y, label: text, fontSize: 18, locked: false, visible: true };
+          const item = {
+            id: uid(), type: 'text', x: tp.x, y: tp.y, label: text,
+            fontSize: s.activeBoard.textSize || 18,
+            color: s.activeBoard.drawColor || '#f4efe2',
+            locked: false, visible: true
+          };
           s.activeBoard.objects.push(item);
           s.activeBoard.selectedId = item.id;
           s.activeBoard.tool = 'select';
@@ -1038,6 +1088,8 @@ const BoardEngine = {
           x: this.startPos.x, y: this.startPos.y,
           x2: this.clampWorld(world.x, world.y).x, y2: this.clampWorld(world.x, world.y).y,
           color: this.strokeColorFor(tool),
+          strokeW: this.penSize(),
+          opacity: this.penOpacity(),
           step: nextStep,
           locked: false, visible: true
         });
@@ -1053,7 +1105,7 @@ const BoardEngine = {
         const paint = this.zonePaint();
         const zone = {
           id: uid(), type: 'zone', shape: 'rect',
-          x, y, w, h, fill: paint.fill, stroke: paint.stroke, color: paint.stroke, opacity: 0.4,
+          x, y, w, h, fill: paint.fill, stroke: paint.stroke, color: paint.stroke, opacity: paint.opacity,
           label: '', locked: false, visible: true
         };
         s.activeBoard.objects.push(zone);
@@ -1069,7 +1121,7 @@ const BoardEngine = {
           id: uid(), type: 'zone', shape: tool === 'ellipse' ? 'ellipse' : 'circle',
           x: this.startPos.x, y: this.startPos.y, r,
           rx: r, ry: tool === 'ellipse' ? r * 0.6 : r,
-          fill: paint.fill, stroke: paint.stroke, color: paint.stroke, opacity: 0.35,
+          fill: paint.fill, stroke: paint.stroke, color: paint.stroke, opacity: paint.opacity,
           label: '', locked: false, visible: true
         };
         s.activeBoard.objects.push(zone);
@@ -1077,17 +1129,17 @@ const BoardEngine = {
         this.pushHistory();
         this._boardChanged = true;
       }
-    } else if (tool === 'freehand' && this._freehand && this._freehand.length > 3) {
-      // Close freehand into polygon zone
-      const paint = this.zonePaint();
-      const zone = {
-        id: uid(), type: 'zone', shape: 'polygon',
+    } else if (tool === 'freehand' && this._freehand && this._freehand.length > 1) {
+      const pen = {
+        id: uid(), type: 'pen',
         points: this._freehand.slice(),
-        fill: paint.fill, stroke: paint.stroke, color: paint.stroke, opacity: 0.3,
-        label: '', locked: false, visible: true
+        color: this.strokeColorFor('arrow'),
+        strokeW: this.penSize(),
+        opacity: this.penOpacity(),
+        locked: false, visible: true
       };
-      s.activeBoard.objects.push(zone);
-      s.activeBoard.selectedId = zone.id;
+      s.activeBoard.objects.push(pen);
+      s.activeBoard.selectedId = pen.id;
       this._freehand = null;
       this.pushHistory();
       this._boardChanged = true;
@@ -1110,7 +1162,7 @@ const BoardEngine = {
     const zone = {
       id: uid(), type: 'zone', shape: 'polygon',
       points: this.polygonPoints.slice(),
-      fill: paint.fill, stroke: paint.stroke, color: paint.stroke, opacity: 0.4,
+          fill: paint.fill, stroke: paint.stroke, color: paint.stroke, opacity: paint.opacity,
       label: 'Zone', locked: false, visible: true
     };
     s.activeBoard.objects.push(zone);
@@ -2167,11 +2219,19 @@ const BoardEngine = {
     else if (view === 'center') vb = `0 ${H * 0.25} ${W} ${H * 0.5}`;
     svg.setAttribute('viewBox', vb);
     if (ds) ds.setAttribute('viewBox', vb);
-    let grass = '';
-    for (let i = 0; i < 12; i++) {
-      grass += `<rect x="0" y="${i * (H / 12)}" width="${W}" height="${H / 12}" fill="${i % 2 === 0 ? '#1a5c2e' : '#1e6b35'}"/>`;
+    let grass = `<defs><linearGradient id="msGrass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#248a42"/><stop offset="1" stop-color="#0c3a20"/></linearGradient></defs>` +
+      `<rect width="${W}" height="${H}" fill="url(#msGrass)"/>`;
+    for (let i = 0; i < 10; i++) {
+      grass += `<rect x="0" y="${i * (H / 10)}" width="${W}" height="${H / 10}" fill="${i % 2 === 0 ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.08)'}"/>`;
     }
-    const L = 'rgba(255,255,255,0.85)';
+    grass += `<rect width="${W}" height="${H}" fill="none" stroke="rgba(232,197,71,0.18)" stroke-width="8"/>`;
+    grass += `<text class="pitch-watermark" x="${W / 2}" y="${H / 2 - 8}" text-anchor="middle" ` +
+      `fill="rgba(232,197,71,0.34)" font-family="system-ui,-apple-system,Segoe UI,sans-serif" ` +
+      `font-weight="800" font-size="26" letter-spacing="10" pointer-events="none">МЕТАЛІСТ</text>` +
+      `<text x="${W / 2}" y="${H / 2 + 22}" text-anchor="middle" ` +
+      `fill="rgba(255,255,255,0.28)" font-family="system-ui,-apple-system,Segoe UI,sans-serif" ` +
+      `font-weight="700" font-size="14" letter-spacing="12" pointer-events="none">ШТУТТГАРТ</text>`;
+    const L = 'rgba(244,239,226,0.78)';
     svg.innerHTML = grass +
       `<rect x="20" y="20" width="${W - 40}" height="${H - 40}" fill="none" stroke="${L}" stroke-width="2"/>` +
       `<line x1="20" y1="${H / 2}" x2="${W - 20}" y2="${H / 2}" stroke="${L}" stroke-width="2"/>` +
@@ -2185,10 +2245,6 @@ const BoardEngine = {
       `<circle cx="${W / 2}" cy="${H - 130}" r="3" fill="${L}"/>` +
       `<rect x="${W / 2 - 36.6}" y="5" width="73.2" height="15" fill="none" stroke="${L}" stroke-width="2"/>` +
       `<rect x="${W / 2 - 36.6}" y="${H - 20}" width="73.2" height="15" fill="none" stroke="${L}" stroke-width="2"/>` +
-      /* Watermark */
-      `<text class="pitch-watermark" x="${W / 2}" y="${H / 2 - 36}" text-anchor="middle" dominant-baseline="auto" ` +
-      `fill="rgba(255,255,255,0.15)" font-family="system-ui,-apple-system,Segoe UI,sans-serif" ` +
-      `font-weight="700" font-size="38" letter-spacing="2" pointer-events="none" style="user-select:none">Metalist Stuttgart</text>` +
       '';
   },
 
@@ -2488,14 +2544,14 @@ const BoardEngine = {
         const col = o.color || o.fill || '#ff6b00';
         const s = m.cone;
         html += `<div class="eq inv-cone" data-id="${o.id}" style="${L};width:${s}px;height:${s * 1.15}px">` +
-          `<svg viewBox="0 0 24 28" width="100%" height="100%"><polygon points="12,2 22,26 2,26" fill="${col}" stroke="rgba(0,0,0,.35)" stroke-width="1"/><rect x="3" y="24" width="18" height="3" rx="1" fill="${col}" opacity=".85"/></svg></div>`;
+          `<svg viewBox="0 0 24 28" width="100%" height="100%"><polygon points="12,2 22,26 2,26" fill="${col}" stroke="rgba(255,255,255,.45)" stroke-width="1"/><polygon points="12,6 16,20 12,18" fill="rgba(255,255,255,.35)"/><rect x="3" y="24" width="18" height="3" rx="1.5" fill="${col}"/></svg></div>`;
         return;
       }
       if (o.type === 'chip') {
         const col = o.color || o.fill || '#f1c40f';
         const s = m.chip;
         html += `<div class="eq inv-chip" data-id="${o.id}" style="${L};width:${s}px;height:${s}px">` +
-          `<svg viewBox="0 0 24 24" width="100%" height="100%"><circle cx="12" cy="12" r="10" fill="${col}" stroke="rgba(255,255,255,.5)" stroke-width="1.5"/><circle cx="12" cy="12" r="4" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="1"/></svg></div>`;
+          `<svg viewBox="0 0 24 24" width="100%" height="100%"><circle cx="12" cy="12" r="10" fill="${col}" stroke="rgba(255,255,255,.55)" stroke-width="1.4"/><ellipse cx="9" cy="8" rx="4" ry="2.4" fill="rgba(255,255,255,.35)"/></svg></div>`;
         return;
       }
       if (o.type === 'chipLarge') {
@@ -2762,7 +2818,7 @@ const BoardEngine = {
           html += `<marker id="${mkId}" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="${col}"/></marker>`;
         }
         html += `<line x1="${tx(o.x)}" y1="${ty(o.y)}" x2="${tx(o.x2)}" y2="${ty(o.y2)}" stroke="transparent" stroke-width="${sw + 14}"/>`;
-        html += `<line x1="${tx(o.x)}" y1="${ty(o.y)}" x2="${tx(o.x2)}" y2="${ty(o.y2)}" stroke="${col}" stroke-width="${sw}" marker-end="url(#${mkId})" ${dash}/>`;
+        html += `<line x1="${tx(o.x)}" y1="${ty(o.y)}" x2="${tx(o.x2)}" y2="${ty(o.y2)}" stroke="${col}" stroke-width="${sw}" stroke-linecap="round" marker-end="url(#${mkId})" opacity="${o.opacity != null ? o.opacity : 1}" ${dash}/>`;
         if (selected) {
           html += `<circle cx="${tx(o.x)}" cy="${ty(o.y)}" r="9" fill="#fff" stroke="#1a73e8" stroke-width="2.5"/>`;
           html += `<circle cx="${tx(o.x2)}" cy="${ty(o.y2)}" r="9" fill="#1a73e8" stroke="#fff" stroke-width="2.5"/>`;
@@ -2793,10 +2849,13 @@ const BoardEngine = {
             html += `<text x="${tx(cx)}" y="${ty(cy)}" fill="#fff" font-size="14" text-anchor="middle" font-weight="600">${sanitize(o.label)}</text>`;
           }
         }
+      } else if (o.type === 'pen' && o.points && o.points.length) {
+        const pts = o.points.map(p => tx(p.x) + ',' + ty(p.y)).join(' ');
+        html += `<polyline points="${pts}" fill="none" stroke="${o.color || '#e8c547'}" stroke-width="${o.strokeW || 3}" stroke-linecap="round" stroke-linejoin="round" opacity="${o.opacity != null ? o.opacity : 1}"/>`;
       } else if (o.type === 'text') {
         const box = this._textBox(o);
         const selected = s.activeBoard.selectedId === o.id;
-        html += `<text x="${tx(o.x)}" y="${ty(o.y)}" fill="#fff" font-size="${box.size}" font-weight="700" text-anchor="middle" dominant-baseline="middle">${sanitize(o.label || '')}</text>`;
+        html += `<text x="${tx(o.x)}" y="${ty(o.y)}" fill="${o.color || '#f4efe2'}" font-size="${box.size}" font-weight="700" text-anchor="middle" dominant-baseline="middle">${sanitize(o.label || '')}</text>`;
         if (selected) {
           const x = tx(o.x) - box.halfWpx;
           const y = ty(o.y) - box.halfHpx;
@@ -2807,6 +2866,11 @@ const BoardEngine = {
     });
 
     // Live polygon points
+    if (this._freehand && this._freehand.length > 1) {
+      const pts = this._freehand.map(p => tx(p.x) + ',' + ty(p.y)).join(' ');
+      const live = (s.activeBoard && s.activeBoard.drawColor) || '#e8c547';
+      html += `<polyline points="${pts}" fill="none" stroke="${live}" stroke-width="${this.penSize()}" stroke-linecap="round" stroke-linejoin="round" opacity="${this.penOpacity()}"/>`;
+    }
     if (this.polygonPoints.length) {
       const pts = this.polygonPoints.map(p => tx(p.x) + ',' + ty(p.y)).join(' ');
       html += `<polyline points="${pts}" fill="none" stroke="#c8a84b" stroke-width="2" stroke-dasharray="4,4"/>`;
@@ -3014,6 +3078,7 @@ const BoardEngine = {
     const linked0 = (live.boards || []).find(x => x && String(x.id) === String(ab0.sourceBoardId || ''));
     const trayKey = [
       ab0.tool, ab0.toolsTrayOpen ? 1 : 0, ab0.paletteOpen ? 1 : 0, ab0.drawColor || '',
+      ab0.drawSize || '', ab0.drawOpacity || '', ab0.textSize || '',
       ab0.fieldView || '', ab0.scheme || '', ab0.sourceBoardId || '', this.chipMode(),
       sel0 ? sel0.type : '', sel0 ? (sel0.color || '') : '', linked0 ? (linked0.name || '') : ''
     ].join('|');
@@ -3096,6 +3161,9 @@ const BoardEngine = {
           <button class="tb ${tool==='pass'?'on':''}" data-tool="pass" title="${typeof t==='function'?t('tool_pass','Пас'):'Пас'}">⇒</button>
           <button class="tb ${tool==='run'?'on':''}" data-tool="run" title="${typeof t==='function'?t('tool_run','Рух'):'Рух'}">⇢</button>
           <button class="tb ${tool==='dribble'?'on':''}" data-tool="dribble" title="${typeof t==='function'?t('tool_dribble','Ведення'):'Ведення'}">∿</button>
+          <button class="tb ${tool==='freehand'?'on':''}" data-tool="freehand" title="Перо">✎</button>
+          <button class="tb ${tool==='text'?'on':''}" data-tool="text" title="Текст">T</button>
+          <button class="tb ${tool==='zone'?'on':''}" data-tool="zone" title="Зона">⬚</button>
           <button type="button" class="tb tb-palette-toggle" data-action="toggle-palette" title="${typeof t==='function'?t('tool_select','Палітра'):'Палітра'}">🎨</button>
           <button type="button" class="tb tb-del" data-action="board-delete-selected" title="${typeof t==='function'?t('tool_delete'):'Видалити вибране'}">🗑</button>
           <button type="button" class="tb tb-more ${trayOpen?'on':''}" data-action="toggle-tools-tray" title="${typeof t==='function'?t('nav_more','Більше'):'Більше'}" aria-expanded="${trayOpen?'true':'false'}">
@@ -3104,14 +3172,28 @@ const BoardEngine = {
         </div>
         ${arrowRow}
         <div class="palette-swatches ${paletteOpen ? 'open' : ''}" id="paletteSwatches">
-          <button type="button" class="tb color-swatch ${drawCol==='#ecf0f1'?'on':''}" data-action="set-draw-color" data-color="#ecf0f1" style="background:#ecf0f1" title="${typeof t==='function'?t('color_white'):'Білий'}"></button>
-          <button type="button" class="tb color-swatch ${drawCol==='#3498db'?'on':''}" data-action="set-draw-color" data-color="#3498db" style="background:#3498db" title="${typeof t==='function'?t('color_blue'):'Синій'}"></button>
-          <button type="button" class="tb color-swatch ${drawCol==='#2ecc71'?'on':''}" data-action="set-draw-color" data-color="#2ecc71" style="background:#2ecc71" title="${typeof t==='function'?t('color_green'):'Зелений'}"></button>
-          <button type="button" class="tb color-swatch ${drawCol==='#f1c40f'?'on':''}" data-action="set-draw-color" data-color="#f1c40f" style="background:#f1c40f" title="${typeof t==='function'?t('color_yellow'):'Жовтий'}"></button>
-          <button type="button" class="tb color-swatch ${drawCol==='#e67e22'?'on':''}" data-action="set-draw-color" data-color="#e67e22" style="background:#e67e22" title="${typeof t==='function'?t('color_orange'):'Помаранчевий'}"></button>
-          <button type="button" class="tb color-swatch ${drawCol==='#e74c3c'?'on':''}" data-action="set-draw-color" data-color="#e74c3c" style="background:#e74c3c" title="${typeof t==='function'?t('color_red'):'Червоний'}"></button>
-          <button type="button" class="tb color-swatch ${drawCol==='#9b59b6'?'on':''}" data-action="set-draw-color" data-color="#9b59b6" style="background:#9b59b6" title="${typeof t==='function'?t('color_purple'):'Фіолетовий'}"></button>
-          <button type="button" class="tb color-swatch ${drawCol==='#000000'?'on':''}" data-action="set-draw-color" data-color="#000000" style="background:#000" title="${typeof t==='function'?t('color_black'):'Чорний'}"></button>
+          <div class="pen-colors">
+          <button type="button" class="tb color-swatch ${drawCol==='#ecf0f1'?'on':''}" data-action="set-draw-color" data-color="#ecf0f1" title="${typeof t==='function'?t('color_white'):'Білий'}"></button>
+          <button type="button" class="tb color-swatch ${drawCol==='#3498db'?'on':''}" data-action="set-draw-color" data-color="#3498db" title="${typeof t==='function'?t('color_blue'):'Синій'}"></button>
+          <button type="button" class="tb color-swatch ${drawCol==='#2ecc71'?'on':''}" data-action="set-draw-color" data-color="#2ecc71" title="${typeof t==='function'?t('color_green'):'Зелений'}"></button>
+          <button type="button" class="tb color-swatch ${drawCol==='#f1c40f'?'on':''}" data-action="set-draw-color" data-color="#f1c40f" title="${typeof t==='function'?t('color_yellow'):'Жовтий'}"></button>
+          <button type="button" class="tb color-swatch ${drawCol==='#e67e22'?'on':''}" data-action="set-draw-color" data-color="#e67e22" title="${typeof t==='function'?t('color_orange'):'Помаранчевий'}"></button>
+          <button type="button" class="tb color-swatch ${drawCol==='#e74c3c'?'on':''}" data-action="set-draw-color" data-color="#e74c3c" title="${typeof t==='function'?t('color_red'):'Червоний'}"></button>
+          <button type="button" class="tb color-swatch ${drawCol==='#9b59b6'?'on':''}" data-action="set-draw-color" data-color="#9b59b6" title="${typeof t==='function'?t('color_purple'):'Фіолетовий'}"></button>
+          <button type="button" class="tb color-swatch ${drawCol==='#000000'?'on':''}" data-action="set-draw-color" data-color="#000000" title="${typeof t==='function'?t('color_black'):'Чорний'}"></button>
+          </div>
+          <div class="pen-tune">
+            <label class="pen-tune-row">Розмір
+              <input type="range" min="1" max="14" step="1" value="${this.penSize()}" oninput="BoardEngine.setPen('size', this.value)">
+            </label>
+            <label class="pen-tune-row">Прозорість
+              <input type="range" min="20" max="100" step="5" value="${Math.round(this.penOpacity() * 100)}" oninput="BoardEngine.setPen('opacity', this.value)">
+            </label>
+            <span class="pen-tune-row pen-tune-text">Текст ${ab.textSize || 18}
+              <button type="button" class="tb" data-action="text-size" data-dir="-1" title="Менший текст">A−</button>
+              <button type="button" class="tb" data-action="text-size" data-dir="1" title="Більший текст">A+</button>
+            </span>
+          </div>
         </div>
       </div>
       <div class="btb-tray ${trayOpen?'open':''}" id="btbToolsTray" aria-hidden="${trayOpen?'false':'true'}">
@@ -3132,14 +3214,14 @@ const BoardEngine = {
           <div class="btb-tray-sec">
             <div class="btb-tray-label">Інвентар</div>
             <div class="btb-tray-row">
-              <button class="tb ${tool==='cone'?'on':''}" data-tool="cone" title="Конус">▲</button>
-              <button class="tb ${tool==='coneBig'?'on':''}" data-tool="coneBig" title="Великий конус">△</button>
-              <button class="tb ${tool==='chip'?'on':''}" data-tool="chip" title="Фішка">◉</button>
-              <button class="tb ${tool==='chipLarge'?'on':''}" data-tool="chipLarge" title="Велика фішка">⬤</button>
-              <button class="tb ${tool==='wall'?'on':''}" data-tool="wall" title="Стінка">▬</button>
-              <button class="tb ${tool==='man'?'on':''}" data-tool="man" title="Манекен">🧍</button>
-              <button class="tb ${tool==='goal'?'on':''}" data-tool="goal" title="Ворота">⊓</button>
-              <button class="tb ${tool==='dot'?'on':''}" data-tool="dot" title="Точка">·</button>
+              <button class="tb tb-inv ${tool==='cone'?'on':''}" data-tool="cone" title="Конус"><span class="tb-inv-ico">▲</span><span class="tb-inv-lb">Конус</span></button>
+              <button class="tb tb-inv ${tool==='coneBig'?'on':''}" data-tool="coneBig" title="Великий конус"><span class="tb-inv-ico">△</span><span class="tb-inv-lb">Великий</span></button>
+              <button class="tb tb-inv ${tool==='chip'?'on':''}" data-tool="chip" title="Фішка"><span class="tb-inv-ico">◉</span><span class="tb-inv-lb">Фішка</span></button>
+              <button class="tb tb-inv ${tool==='chipLarge'?'on':''}" data-tool="chipLarge" title="Велика фішка"><span class="tb-inv-ico">⬤</span><span class="tb-inv-lb">Велика</span></button>
+              <button class="tb tb-inv ${tool==='wall'?'on':''}" data-tool="wall" title="Стінка"><span class="tb-inv-ico">▬</span><span class="tb-inv-lb">Стінка</span></button>
+              <button class="tb tb-inv ${tool==='man'?'on':''}" data-tool="man" title="Манекен"><span class="tb-inv-ico">🧍</span><span class="tb-inv-lb">Манекен</span></button>
+              <button class="tb tb-inv ${tool==='goal'?'on':''}" data-tool="goal" title="Ворота"><span class="tb-inv-ico">⊓</span><span class="tb-inv-lb">Ворота</span></button>
+              <button class="tb tb-inv ${tool==='dot'?'on':''}" data-tool="dot" title="Точка"><span class="tb-inv-ico">●</span><span class="tb-inv-lb">Точка</span></button>
             </div>
           </div>
           <div class="btb-tray-sec">

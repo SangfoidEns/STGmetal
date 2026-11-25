@@ -14237,3 +14237,116 @@ body.bench-collapsed .bench-panel {
   font-size: 13px !important;
   font-weight: 800 !important;
 }
+
+/* z154 — інструменти малювання лежать на траві, решта лишається зверху */
+#v-board.view-board.on {
+  position: relative !important;
+  background: #0c3a20 !important;
+}
+#v-board #fieldContainer.fc,
+body.mode-board-focus #fieldContainer.fc {
+  background: #0c3a20 !important;
+}
+#v-board.on #boardToolbarBottom.btb-bottom,
+body.mode-board-focus #v-board #boardToolbarBottom.btb-bottom,
+body.board-only-mode #boardToolbarBottom.btb-bottom {
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: max(4px, env(safe-area-inset-bottom, 0px)) !important;
+  width: auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  z-index: 70 !important;
+  pointer-events: none !important;
+  overflow: visible !important;
+}
+#v-board #boardToolbarBottom .btb-dock,
+#v-board #boardToolbarBottom .btb-tray,
+#v-board #boardToolbarBottom .palette-swatches,
+#v-board #boardToolbarBottom button,
+#v-board #boardToolbarBottom input,
+#v-board #boardToolbarBottom label {
+  pointer-events: auto !important;
+}
+#boardToolbarBottom .btb-dock {
+  margin: 0 10px 8px !important;
+}
+.btb-dock .palette-swatches.open {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  flex-wrap: nowrap !important;
+  overflow: visible !important;
+  width: 100% !important;
+  gap: 8px !important;
+}
+.pen-colors {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  width: 100%;
+}
+#boardToolbarBottom .tb.color-swatch[data-color="#ecf0f1"] { background: #ecf0f1 !important; }
+#boardToolbarBottom .tb.color-swatch[data-color="#3498db"] { background: #3498db !important; }
+#boardToolbarBottom .tb.color-swatch[data-color="#2ecc71"] { background: #2ecc71 !important; }
+#boardToolbarBottom .tb.color-swatch[data-color="#f1c40f"] { background: #f1c40f !important; }
+#boardToolbarBottom .tb.color-swatch[data-color="#e67e22"] { background: #e67e22 !important; }
+#boardToolbarBottom .tb.color-swatch[data-color="#e74c3c"] { background: #e74c3c !important; }
+#boardToolbarBottom .tb.color-swatch[data-color="#9b59b6"] { background: #9b59b6 !important; }
+#boardToolbarBottom .tb.color-swatch[data-color="#000000"] { background: #111 !important; }
+.pen-tune {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  align-items: stretch;
+  padding: 2px 2px 0;
+}
+.pen-tune-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #f4efe2;
+}
+.pen-tune-row input[type="range"] {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 80px;
+  accent-color: #e8c547;
+}
+.pen-tune-text .tb {
+  width: 36px !important;
+  min-width: 36px !important;
+  height: 32px !important;
+}
+.btb-tray-row .tb.tb-inv {
+  width: 64px !important;
+  height: 58px !important;
+  min-width: 64px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 2px !important;
+  border-radius: 18px !important;
+  padding: 4px !important;
+}
+.tb-inv-ico { font-size: 16px; line-height: 1; }
+.tb-inv-lb {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+}
+.eq { filter: drop-shadow(0 6px 8px rgba(0,0,0,0.35)); }
+.scheme-collapse { margin-top: 8px; }

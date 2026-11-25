@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z153',
+  APP_BUILD: 'z154',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -2492,6 +2492,7 @@ trainings() {
       '<div class="scheme-card-detail">' +
         '<p class="scheme-card-desc">' + (desc ? this._richText(desc) : 'Опису ще немає.') + '</p>' +
         actions +
+        '<button type="button" class="btn btn-s btn-sm scheme-collapse" data-action="collapse-scheme" data-board-id="' + id + '">Згорнути</button>' +
       '</div></article>';
   },
 
@@ -2605,6 +2606,7 @@ trainings() {
         '<div class="ym-expand-copy">' +
           '<b class="ym-expand-title">' + title + '</b>' +
           '<p class="ym-desc">' + (desc ? this._richText(desc) : 'Опису ще немає.') + '</p>' +
+          '<button type="button" class="btn btn-s btn-sm scheme-collapse" data-action="collapse-scheme" data-board-id="' + id + '">Згорнути</button>' +
           menu +
         '</div>' +
         '<div class="ym-art" aria-hidden="true">' + thumb + '</div>' +

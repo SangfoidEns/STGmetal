@@ -2111,6 +2111,7 @@ const App = {
     try { this._bindPlayerCompare(); } catch (_) {}
     try { this.bindSquadViewButtons(); } catch (_) {}
     try { this.bindCoachCardButtons(); } catch (_) {}
+    try { this._restoreOpenRead(); } catch (_) {}
     try { this._noteScreen(); } catch (_) {}
   },
 
@@ -2464,20 +2465,56 @@ const App = {
     document.querySelectorAll('.ym-track[data-board-id]').forEach(row => {
       const same = String(row.dataset.boardId || '') === id;
       if (!same) row.classList.remove('ym-open');
-      else row.classList.toggle('ym-open');
+      else if (!row.classList.contains('ym-open')) row.classList.add('ym-open');
     });
+    this._pinOpenRead();
     try { TelegramManager.haptic && TelegramManager.haptic('medium'); } catch (_) {}
   },
 
   expandSchemeCard(boardId) {
     const id = String(boardId || '');
-    const cards = document.querySelectorAll('.scheme-card[data-board-id]');
-    cards.forEach(card => {
+    document.querySelectorAll('.scheme-card[data-board-id]').forEach(card => {
       const same = String(card.dataset.boardId || '') === id;
       if (!same) card.classList.remove('scheme-card-open');
-      else card.classList.toggle('scheme-card-open');
+      else if (!card.classList.contains('scheme-card-open')) card.classList.add('scheme-card-open');
     });
+    this._pinOpenRead();
     try { TelegramManager.haptic && TelegramManager.haptic('medium'); } catch (_) {}
+  },
+
+  _pinOpenRead() {
+    try {
+      const s = Store.get();
+      s.ui = s.ui || {};
+      const open = [];
+      document.querySelectorAll('.ym-track.ym-open').forEach(el => open.push('ym:' + (el.dataset.boardId || '')));
+      document.querySelectorAll('.scheme-card.scheme-card-open').forEach(el => open.push('card:' + (el.dataset.boardId || '')));
+      s.ui.openSchemeRead = open;
+    } catch (_) {}
+  },
+
+  _restoreOpenRead() {
+    const open = (Store.get().ui && Store.get().ui.openSchemeRead) || [];
+    if (!open.length) return;
+    open.forEach(key => {
+      const cut = String(key).indexOf(':');
+      if (cut < 0) return;
+      const kind = key.slice(0, cut);
+      const id = key.slice(cut + 1);
+      const sel = kind === 'ym' ? '.ym-track' : '.scheme-card';
+      const cls = kind === 'ym' ? 'ym-open' : 'scheme-card-open';
+      document.querySelectorAll(sel).forEach(el => {
+        if (String(el.dataset.boardId || '') === id) el.classList.add(cls);
+      });
+    });
+  },
+
+  collapseScheme(boardId) {
+    const id = String(boardId || '');
+    document.querySelectorAll('.ym-track[data-board-id], .scheme-card[data-board-id]').forEach(el => {
+      if (!id || String(el.dataset.boardId || '') === id) el.classList.remove('ym-open', 'scheme-card-open');
+    });
+    this._pinOpenRead();
   },
 
   openSchemeActionSheet(boardId) {
@@ -2666,6 +2703,8 @@ const App = {
       const playerTile = e.target.closest && e.target.closest('.pl-card[data-player-id]');
       const schemeCard = e.target.closest && e.target.closest('.scheme-card[data-board-id]');
       const track = e.target.closest && e.target.closest('.ym-track[data-board-id]');
+      if (track && track.classList.contains('ym-open')) return;
+      if (schemeCard && schemeCard.classList.contains('scheme-card-open')) return;
       if (!albumTile && !pmCard && !playerTile && !schemeCard && !track && e.target.closest && e.target.closest('button:not(.coach-tools-handle), a, input, select, textarea')) return;
       const row = albumTile || pmCard || playerTile || track || schemeCard || (e.target.closest && e.target.closest(
         '.sc-next-training[data-next-training], .coach-tools-handle, .sc-tap[data-view="players"]'
@@ -3520,6 +3559,16 @@ const App = {
       if (action === 'open-self-profile') {
         e.preventDefault(); e.stopPropagation();
         try { App.navigate('home'); } catch (_) {}
+        return;
+      }
+      if (action === 'collapse-scheme') {
+        e.preventDefault(); e.stopPropagation();
+        this.collapseScheme(t.dataset.boardId || '');
+        return;
+      }
+      if (action === 'text-size') {
+        e.preventDefault(); e.stopPropagation();
+        try { BoardEngine.bumpText(t.dataset.dir || 1); } catch (_) {}
         return;
       }
       if (action === 'scheme-menu') {
