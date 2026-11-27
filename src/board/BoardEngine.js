@@ -1761,6 +1761,7 @@ const BoardEngine = {
     try {
       const s = Store.get();
       if (!s || !s.activeBoard) return;
+      if (this._loadingScheme) return;
       if (s.activeBoard.holdSchemeSave && !(s.activeBoard.objects || []).length) return;
       s.activeBoard.holdSchemeSave = false;
       const now = new Date().toISOString();
@@ -1856,13 +1857,20 @@ const BoardEngine = {
       try { Toast.show('Цю схему бачить лише тренер', 'warn'); } catch (_) {}
       return false;
     }
+    try { this.detachLiveDrawing(); } catch (_) {}
     if (!s.activeBoard) s.activeBoard = { objects: [], history: [], historyIdx: -1 };
-    s.activeBoard.objects = JSON.parse(JSON.stringify(b.objects || []));
-    if (b.camera) this.camera = Object.assign({}, this.camera || {}, b.camera);
-    this._migratedLeft = false;
-    try { this.migrateLeftEdgeToBench && this.migrateLeftEdgeToBench(); } catch (_) {}
-    try { this.pushHistory && this.pushHistory(); } catch (_) {}
     if (b.id) s.activeBoard.sourceBoardId = b.id;
+    s.activeBoard.holdSchemeSave = false;
+    this._loadingScheme = true;
+    try {
+      s.activeBoard.objects = JSON.parse(JSON.stringify(b.objects || []));
+      if (b.camera) this.camera = Object.assign({}, this.camera || {}, b.camera);
+      this._migratedLeft = false;
+      try { this.migrateLeftEdgeToBench && this.migrateLeftEdgeToBench(); } catch (_) {}
+      try { this.pushHistory && this.pushHistory(); } catch (_) {}
+    } finally {
+      this._loadingScheme = false;
+    }
     try { this.render && this.render(); } catch (_) {}
     try { this.renderTokens && this.renderTokens(); } catch (_) {}
     try { this.renderDrawings && this.renderDrawings(); } catch (_) {}

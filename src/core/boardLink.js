@@ -26,6 +26,8 @@ const BoardLink = {
     try {
       const s = Store.get();
       if (!s.activeBoard) s.activeBoard = { objects: [], fieldView: 'full' };
+      s.activeBoard.sourceBoardId = null;
+      s.activeBoard.holdSchemeSave = false;
       s.activeBoard.objects = JSON.parse(JSON.stringify(snap.objects || []));
       if (snap.fieldView) s.activeBoard.fieldView = snap.fieldView;
       if (snap.camera && typeof BoardEngine !== 'undefined') {

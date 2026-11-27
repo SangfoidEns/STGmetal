@@ -71,4 +71,24 @@ describe('scheme drawings stay separate', () => {
     assert.equal(cover.objects[0].x, 0.25);
     assert.equal(ctx.BoardEngine._schemeEditBar().includes('Зберегти'), true);
   });
+
+  it('opening the next scheme does not replace the one that was open', () => {
+    const ctx = boot();
+    const allZones = { id: 'all', name: 'всі зони', objects: [{ id: 'z', type: 'zone', x: 0.1 }] };
+    const flanks = { id: 'flanks', name: 'зони фланги', objects: [{ id: 'f', type: 'zone', x: 0.8 }] };
+    ctx.state.boards = [allZones, flanks];
+    ctx.state.activeBoard.objects = [{ id: 'live', type: 'zone', x: 0.1 }];
+    ctx.state.activeBoard.sourceBoardId = 'all';
+    const opened = ctx.BoardEngine.loadBoard('flanks');
+    assert.equal(opened, true);
+    assert.equal(ctx.state.activeBoard.sourceBoardId, 'flanks');
+    assert.equal(allZones.objects[0].id, 'z');
+    assert.equal(allZones.objects[0].x, 0.1);
+    assert.equal(ctx.state.activeBoard.objects[0].id, 'f');
+    ctx.state.activeBoard.objects[0].x = 0.2;
+    ctx.BoardEngine._syncLiveBoard();
+    assert.equal(allZones.objects[0].x, 0.1);
+    assert.equal(flanks.objects[0].x, 0.2);
+    assert.equal(flanks.objects[0].id, 'f');
+  });
 });
