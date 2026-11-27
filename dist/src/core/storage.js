@@ -155,8 +155,15 @@ const StorageManager = {
   scheduleClubPush() {
     if (this._staticClubOnly()) return;
     if (this._suppressClubPush || !this._clubReady || !this._isCoachWriter()) return;
-    clearTimeout(this._clubPushTimer);
-    this._clubPushTimer = setTimeout(() => { this.pushClub().catch(() => {}); }, 400);
+    if (this._clubPushTimer) return;
+    this._clubPushTimer = setTimeout(() => {
+      this._clubPushTimer = null;
+      if (this._editorOpen()) {
+        this.scheduleClubPush();
+        return;
+      }
+      this.pushClub().catch(() => {});
+    }, 60000);
   },
 
   async fetchClub() {
@@ -220,10 +227,32 @@ const StorageManager = {
     return null;
   },
 
+  _editorOpen() {
+    try {
+      const modal = document.getElementById('modal');
+      if (modal && modal.classList.contains('show')) return true;
+    } catch (_) {}
+    return false;
+  },
+
+  flushHeld() {
+    const remote = this._heldRemote;
+    this._heldRemote = null;
+    if (!remote || this._editorOpen()) {
+      if (remote) this._heldRemote = remote;
+      return false;
+    }
+    return this.applyClubPayload(remote, { quiet: true });
+  },
+
   applyClubPayload(remote, opts) {
     if (this._holdRemote && !(opts && opts.force)) return false;
     if (typeof BoardEngine !== 'undefined' && BoardEngine.dragObj) return false;
     if (!remote || !remote.payload || !remote.updatedAt) return false;
+    if (this._editorOpen() && !(opts && opts.force)) {
+      this._heldRemote = remote;
+      return false;
+    }
     const current = Store.get() || {};
     const ui = current.ui;
     const localStats = current.settings && current.settings.coachStats;
@@ -278,7 +307,12 @@ const StorageManager = {
       try { Toast.show('Дані клубу оновлено', 'ok'); } catch (_) {}
     }
     try { if (typeof I18n !== 'undefined' && I18n.initFromStore) I18n.initFromStore(); } catch (_) {}
-    try { if (typeof App !== 'undefined') { App.applyBranding(); App.renderCurrent(); } } catch (_) {}
+    try {
+      if (typeof App !== 'undefined') {
+        App.applyBranding();
+        if (!this._editorOpen()) App.renderCurrent();
+      }
+    } catch (_) {}
     try { if (typeof AuthManager !== 'undefined') { AuthManager._resolveRole(); AuthManager._applyUiRole(); } } catch (_) {}
     try {
       if (typeof CoachTools !== 'undefined' && CoachTools.noticeNewGifts) CoachTools.noticeNewGifts(migrated.gifts || []);
@@ -321,10 +355,13 @@ const StorageManager = {
       try {
         if (document.visibilityState === 'hidden') return;
       } catch (_) {}
+      try { if (typeof navigator !== 'undefined' && navigator.onLine === false) return; } catch (_) {}
+      if (this._editorOpen()) return;
       this.pullClub().catch(() => {});
     };
     document.addEventListener('visibilitychange', kick);
-    window.addEventListener('focus', kick);
+    window.addEventListener('online', kick);
+    window.addEventListener('offline', () => this._setClubSyncLine('Клубний обмін: немає зв’язку'));
   },
 
   async bootstrapClubSync() {
@@ -364,7 +401,7 @@ const StorageManager = {
     }
     this._freshInstall = false;
     if (this._clubPoll) clearInterval(this._clubPoll);
-    this._clubPoll = setInterval(() => { this.pullClub().catch(() => {}); }, 4000);
+    this._clubPoll = setInterval(() => { this.pullClub().catch(() => {}); }, 60000);
     this._bindClubWatchers();
     if (offline) this._setClubSyncLine('Клубний обмін: немає зв’язку');
     else this._setClubSyncLine(remote.updatedAt ? 'Клубний обмін: підключено' : 'Клубний обмін: очікує перший запис тренера');

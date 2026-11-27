@@ -4,6 +4,8 @@ const SupabaseClub = {
   KEY: '',
   KEY_RUNTIME: '',
   ROW_LIMIT: 1500000,
+  POLL_MS: 60000,
+  PUSH_MS: 60000,
 
   enabled() {
     return !!(this.URL && this._key());
@@ -104,7 +106,8 @@ const SupabaseClub = {
       }
       await this.pull({ quiet: true, known: remote });
       let sent = true;
-      if (this._canWrite(sm) && !this._rebuilding) sent = await this.push();
+      const needSend = !!(remote.empty || !remote.payload || (sm && sm._clubDirty));
+      if (this._canWrite(sm) && !this._rebuilding && needSend) sent = await this.push();
       this._armPoll();
       return sent !== false;
     } catch (err) {
@@ -116,23 +119,63 @@ const SupabaseClub = {
     }
   },
 
+  editorOpen() {
+    try {
+      if (this._sm && this._sm._editorOpen) return !!this._sm._editorOpen();
+    } catch (_) {}
+    return false;
+  },
+
   _armPoll() {
     clearInterval(this._poll);
-    this._poll = setInterval(() => {
+    const tick = () => {
       try { if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return; } catch (_) {}
+      try { if (typeof navigator !== 'undefined' && navigator.onLine === false) return; } catch (_) {}
+      if (this.editorOpen()) return;
       this.pull({ quiet: true }).catch(() => {});
-    }, 15000);
-    if (!this._focusBound && typeof window !== 'undefined') {
-      this._focusBound = true;
-      window.addEventListener('focus', () => { this.pull({ quiet: true }).catch(() => {}); });
+    };
+    this._poll = setInterval(tick, this.POLL_MS);
+    if (!this._netBound && typeof window !== 'undefined') {
+      this._netBound = true;
+      window.addEventListener('online', () => {
+        this._line('Зв’язок є');
+        tick();
+      });
+      window.addEventListener('offline', () => {
+        this._line('Немає зв’язку');
+        this.flush().catch(() => {});
+      });
+      document.addEventListener('visibilitychange', () => {
+        try {
+          if (document.visibilityState === 'hidden') this.flush().catch(() => {});
+          else tick();
+        } catch (_) {}
+      });
     }
   },
 
   schedulePush(sm) {
     if (sm) this._sm = sm;
     if (!this.enabled() || !this._ready || !this._canWrite(this._sm)) return;
-    clearTimeout(this._timer);
-    this._timer = setTimeout(() => { this.push().catch(() => {}); }, 900);
+    if (this._timer) return;
+    this._timer = setTimeout(() => {
+      this._timer = null;
+      if (this.editorOpen()) {
+        this.schedulePush(this._sm);
+        return;
+      }
+      this.push().catch(() => {});
+    }, this.PUSH_MS);
+  },
+
+  flush() {
+    if (this._timer) {
+      clearTimeout(this._timer);
+      this._timer = null;
+    }
+    if (!this.enabled() || !this._ready || !this._canWrite(this._sm)) return Promise.resolve(false);
+    if (!(this._sm && this._sm._clubDirty)) return Promise.resolve(false);
+    return this.push();
   },
 
   async fetchRemote(opts) {
@@ -203,6 +246,7 @@ const SupabaseClub = {
 
   async pull(opts) {
     if (!this.enabled() || !this._sm) return false;
+    if (this.editorOpen() && !(opts && opts.force)) return false;
     if (typeof BoardEngine !== 'undefined' && BoardEngine.dragObj) return false;
     let remote = opts && opts.known;
     if (!remote) {
@@ -276,9 +320,13 @@ const SupabaseClub = {
         }
         const off = await this.offload(local);
         const slim = this.withoutInline(off.payload);
-        await this.slimStored(slim);
         const remember = (updatedAt) => {
-          if (!stillMine() || !this._sm.applyClubPayload) return;
+          if (!stillMine()) return;
+          if (updatedAt) this._sm._clubUpdatedAt = updatedAt;
+          if (this.editorOpen() || !this._sm.applyClubPayload) {
+            this._sm._clubDirty = false;
+            return;
+          }
           try {
             const now = this._sm.buildExportPayload ? this._sm.buildExportPayload() : null;
             if (now && this.same(now, slim)) return;
@@ -299,7 +347,6 @@ const SupabaseClub = {
           if (stillMine()) this._sm._clubDirty = false;
           else this._again = true;
           if (remote.updated_at) this._sm._clubUpdatedAt = remote.updated_at;
-          await this.sweep(fits ? '' : 'state/current.json', slim);
           return true;
         }
         const rev = remote.empty ? 0 : (remote.rev || 0);
@@ -388,7 +435,6 @@ const SupabaseClub = {
       if (!res.ok) return false;
       const rows = await res.json().catch(() => []);
       if (!Array.isArray(rows) || !rows.length) return 'conflict';
-      await this.sweep(path || '', payload);
       return true;
     }
     const res = await fetch(this.URL + '/rest/v1/club_state?id=eq.metalist&rev=eq.' + (Number(rev) || 0), {
@@ -405,7 +451,6 @@ const SupabaseClub = {
     if (!res.ok) return false;
     const rows = await res.json().catch(() => []);
     if (!Array.isArray(rows) || !rows.length) return 'conflict';
-    await this.sweep(path || '', payload);
     return true;
   },
 

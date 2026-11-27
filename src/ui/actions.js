@@ -658,17 +658,7 @@ const Actions = {
     if (typeof App !== 'undefined' && App._chatBlocksTraining && App._chatBlocksTraining()) return;
     const t = Store.get().trainings.find(x => x.id === id);
     if (!t) return;
-    const structHtml = (t.structure || []).map((b, i) => `
-      <div class="si" data-idx="${i}">
-        <span class="dh">⠿</span>
-        <span class="bn">${sanitize(b.title || b.name)}</span>
-        <span class="btm">${b.duration} хв</span>
-        <div class="ba2">
-          <button class="btn btn-s btn-sm" data-edit-block="${id}:${i}">✎</button>
-          <button class="btn btn-s btn-sm" data-dup-block="${id}:${i}">⧉</button>
-          <button class="btn btn-d btn-sm" data-del-block="${id}:${i}">✕</button>
-        </div>
-      </div>`).join('');
+    const structHtml = this._trainingBlocksHtml(t);
     const total = (t.structure || []).reduce((a, b) => a + (b.duration || 0), 0);
     Modal.open('Редагування тренування', `
       <div class="fg">
@@ -706,59 +696,110 @@ const Actions = {
     const boardBtn = document.querySelector('[data-modal-action="open-training-board"]');
     if (boardBtn) boardBtn.dataset.tid = id;
 
-    // block actions via delegation on modal
-    document.getElementById('modalBody').onclick = e => {
+    const body = document.getElementById('modalBody');
+    const keep = (fn) => {
+      const tr = Store.get().trainings.find(x => x.id === id);
+      if (!tr) return;
+      this._readTrainingFields(tr);
+      fn(tr);
+      this._paintTrainingBlocks(tr);
+      try { StorageManager.save(); } catch (_) {}
+    };
+    body.oninput = e => {
+      const tr = Store.get().trainings.find(x => x.id === id);
+      if (!tr) return;
+      this._readTrainingFields(tr);
+      const name = e.target.closest && e.target.closest('[data-block-name]');
+      const mins = e.target.closest && e.target.closest('[data-block-min]');
+      if (name && tr.structure && tr.structure[+name.dataset.blockName]) tr.structure[+name.dataset.blockName].title = name.value;
+      if (mins && tr.structure && tr.structure[+mins.dataset.blockMin]) {
+        tr.structure[+mins.dataset.blockMin].duration = +mins.value || 5;
+        const totalEl = document.getElementById('totalDur');
+        if (totalEl) totalEl.textContent = String(tr.structure.reduce((a, b) => a + (Number(b.duration) || 0), 0));
+      }
+    };
+    body.onchange = () => {
+      const tr = Store.get().trainings.find(x => x.id === id);
+      if (!tr) return;
+      this._readTrainingFields(tr);
+      try { StorageManager.save(); } catch (_) {}
+    };
+    body.onclick = e => {
       e.stopPropagation();
       const ab = e.target.closest('[data-add-block]');
       if (ab) {
-        const [tid, name, dur] = ab.dataset.addBlock.split(':');
-        const tr = Store.get().trainings.find(x => x.id === tid);
-        if (!tr) return;
-        if (!tr.structure) tr.structure = [];
-        tr.structure.push({ id: uid(), title: name, type: 'custom', duration: +dur, intensity: 5 });
-        tr.duration = tr.structure.reduce((a, b) => a + b.duration, 0);
-        StorageManager.save();
-        Actions.editTraining(tid);
+        const parts = ab.dataset.addBlock.split(':');
+        const name = parts[1];
+        const dur = parts[2];
+        keep(tr => {
+          if (!tr.structure) tr.structure = [];
+          tr.structure.push({ id: uid(), title: name, type: 'custom', duration: +dur, intensity: 5 });
+        });
         return;
       }
       const db = e.target.closest('[data-del-block]');
       if (db) {
-        const [tid, idx] = db.dataset.delBlock.split(':');
-        const tr = Store.get().trainings.find(x => x.id === tid);
-        if (tr?.structure) { tr.structure.splice(+idx, 1); tr.duration = tr.structure.reduce((a, b) => a + b.duration, 0); StorageManager.save(); Actions.editTraining(tid); }
+        const idx = +db.dataset.delBlock.split(':')[1];
+        keep(tr => { if (tr.structure) tr.structure.splice(idx, 1); });
         return;
       }
       const dup = e.target.closest('[data-dup-block]');
       if (dup) {
-        const [tid, idx] = dup.dataset.dupBlock.split(':');
-        const tr = Store.get().trainings.find(x => x.id === tid);
-        if (tr?.structure) {
-          const c = Object.assign({}, tr.structure[+idx], { id: uid() });
-          tr.structure.splice(+idx + 1, 0, c);
-          tr.duration = tr.structure.reduce((a, b) => a + b.duration, 0);
-          StorageManager.save(); Actions.editTraining(tid);
-        }
-        return;
-      }
-      const eb = e.target.closest('[data-edit-block]');
-      if (eb) {
-        const [tid, idx] = eb.dataset.editBlock.split(':');
-        const tr = Store.get().trainings.find(x => x.id === tid);
-        const block = tr?.structure?.[+idx];
-        if (!block) return;
-        Modal.prompt('Назва блоку', block.title || block.name, name => {
-          if (name === null) return;
-          Modal.prompt('Тривалість (хв)', String(block.duration), dur => {
-            if (dur === null) return;
-            block.title = name;
-            block.duration = +dur || 5;
-            tr.duration = tr.structure.reduce((a, b) => a + b.duration, 0);
-            StorageManager.save();
-            Actions.editTraining(tid);
-          });
+        const idx = +dup.dataset.dupBlock.split(':')[1];
+        keep(tr => {
+          if (!tr.structure || !tr.structure[idx]) return;
+          const c = Object.assign({}, tr.structure[idx], { id: uid() });
+          tr.structure.splice(idx + 1, 0, c);
         });
       }
     };
+  },
+
+  _readTrainingFields(t) {
+    if (!t) return;
+    const name = document.getElementById('teName');
+    if (name) t.name = name.value || t.name;
+    const date = document.getElementById('teDate');
+    if (date && date.value) t.date = date.value;
+    const time = document.getElementById('teTime');
+    if (time) t.time = time.value;
+    const status = document.getElementById('teSt');
+    if (status && status.value) t.status = status.value;
+    const intensity = document.getElementById('teInt');
+    if (intensity) t.intensity = +intensity.value || t.intensity;
+    const goal = document.getElementById('teGoal');
+    if (goal) t.mainGoal = goal.value;
+    const comment = document.getElementById('teCom');
+    if (comment) t.comment = comment.value;
+    const album = document.getElementById('teAlbum');
+    if (album) t.schemeAlbumId = album.value || '';
+    (t.structure || []).forEach((block, i) => {
+      const title = document.querySelector('[data-block-name="' + i + '"]');
+      const mins = document.querySelector('[data-block-min="' + i + '"]');
+      if (title) block.title = title.value;
+      if (mins) block.duration = +mins.value || block.duration || 5;
+    });
+  },
+
+  _trainingBlocksHtml(t) {
+    return (t.structure || []).map((b, i) => `
+      <div class="si" data-idx="${i}">
+        <input class="tr-block-name" data-block-name="${i}" value="${sanitize(b.title || b.name || '')}" aria-label="Назва блоку">
+        <input class="tr-block-min" data-block-min="${i}" type="number" min="1" max="180" value="${Number(b.duration) || 5}" aria-label="Хвилини">
+        <div class="ba2">
+          <button type="button" class="btn btn-s btn-sm" data-dup-block="${t.id}:${i}">⧉</button>
+          <button type="button" class="btn btn-d btn-sm" data-del-block="${t.id}:${i}">✕</button>
+        </div>
+      </div>`).join('');
+  },
+
+  _paintTrainingBlocks(t) {
+    const list = document.getElementById('structList');
+    const totalEl = document.getElementById('totalDur');
+    const total = (t.structure || []).reduce((a, b) => a + (Number(b.duration) || 0), 0);
+    t.duration = total;
+    if (totalEl) totalEl.textContent = String(total);
+    if (list) list.innerHTML = this._trainingBlocksHtml(t);
   },
 
   saveTraining(id) {

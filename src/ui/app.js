@@ -1942,7 +1942,7 @@ const App = {
         const due = !this._usageSaveAt || Date.now() - this._usageSaveAt > 60000;
         if (key && clubReady && due) {
           this._usageSaveAt = Date.now();
-          try { StorageManager.save(); } catch (_) {}
+          try { StorageManager.save({ localOnly: true }); } catch (_) {}
         }
       } catch (_) {}
     };
@@ -3253,6 +3253,19 @@ const App = {
   },
 
   bindEvents() {
+    if (!this._modalShield) {
+      this._modalShield = true;
+      const shield = (e) => {
+        const modal = document.getElementById('modal');
+        if (!modal || !modal.classList.contains('show')) return;
+        if (e.target && e.target.closest && e.target.closest('#modal')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+      };
+      document.addEventListener('pointerdown', shield, true);
+      document.addEventListener('click', shield, true);
+    }
     if (!this._fmtBound) {
       this._fmtBound = true;
       document.addEventListener('click', (e) => {

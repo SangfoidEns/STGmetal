@@ -281,6 +281,8 @@ tr:hover td{background:var(--panel-h)}
 .si .bn{flex:1;font-weight:600;font-size:13px}
 .si .btm{font-size:11px;color:var(--muted);min-width:45px;text-align:right}
 .si .ba2{display:flex;gap:3px}
+.si .tr-block-name{flex:1;min-width:0;font-weight:600;font-size:13px}
+.si .tr-block-min{width:64px;text-align:right}
 
 .ec{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:10px;margin-bottom:6px;cursor:pointer;transition:var(--t)}
 .ec:hover{border-color:var(--club-secondary)}

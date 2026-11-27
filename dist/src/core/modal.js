@@ -3,16 +3,21 @@ const Modal = {
   _onConfirm: null,
   _resolve: null,
   open(title, body, buttons) {
+    const root = document.getElementById('modal');
+    const active = typeof document !== 'undefined' ? document.activeElement : null;
+    const keepFocus = !!(root && root.classList.contains('show') && active && root.contains(active) && active.id && active.id !== 'teName' && active.id !== 'tName' && active.id !== 'schName' && active.id !== 'plF');
     document.getElementById('modalTitle').textContent = title;
     document.getElementById('modalBody').innerHTML = body;
     document.getElementById('modalFooter').innerHTML = (buttons || []).map(b =>
       `<button type="button" class="btn ${b.cls || 'btn-s'}" data-modal-action="${b.action || ''}">${b.label}</button>`
     ).join('');
-    document.getElementById('modal').classList.add('show');
-    setTimeout(() => {
-      const inp = document.querySelector('#modalBody input, #modalBody textarea, #modalBody select');
-      if (inp) inp.focus();
-    }, 50);
+    root.classList.add('show');
+    if (!keepFocus) {
+      setTimeout(() => {
+        const inp = document.querySelector('#modalBody input, #modalBody textarea, #modalBody select');
+        if (inp && document.activeElement === document.body) inp.focus();
+      }, 50);
+    }
     // Promise API for callers that use .then()
     return new Promise((resolve) => {
       this._resolve = resolve;
@@ -27,6 +32,7 @@ const Modal = {
     }
     this._resolve = null;
     this._onConfirm = null;
+    try { if (typeof StorageManager !== 'undefined' && StorageManager.flushHeld) StorageManager.flushHeld(); } catch (_) {}
   },
   confirm(msg, onYes) {
     this._onConfirm = onYes;
