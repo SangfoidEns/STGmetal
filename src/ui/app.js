@@ -184,6 +184,9 @@ const App = {
         this.syncRoleClass && this.syncRoleClass();
         this.applyBranding && this.applyBranding();
         if (this._booted) this.renderCurrent && this.renderCurrent();
+        if ((AuthManager.role === 'player' || AuthManager.role === 'guest') && typeof SupabaseClub !== 'undefined' && SupabaseClub.followServer) {
+          SupabaseClub.followServer().catch(() => {});
+        }
       }
     } catch (e) { console.warn('identity', e); }
   },
@@ -4207,6 +4210,8 @@ const App = {
       if (action === 'enter-server-code') return this.askClubCode();
       if (action === 'save-supabase-key') return Actions.saveSupabaseKey();
       if (action === 'server-stats') return Actions.refreshServerStats();
+      if (action === 'server-push') return Actions.pushDeviceToServer();
+      if (action === 'server-pull') return Actions.pullServerToDevice();
       if (action === 'server-rebuild') return Actions.rebuildServer();
       if (action === 'staff-add') {
         e.preventDefault(); e.stopPropagation();

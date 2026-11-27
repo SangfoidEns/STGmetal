@@ -629,8 +629,6 @@ const StorageManager = {
       }
       if (this._supabaseOn() && !(opts && opts.localOnly)) {
         this._clubRev = (this._clubRev || 0) + 1;
-        this._clubDirty = true;
-        try { SupabaseClub.schedulePush(this); } catch (_) {}
       }
     } catch (e) {
       console.warn('[Storage.save]', e);
@@ -1558,26 +1556,8 @@ const StorageManager = {
     const coachWriter = this._isCoachWriter();
     this._holdRemote = true;
     const publishImport = () => {
-      if (!coachWriter) {
-        this._holdRemote = false;
-        return;
-      }
-      this._clubDirty = true;
+      this._holdRemote = false;
       this._clubReady = true;
-      const finish = () => { this._holdRemote = false; };
-      if (this._supabaseOn() && typeof SupabaseClub !== 'undefined' && SupabaseClub.push) {
-        try {
-          SupabaseClub._sm = this;
-          SupabaseClub._ready = true;
-          if (SupabaseClub._timer) {
-            clearTimeout(SupabaseClub._timer);
-            SupabaseClub._timer = null;
-          }
-          SupabaseClub.push({ replace: true }).then(finish, finish);
-          return;
-        } catch (_) {}
-      }
-      this.pushClub({ force: true }).then(finish, finish);
     };
     const applyMerged = (payload, file) => {
       const current = Store.get() || {};

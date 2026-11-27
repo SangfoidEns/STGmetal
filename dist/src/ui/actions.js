@@ -2696,6 +2696,51 @@ const Actions = {
     });
   },
 
+  pushDeviceToServer() {
+    if (!this._schemeCoach() && !(typeof StorageManager !== 'undefined' && StorageManager._isCoachWriter && StorageManager._isCoachWriter())) {
+      try { Toast.show('Це робить тренер', 'warn'); } catch (_) {}
+      return;
+    }
+    if (typeof SupabaseClub === 'undefined' || !SupabaseClub.enabled || !SupabaseClub.enabled()) {
+      try { Toast.show('Спочатку підключи сервер', 'warn'); } catch (_) {}
+      return;
+    }
+    Modal.confirm('Викласти клуб з цього приладу на сервер? Клуб на сервері заміниться.', () => {
+      try { Toast.show('Викладаю на сервер…'); } catch (_) {}
+      SupabaseClub._sm = StorageManager;
+      SupabaseClub._ready = true;
+      SupabaseClub.push({ replace: true }).then(ok => {
+        try { Toast.show(ok ? 'Клуб із цього приладу на сервері' : 'Не вдалося викласти на сервер', ok ? 'ok' : 'warn'); } catch (_) {}
+        try { App.renderCurrent && App.renderCurrent(); } catch (_) {}
+      }).catch(() => {
+        try { Toast.show('Немає зв’язку з сервером', 'warn'); } catch (_) {}
+      });
+    });
+  },
+
+  pullServerToDevice() {
+    if (!this._schemeCoach() && !(typeof StorageManager !== 'undefined' && StorageManager._isCoachWriter && StorageManager._isCoachWriter())) {
+      try { Toast.show('Це робить тренер', 'warn'); } catch (_) {}
+      return;
+    }
+    if (typeof SupabaseClub === 'undefined' || !SupabaseClub.enabled || !SupabaseClub.enabled()) {
+      try { Toast.show('Спочатку підключи сервер', 'warn'); } catch (_) {}
+      return;
+    }
+    Modal.confirm('Забрати клуб із сервера на цей прилад? Клуб на приладі заміниться.', () => {
+      try { Toast.show('Забираю з сервера…'); } catch (_) {}
+      SupabaseClub._sm = StorageManager;
+      SupabaseClub._ready = true;
+      SupabaseClub.pull({ force: true }).then(ok => {
+        try { Toast.show(ok ? 'Клуб із сервера на цьому приладі' : 'На сервері ще немає клубу', ok ? 'ok' : 'warn'); } catch (_) {}
+        try { App.renderCurrent && App.renderCurrent(); } catch (_) {}
+        try { App.updateHeader && App.updateHeader(); } catch (_) {}
+      }).catch(() => {
+        try { Toast.show('Немає зв’язку з сервером', 'warn'); } catch (_) {}
+      });
+    });
+  },
+
   refreshServerStats() {
     const storeEl = document.getElementById('serverStatsStore');
     const dbEl = document.getElementById('serverStatsDb');

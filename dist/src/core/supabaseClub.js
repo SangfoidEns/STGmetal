@@ -92,6 +92,22 @@ const SupabaseClub = {
     } catch (_) { return ''; }
   },
 
+  _coachHolds() {
+    try {
+      if (typeof AuthManager !== 'undefined' && AuthManager._canWriteClub && AuthManager._canWriteClub()) return true;
+      if (typeof AuthManager !== 'undefined' && AuthManager.isCoach && AuthManager.isCoach()) return true;
+    } catch (_) {}
+    return false;
+  },
+
+  _autoTakesServer() {
+    try {
+      if (this._coachHolds()) return false;
+      if (typeof AuthManager === 'undefined' || !AuthManager.role) return false;
+      return AuthManager.role === 'player' || AuthManager.role === 'guest';
+    } catch (_) { return false; }
+  },
+
   async start(sm) {
     this._sm = sm;
     if (!this.enabled()) return false;
@@ -99,7 +115,8 @@ const SupabaseClub = {
     this._starting = true;
     this._ready = false;
     try {
-      const remote = await this.fetchRemote();
+      const coach = this._coachHolds();
+      const remote = await this.fetchRemote(coach ? { light: true } : undefined);
       if (!remote || remote.error) {
         this._line(this._fail(remote));
         return false;
@@ -109,10 +126,15 @@ const SupabaseClub = {
         return false;
       }
       this._ready = true;
+      if (coach || !this._autoTakesServer()) {
+        this._line('Сервер підключено.');
+        this._armPoll();
+        return true;
+      }
       if (!this._rebuilding && remote.payload) {
         try { await this.sweep(remote.path || '', remote.payload); } catch (_) {}
       }
-      const got = await this.pull({ quiet: true, known: remote });
+      const got = await this.pull({ quiet: true, known: remote, take: true });
       this._armPoll();
       return got !== false;
     } catch (err) {
@@ -122,6 +144,14 @@ const SupabaseClub = {
     } finally {
       this._starting = false;
     }
+  },
+
+  async followServer() {
+    if (!this.enabled() || !this._autoTakesServer()) return false;
+    if (!this._sm && typeof StorageManager !== 'undefined') this._sm = StorageManager;
+    if (!this._sm) return false;
+    if (!this._ready) return this.start(this._sm);
+    return this.pull({ quiet: true, take: true });
   },
 
   editorOpen() {
@@ -137,7 +167,8 @@ const SupabaseClub = {
       try { if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return; } catch (_) {}
       try { if (typeof navigator !== 'undefined' && navigator.onLine === false) return; } catch (_) {}
       if (this.editorOpen()) return;
-      this.pull({ quiet: true }).catch(() => {});
+      if (!this._autoTakesServer()) return;
+      this.pull({ quiet: true, take: true }).catch(() => {});
     };
     this._poll = setInterval(tick, this.POLL_MS);
     if (!this._netBound && typeof window !== 'undefined') {
@@ -148,13 +179,9 @@ const SupabaseClub = {
       });
       window.addEventListener('offline', () => {
         this._line('Немає зв’язку');
-        this.flush().catch(() => {});
       });
       document.addEventListener('visibilitychange', () => {
-        try {
-          if (document.visibilityState === 'hidden') this.flush().catch(() => {});
-          else tick();
-        } catch (_) {}
+        try { if (document.visibilityState !== 'hidden') tick(); } catch (_) {}
       });
     }
   },
@@ -272,23 +299,23 @@ const SupabaseClub = {
       return false;
     }
     if (remote.empty || !remote.payload) {
-      this._line('Сервер ще без цієї копії. Телефон свою не виклав.');
+      this._line('На сервері ще немає клубу.');
       this._rev = 0;
       return false;
     }
     this._rev = remote.rev;
+    const take = !!(opts && (opts.force || opts.take));
     const serverAt = String(remote.updated_at || '');
     const seen = String(this._sm._clubUpdatedAt || '');
     const onTop = !!(seen && serverAt && seen === serverAt);
     if (onTop && !(opts && opts.force)) {
-      if (this._sm._clubDirty && this._canWrite(this._sm)) this.schedulePush(this._sm);
-      this._line('Клуб на сервері');
+      this._line('Клуб із сервера');
       return false;
     }
     const localMs = Date.parse(this._localUpdatedAt()) || 0;
     const serverMs = Date.parse(serverAt) || 0;
-    if (localMs && serverMs && localMs > serverMs && !(opts && opts.force)) {
-      this._line('На цьому пристрої новіша копія. Завантаж файл ще раз, щоб викласти її на сервер.');
+    if (!take && localMs && serverMs && localMs > serverMs) {
+      this._line('На цьому приладі свій клуб. На сервер він піде кнопкою.');
       return false;
     }
     try { if (this._sm.createBackup) this._sm.createBackup(); } catch (_) {}

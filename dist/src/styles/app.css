@@ -10524,6 +10524,13 @@ body.tg-mini-app .main, body.tg-mini-app #main {
   gap: 8px;
   margin-top: 4px;
 }
+.sync-directions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+}
+.sync-directions .btn { width: 100%; }
 .settings-card { margin-bottom: 12px; }
 
 /* Squad sections modern */

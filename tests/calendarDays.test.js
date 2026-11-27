@@ -29,11 +29,11 @@ describe('calendar weekday letters', () => {
     assert.match(html, /title="Субота">Сб</);
     assert.match(html, /title="Неділя">Нд</);
     assert.equal(html.includes('>А<'), false);
-    assert.equal(context.Views.APP_BUILD, 'z166');
-    assert.equal(context.Views.versionLabel(), '166');
+    assert.equal(context.Views.APP_BUILD, 'z167');
+    assert.equal(context.Views.versionLabel(), '167');
     const settings = context.Views.settings();
-    assert.match(settings, /Версія 166/);
-    assert.equal(settings.includes('z166'), false);
+    assert.match(settings, /Версія 167/);
+    assert.equal(settings.includes('z167'), false);
     const library = context.Views.tactics();
     assert.match(library, /Всі альбоми/);
     assert.match(library, /open-scheme-archive/);
@@ -176,6 +176,10 @@ describe('calendar weekday letters', () => {
     assert.match(settings, /id="serverStatsStore"/);
     assert.match(settings, /id="serverStatsDb"/);
     assert.match(settings, /data-action="server-rebuild"/);
+    assert.match(settings, /data-action="server-push"/);
+    assert.match(settings, /З цього приладу на сервер/);
+    assert.match(settings, /data-action="server-pull"/);
+    assert.match(settings, /З сервера на цей прилад/);
     assert.match(settings, /id="setClubName"/);
     assert.match(settings, /id="setClubShort"/);
     assert.equal(settings.includes('Зберегти склад'), false);

@@ -67,6 +67,8 @@ describe('club sync stays quiet', () => {
     assert.match(app, /StorageManager\.save\(\{ localOnly: true \}\)/);
     const actions = readFileSync(new URL('../src/ui/actions.js', import.meta.url), 'utf8');
     assert.equal(actions.includes('Actions.editTraining(tid)'), false);
+    const storage = readFileSync(new URL('../src/core/storage.js', import.meta.url), 'utf8');
+    assert.equal(storage.includes('SupabaseClub.schedulePush'), false);
   });
 
   it('keeps the training fields and only refreshes the block list', () => {

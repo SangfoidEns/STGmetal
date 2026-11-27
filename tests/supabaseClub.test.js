@@ -24,6 +24,9 @@ function boot() {
       });
     },
     Blob,
+    setInterval() { return 1; },
+    clearInterval() {},
+    addEventListener() {},
     atob(value) { return Buffer.from(value, 'base64').toString('binary'); },
     Store: { get() { return context.state; } },
     ClubMerge: { mergePayload(a, b) { return Object.assign({}, a, b, { players: (b && b.players) || (a && a.players) || [] }); } },
@@ -323,7 +326,7 @@ describe('supabase club sync', () => {
       _clubDirty: true,
       _clubUpdatedAt: '',
       _canSyncWrite() { return true; },
-      applyClubPayload() { ctx.applied = true; return true; }
+      applyClubPayload(remote, opts) { ctx.applied = { remote: remote, opts: opts }; return true; }
     };
     const ok = await ctx.SupabaseClub.pull({
       quiet: true,
@@ -336,6 +339,37 @@ describe('supabase club sync', () => {
     assert.equal(ok, false);
     assert.equal(pushed, 0);
     assert.equal(ctx.applied, undefined);
+    const taken = await ctx.SupabaseClub.pull({
+      quiet: true,
+      take: true,
+      known: {
+        rev: 4,
+        updated_at: '2026-11-27T10:00:00.000Z',
+        payload: { players: [{ id: 'from-server' }] }
+      }
+    });
+    assert.equal(taken, true);
+    assert.equal(pushed, 0);
+    assert.equal(ctx.applied.opts.replace, true);
+    assert.equal(ctx.applied.remote.payload.players[0].id, 'from-server');
+  });
+
+  it('connecting as the coach does not replace this device', async () => {
+    const ctx = boot();
+    ctx.SupabaseClub.KEY = 'anon-public';
+    ctx.document = { visibilityState: 'visible', addEventListener() {} };
+    let applied = 0;
+    const sm = {
+      _setClubSyncLine() {},
+      applyClubPayload() { applied += 1; return true; }
+    };
+    ctx.fetch.next.push(jsonRes(200, [{
+      id: 'metalist', rev: 3, updated_at: '2026-11-27T12:00:00.000Z', path: 'state/current.json'
+    }]));
+    const ok = await ctx.SupabaseClub.start(sm);
+    assert.equal(ok, true);
+    assert.equal(applied, 0);
+    assert.equal(ctx.calls[0].url.includes('payload'), false);
   });
 
   it('a restored file replaces the server club', async () => {

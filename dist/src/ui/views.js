@@ -1,6 +1,6 @@
 /** Extracted module: src/ui/views.js lines 1491-1818 — DO NOT rewrite business logic */
 const Views = {
-  APP_BUILD: 'z166',
+  APP_BUILD: 'z167',
   APP_UPDATED: '14.11.2026',
   VERSION_LETTERS: ['А', 'Б', 'В', 'Г', 'Ґ', 'Д', 'Е'],
 
@@ -4288,21 +4288,27 @@ trainings() {
         <div class="ct">Сервер</div>
         <p class="server-stat" id="serverStatsStore"><span>Сховище</span>Читаю…</p>
         <p class="server-stat" id="serverStatsDb"><span>База</span>Читаю…</p>
+        <div class="sync-directions">
+          <button type="button" class="btn btn-p" data-action="server-push">З цього приладу на сервер</button>
+          <button type="button" class="btn btn-s" data-action="server-pull">З сервера на цей прилад</button>
+        </div>
+        <p class="note-sm">Гравці й гості забирають клуб із сервера самі.</p>
         <div class="settings-actions">
           <button type="button" class="btn btn-s btn-sm" data-action="server-stats">Оновити</button>
           <button type="button" class="btn btn-s btn-sm" data-action="server-rebuild">Копія, очистити і завантажити знову</button>
         </div>
-        <p class="note-sm">Спочатку файл копії лягає на телефон. Потім сховище стирається повністю, і клуб завантажується назад. Зайві файли не повертаються.</p>
+        <p class="note-sm">Очищення: файл копії лягає на прилад, сховище стирається, клуб завантажується назад.</p>
       </div>` : ''}
       <div class="card glass settings-card">
         <div class="ct">Дані клубу</div>
-        <p class="note-sm">Клуб ходить тільки через сервер. Гравець і гість файл не пересилають.</p>
-        <p class="note-sm">Анкета гравця приносить його вибір подарунка біля імені і подарунки, яких ще немає у тренера. Явку лишає тренер.</p>
-        <label class="fl"><span class="fl-label">Код клубу (anon public)</span>
-          <input id="setSbKey" class="fl-input" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" placeholder="eyJ… або sb_publishable…" value="${sanitize((typeof SupabaseClub !== 'undefined' && SupabaseClub._key) ? SupabaseClub._key() : '')}">
-        </label>
-        <button type="button" class="btn btn-p btn-sm" data-action="save-supabase-key">Підключити сервер</button>
-        <p class="note-sm" id="clubSyncLine">${sanitize((typeof StorageManager !== 'undefined' && StorageManager._clubSyncText) || 'Клубний обмін: підключення…')}</p>
+        ${canEdit
+          ? '<p class="note-sm">Кнопки сервера вище. Код потрібен один раз.</p>' +
+            '<label class="fl"><span class="fl-label">Код клубу (anon public)</span>' +
+            '<input id="setSbKey" class="fl-input" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" placeholder="eyJ… або sb_publishable…" value="' + sanitize((typeof SupabaseClub !== 'undefined' && SupabaseClub._key) ? SupabaseClub._key() : '') + '">' +
+            '</label>' +
+            '<button type="button" class="btn btn-s btn-sm" data-action="save-supabase-key">Підключити сервер</button>'
+          : '<p class="note-sm">Клуб приходить із сервера сам.</p>'}
+        <p class="note-sm" id="clubSyncLine">${sanitize((typeof StorageManager !== 'undefined' && StorageManager._clubSyncText) || (canEdit ? 'Сервер підключено.' : 'Клуб із сервера'))}</p>
         ${canEdit ? '<p class="note-sm">Резервна копія лише для тренера. Нею клуб не передають.</p><div class="settings-actions"><button type="button" class="btn btn-s" data-action="export-json">Зберегти копію</button><button type="button" class="btn btn-s" data-action="import-trigger" id="btnImportJson">Відновити з копії</button></div>' : ''}
         <p class="note-sm" id="tgStatusLine">—</p>
         <p class="note-sm" id="rbacMe">—</p>
