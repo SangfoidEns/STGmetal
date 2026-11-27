@@ -1565,6 +1565,18 @@ const StorageManager = {
       this._clubDirty = true;
       this._clubReady = true;
       const finish = () => { this._holdRemote = false; };
+      if (this._supabaseOn() && typeof SupabaseClub !== 'undefined' && SupabaseClub.push) {
+        try {
+          SupabaseClub._sm = this;
+          SupabaseClub._ready = true;
+          if (SupabaseClub._timer) {
+            clearTimeout(SupabaseClub._timer);
+            SupabaseClub._timer = null;
+          }
+          SupabaseClub.push({ replace: true }).then(finish, finish);
+          return;
+        } catch (_) {}
+      }
       this.pushClub({ force: true }).then(finish, finish);
     };
     const applyMerged = (payload, file) => {

@@ -281,6 +281,84 @@ describe('supabase club sync', () => {
     assert.deepEqual(prefixes, ['media/gone.jpg']);
   });
 
+  it('takes the server copy instead of sending the phone club', async () => {
+    const ctx = boot();
+    ctx.SupabaseClub.KEY = 'anon-public';
+    let pushed = 0;
+    ctx.SupabaseClub.schedulePush = () => { pushed += 1; };
+    ctx.SupabaseClub._sm = {
+      _clubDirty: true,
+      _clubUpdatedAt: '2026-11-01T00:00:00.000Z',
+      _canSyncWrite() { return true; },
+      applyClubPayload(remote, opts) {
+        ctx.applied = { remote: remote, opts: opts };
+        return true;
+      }
+    };
+    const ok = await ctx.SupabaseClub.pull({
+      quiet: true,
+      known: {
+        rev: 9,
+        updated_at: '2026-11-27T16:00:00.000Z',
+        payload: { players: [{ id: 'tablet' }] }
+      }
+    });
+    assert.equal(ok, true);
+    assert.equal(pushed, 0);
+    assert.equal(ctx.applied.opts.replace, true);
+    assert.equal(ctx.applied.remote.payload.players[0].id, 'tablet');
+    assert.equal(ctx.SupabaseClub._sm._clubDirty, false);
+    const empty = await ctx.SupabaseClub.pull({ quiet: true, known: { empty: true, rev: 0 } });
+    assert.equal(empty, false);
+    assert.equal(pushed, 0);
+  });
+
+  it('keeps a newer copy on this device and does not send it on open', async () => {
+    const ctx = boot();
+    ctx.SupabaseClub.KEY = 'anon-public';
+    let pushed = 0;
+    ctx.state.updatedAt = '2026-11-28T10:00:00.000Z';
+    ctx.SupabaseClub.schedulePush = () => { pushed += 1; };
+    ctx.SupabaseClub._sm = {
+      _clubDirty: true,
+      _clubUpdatedAt: '',
+      _canSyncWrite() { return true; },
+      applyClubPayload() { ctx.applied = true; return true; }
+    };
+    const ok = await ctx.SupabaseClub.pull({
+      quiet: true,
+      known: {
+        rev: 4,
+        updated_at: '2026-11-27T10:00:00.000Z',
+        payload: { players: [{ id: 'old-server' }] }
+      }
+    });
+    assert.equal(ok, false);
+    assert.equal(pushed, 0);
+    assert.equal(ctx.applied, undefined);
+  });
+
+  it('a restored file replaces the server club', async () => {
+    const ctx = boot();
+    ctx.SupabaseClub.KEY = 'anon-public';
+    ctx.ClubMerge.mergePayload = () => { throw new Error('merge'); };
+    ctx.SupabaseClub._sm = {
+      _canSyncWrite() { return true; },
+      _setClubSyncLine() {},
+      buildExportPayload() { return { players: [{ id: 'tablet' }], trainings: [] }; }
+    };
+    ctx.fetch.next.push(jsonRes(200, [{
+      id: 'metalist', rev: 3, updated_at: '2026-11-27T10:00:00.000Z', path: '',
+      payload: { players: [{ id: 'phone' }] }
+    }]));
+    ctx.fetch.next.push(jsonRes(200, [{ id: 'metalist', rev: 4 }]));
+    const ok = await ctx.SupabaseClub.push({ replace: true });
+    assert.equal(ok, true);
+    const patch = ctx.calls.find(call => call.opts.method === 'PATCH');
+    const body = JSON.parse(patch.opts.body);
+    assert.equal(body.payload.players[0].id, 'tablet');
+  });
+
   it('does not download photos again when there is no page to shrink them', async () => {
     const ctx = boot();
     const payload = {

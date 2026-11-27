@@ -84,6 +84,14 @@ const SupabaseClub = {
     try { if (this._sm && this._sm._setClubSyncLine) this._sm._setClubSyncLine(text); } catch (_) {}
   },
 
+  _localUpdatedAt() {
+    try {
+      if (typeof Store === 'undefined' || !Store.get) return '';
+      const state = Store.get();
+      return String((state && state.updatedAt) || '');
+    } catch (_) { return ''; }
+  },
+
   async start(sm) {
     this._sm = sm;
     if (!this.enabled()) return false;
@@ -104,12 +112,9 @@ const SupabaseClub = {
       if (!this._rebuilding && remote.payload) {
         try { await this.sweep(remote.path || '', remote.payload); } catch (_) {}
       }
-      await this.pull({ quiet: true, known: remote });
-      let sent = true;
-      const needSend = !!(remote.empty || !remote.payload || (sm && sm._clubDirty));
-      if (this._canWrite(sm) && !this._rebuilding && needSend) sent = await this.push();
+      const got = await this.pull({ quiet: true, known: remote });
       this._armPoll();
-      return sent !== false;
+      return got !== false;
     } catch (err) {
       console.warn('[supabase]', err);
       this._line(this._fail(null));
@@ -267,32 +272,40 @@ const SupabaseClub = {
       return false;
     }
     if (remote.empty || !remote.payload) {
-      const writer = this._canWrite(this._sm);
-      this._line(writer
-        ? 'Код прийнято. Сервер порожній — цей телефон зараз викладе клуб.'
-        : 'Код прийнято. Сервер ще порожній, клуб з’явиться після тренера.');
+      this._line('Сервер ще без цієї копії. Телефон свою не виклав.');
       this._rev = 0;
       return false;
     }
     this._rev = remote.rev;
-    if (this._sm._clubDirty && this._canWrite(this._sm) && !(opts && opts.force)) {
-      this.schedulePush(this._sm);
-      return false;
-    }
-    if (this._sm._clubUpdatedAt && remote.updated_at && remote.updated_at === this._sm._clubUpdatedAt && !(opts && opts.force)) {
+    const serverAt = String(remote.updated_at || '');
+    const seen = String(this._sm._clubUpdatedAt || '');
+    const onTop = !!(seen && serverAt && seen === serverAt);
+    if (onTop && !(opts && opts.force)) {
+      if (this._sm._clubDirty && this._canWrite(this._sm)) this.schedulePush(this._sm);
       this._line('Клуб на сервері');
       return false;
     }
+    const localMs = Date.parse(this._localUpdatedAt()) || 0;
+    const serverMs = Date.parse(serverAt) || 0;
+    if (localMs && serverMs && localMs > serverMs && !(opts && opts.force)) {
+      this._line('На цьому пристрої новіша копія. Завантаж файл ще раз, щоб викласти її на сервер.');
+      return false;
+    }
+    try { if (this._sm.createBackup) this._sm.createBackup(); } catch (_) {}
     const applied = this._sm.applyClubPayload({
       updatedAt: remote.updated_at || new Date().toISOString(),
       updatedBy: 'supabase',
       payload: remote.payload
-    }, { quiet: true });
-    if (applied) this._line('Клуб оновлено з сервера');
+    }, { quiet: true, force: true, replace: true });
+    if (applied) {
+      this._sm._clubDirty = false;
+      this._line('Клуб оновлено з сервера');
+    }
     return applied;
   },
 
-  async push() {
+  async push(opts) {
+    const replace = !!(opts && opts.replace);
     if (this._rebuilding && !this._allowPush) return false;
     if (!this.enabled() || !this._sm || !this._canWrite(this._sm)) return false;
     if (this._pushing) {
@@ -315,7 +328,7 @@ const SupabaseClub = {
         }
         const live = this._sm.buildExportPayload();
         let local = live;
-        if (remote.payload && typeof ClubMerge !== 'undefined' && ClubMerge.mergePayload) {
+        if (!replace && remote.payload && typeof ClubMerge !== 'undefined' && ClubMerge.mergePayload) {
           local = ClubMerge.mergePayload(remote.payload, local);
         }
         const off = await this.offload(local);
