@@ -330,6 +330,7 @@ const Actions = {
     b.objects = JSON.parse(JSON.stringify(ab.objects || []));
     if (typeof BoardEngine !== 'undefined' && BoardEngine.camera) b.camera = Object.assign({}, BoardEngine.camera);
     b.updatedAt = new Date().toISOString();
+    ab.holdSchemeSave = false;
     ab.sourceBoardId = b.id;
     StorageManager.save();
     try { Toast.show('Малюнок схеми збережено', 'ok'); } catch (_) {}

@@ -864,6 +864,9 @@ const StorageManager = {
     if (Array.isArray(data.trainings)) base.trainings = data.trainings;
     if (Array.isArray(data.exercises) && data.exercises.length) base.exercises = data.exercises;
     if (Array.isArray(data.boards)) base.boards = data.boards;
+    try {
+      if (typeof BoardEngine !== 'undefined' && BoardEngine.isolateBoardDrawings) BoardEngine.isolateBoardDrawings(base.boards);
+    } catch (_) {}
     if (Array.isArray(data.schemeAlbums)) base.schemeAlbums = data.schemeAlbums;
     if (Array.isArray(data.schemeSections)) base.schemeSections = data.schemeSections;
     if (Array.isArray(data.schemeOpens)) base.schemeOpens = data.schemeOpens;

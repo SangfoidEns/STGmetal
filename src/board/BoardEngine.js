@@ -603,6 +603,7 @@ const BoardEngine = {
 
   /* ── POINTER DOWN ── */
   onPointerDown(e) {
+    try { this.detachLiveDrawing(); } catch (_) {}
     try {
       var _ab = (typeof Store !== 'undefined' && Store.get) ? Store.get().activeBoard : null;
       if (_ab && _ab.toolsTrayOpen) {
@@ -1259,12 +1260,17 @@ const BoardEngine = {
 
   clear() {
     Modal.confirm((typeof t==='function'?t('confirm_clear_board'):'Очистити дошку?'), () => {
-      Store.get().activeBoard.objects = [];
-      Store.get().activeBoard.selectedId = null;
+      const board = Store.get().activeBoard;
+      try { this.detachLiveDrawing(); } catch (_) {}
+      if (!board) return;
+      board.objects = [];
+      board.selectedId = null;
+      board.holdSchemeSave = !!board.sourceBoardId;
       this.polygonPoints = [];
       this.pushHistory();
       this.render();
-      Toast.show('Очищено');
+      try { this.renderToolbar(); } catch (_) {}
+      Toast.show(board.sourceBoardId ? 'Поле чисте. Це та сама схема — намалюй і натисни Зберегти.' : 'Очищено');
     });
   },
 
@@ -1409,6 +1415,44 @@ const BoardEngine = {
     Toast.show('#' + p.number + ' ' + p.firstName + ' · ' + readiness + '%' + (chipColor ? ' · колір' : ''), 'ok');
   },
 
+  /** Кожна схема тримає свій малюнок. Спільні фішки не переносять правку на сусідів в альбомі. */
+  isolateBoardDrawings(boards) {
+    const seenArr = new Set();
+    const seenObj = new Set();
+    (boards || []).forEach(board => {
+      if (!board || !Array.isArray(board.objects)) return;
+      let shared = seenArr.has(board.objects);
+      if (!shared) {
+        for (let i = 0; i < board.objects.length; i++) {
+          const obj = board.objects[i];
+          if (obj && seenObj.has(obj)) { shared = true; break; }
+        }
+      }
+      if (shared) {
+        try { board.objects = JSON.parse(JSON.stringify(board.objects)); } catch (_) { board.objects = board.objects.slice(); }
+      }
+      seenArr.add(board.objects);
+      board.objects.forEach(obj => { if (obj) seenObj.add(obj); });
+    });
+  },
+
+  detachLiveDrawing() {
+    const s = (typeof Store !== 'undefined' && Store.get) ? Store.get() : null;
+    if (!s) return;
+    const live = s.activeBoard && s.activeBoard.objects;
+    if (s.activeBoard && Array.isArray(live)) {
+      const hitsStore = (s.boards || []).some(board => {
+        if (!board || !Array.isArray(board.objects)) return false;
+        if (board.objects === live) return true;
+        return board.objects.some(obj => obj && live.indexOf(obj) >= 0);
+      });
+      if (hitsStore) {
+        try { s.activeBoard.objects = JSON.parse(JSON.stringify(live)); } catch (_) {}
+      }
+    }
+    this.isolateBoardDrawings(s.boards);
+  },
+
   applyScheme(name, forceTeam) {
     const scheme = SCHEMES[name];
     if (!scheme) {
@@ -1416,7 +1460,8 @@ const BoardEngine = {
       return;
     }
     const s = Store.get();
-    if (s.activeBoard) s.activeBoard.sourceBoardId = null;
+    try { this.detachLiveDrawing(); } catch (_) {}
+    const linkedScheme = !!(s.activeBoard && s.activeBoard.sourceBoardId);
     const tool = s.activeBoard.tool || 'select';
     // Режим суперника або явний forceTeam
     const asOpp = forceTeam === 'opp' || forceTeam === 'opponent' || tool === 'opponent';
@@ -1464,7 +1509,7 @@ const BoardEngine = {
       return;
     }
     const upcoming = (typeof CoachTools !== 'undefined' && CoachTools.nextMatch) ? CoachTools.nextMatch(s.matches) : null;
-    if (upcoming && this.placeMatchLineup(Object.assign({}, upcoming, { scheme: name }))) return;
+    if (!linkedScheme && upcoming && this.placeMatchLineup(Object.assign({}, upcoming, { scheme: name }))) return;
     // Своя команда: 11 основи на поле; резерв / травма / відновлення — на лавку
     s.activeBoard.objects = s.activeBoard.objects.filter(o => !(o.type === 'player' && o.team !== 'opp'));
     const chipColor = s.activeBoard.drawColor || null;
@@ -1565,7 +1610,6 @@ const BoardEngine = {
     const s = Store.get();
     if (!s) return false;
     if (!s.activeBoard) s.activeBoard = { objects: [], selectedId: null, tool: 'select', fieldView: 'full' };
-    s.activeBoard.sourceBoardId = null;
     s.activeBoard.scheme = schemeName;
     s.activeBoard.selectedId = null;
     const roles = ['GK', 'DEF', 'DEF', 'DEF', 'MID', 'MID', 'MID', 'ATT', 'ATT', 'MID', 'ATT'];
@@ -1645,7 +1689,6 @@ const BoardEngine = {
     const s = Store.get();
     if (!s) return false;
     if (!s.activeBoard) s.activeBoard = { objects: [], selectedId: null, tool: 'select', fieldView: 'full' };
-    s.activeBoard.sourceBoardId = null;
     s.activeBoard.scheme = schemeName;
     s.activeBoard.selectedId = null;
     const roles = (typeof CoachTools !== 'undefined' && CoachTools.schemeRoles)
@@ -1718,6 +1761,8 @@ const BoardEngine = {
     try {
       const s = Store.get();
       if (!s || !s.activeBoard) return;
+      if (s.activeBoard.holdSchemeSave && !(s.activeBoard.objects || []).length) return;
+      s.activeBoard.holdSchemeSave = false;
       const now = new Date().toISOString();
       s.activeBoard.updatedAt = now;
       const objects = JSON.parse(JSON.stringify(s.activeBoard.objects || []));
