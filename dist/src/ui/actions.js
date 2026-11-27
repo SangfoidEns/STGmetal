@@ -2736,11 +2736,17 @@ const Actions = {
       try { Toast.show('Спочатку підключи сервер', 'warn'); } catch (_) {}
       return;
     }
-    if (this._rebuilding) return;
+    if (this._rebuilding) {
+      try { Toast.show('Зачекай, копія ще збирається', ''); } catch (_) {}
+      return;
+    }
     this._rebuilding = true;
     try { Toast.show('Роблю копію…', ''); } catch (_) {}
     let live = null;
     try { live = StorageManager.buildExportPayload(); } catch (_) {}
+    if (!live) {
+      try { live = StorageManager._buildLocalPayload(); } catch (_) {}
+    }
     if (!live) {
       this._rebuilding = false;
       try { Toast.show('Не вдалося зібрати копію. Сервер не чіпав.', 'warn'); } catch (_) {}
@@ -2748,18 +2754,20 @@ const Actions = {
     }
     SupabaseClub.collectRestore(live).then(packed => {
       this._rebuilding = false;
-      if (!packed) {
+      if (!packed || !packed.backup) {
         try { Toast.show('Не вдалося зібрати копію. Сервер не чіпав.', 'warn'); } catch (_) {}
         return;
       }
-      const filename = 'metalist_stuttgart_' + (typeof today === 'function' ? today() : new Date().toISOString().slice(0, 10)) + '.json';
       try { StorageManager.createBackup(); } catch (_) {}
-      try { StorageManager._downloadExport(JSON.stringify(packed.backup, null, 2), filename); } catch (_) {}
-      Modal.confirm('Копія зберігається на телефон. Стерти все сховище і завантажити клуб знову? Зайві файли не повернуться.', () => {
+      const missing = packed.missing || [];
+      const note = missing.length
+        ? ' Клуб на телефоні збережений. ' + missing.length + ' файлів телефон не прочитав, їх не зітру.'
+        : ' Клуб на телефоні збережений. Зайві файли не повернуться.';
+      Modal.confirm('Стерти сховище і завантажити клуб знову?' + note, () => {
         if (this._rebuilding) return;
         this._rebuilding = true;
         SupabaseClub._rebuilding = true;
-        SupabaseClub.wipeAndRestore(packed.files).then(ok => {
+        SupabaseClub.wipeAndRestore(packed.files, missing).then(ok => {
           if (!ok) {
             SupabaseClub._rebuilding = false;
             this._rebuilding = false;

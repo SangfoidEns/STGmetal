@@ -550,44 +550,65 @@ const SupabaseClub = {
   },
 
   async _fetchObject(path) {
-    const safe = String(path || '').replace(/^\/+/, '');
-    let res = await fetch(this.URL + '/storage/v1/object/public/club-media/' + safe);
-    if (!res.ok) {
-      res = await fetch(this.URL + '/storage/v1/object/club-media/' + safe, {
-        headers: this.headers({ Accept: '*/*' }, { json: false })
-      });
+    const safe = String(path || '').replace(/^\/+/, '').split('/').map(part => {
+      try { return encodeURIComponent(decodeURIComponent(part)); } catch (_) { return encodeURIComponent(part); }
+    }).join('/');
+    if (!safe) return null;
+    const urls = [
+      this.URL + '/storage/v1/object/public/club-media/' + safe,
+      this.URL + '/storage/v1/object/club-media/' + safe
+    ];
+    for (let i = 0; i < urls.length; i++) {
+      try {
+        const res = await fetch(urls[i], i === 0 ? undefined : {
+          headers: this.headers({ Accept: '*/*' }, { json: false })
+        });
+        if (res && res.ok) return res;
+      } catch (_) {}
     }
-    return res;
+    return null;
   },
 
   async _dataUrl(blob) {
     if (!blob || typeof FileReader === 'undefined') return '';
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ''));
-      reader.onerror = () => resolve('');
-      reader.readAsDataURL(blob);
-    });
+    try {
+      return await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => resolve('');
+        try { reader.readAsDataURL(blob); } catch (_) { resolve(''); }
+      });
+    } catch (_) {
+      return '';
+    }
   },
 
   /** Копія клубу з фото всередині і файли, які треба повернути після очищення. */
   async collectRestore(payload) {
-    const backup = JSON.parse(JSON.stringify(payload || {}));
+    let backup = payload || {};
+    try { backup = JSON.parse(JSON.stringify(payload || {})); } catch (_) {}
     const jobs = [];
     this._walk(backup, (value) => {
       const path = this._mediaPath(value);
       if (path && jobs.indexOf(path) < 0) jobs.push(path);
     });
     const files = [];
+    const missing = [];
     const inline = new Map();
     for (let i = 0; i < jobs.length; i++) {
       const path = jobs[i];
       let res = null;
-      try { res = await this._fetchObject(path); } catch (_) { return null; }
-      if (!res || !res.ok || !res.blob) return null;
+      try { res = await this._fetchObject(path); } catch (_) { res = null; }
+      if (!res || !res.ok || typeof res.blob !== 'function') {
+        missing.push(path);
+        continue;
+      }
       let blob = null;
-      try { blob = await res.blob(); } catch (_) { return null; }
-      if (!blob) return null;
+      try { blob = await res.blob(); } catch (_) { blob = null; }
+      if (!blob) {
+        missing.push(path);
+        continue;
+      }
       if (blob.size > 180 * 1024) {
         const small = await this._shrinkBlob(blob, 960, 0.66);
         if (small && small.size < blob.size) blob = small;
@@ -604,17 +625,18 @@ const SupabaseClub = {
         if (path && inline.has(path)) set(inline.get(path));
       });
     }
-    return { backup: backup, files: files };
+    return { backup: backup, files: files, missing: missing };
   },
 
-  async wipeAndRestore(files) {
+  async wipeAndRestore(files, keepPaths) {
     if (this._wiping) return false;
     this._wiping = true;
+    const hold = new Set((keepPaths || []).filter(Boolean));
     try {
       for (let pass = 0; pass < 8; pass++) {
         const listed = await this.inventory();
         if (!listed) return false;
-        const drop = listed.map(file => file && file.path).filter(Boolean);
+        const drop = listed.map(file => file && file.path).filter(path => path && !hold.has(path));
         if (!drop.length) break;
         const ok = await this.removePaths(drop);
         if (!ok) return false;

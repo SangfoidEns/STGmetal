@@ -251,6 +251,36 @@ describe('supabase club sync', () => {
     assert.ok(upload);
   });
 
+  it('still prepares a backup when the phone cannot read a file', async () => {
+    const ctx = boot();
+    ctx.SupabaseClub.KEY = 'anon-public';
+    const payload = {
+      players: [{ photoUrl: ctx.SupabaseClub.URL + '/storage/v1/object/public/club-media/media/keep.png' }],
+      trainings: [{ id: 't1', name: 'Гра' }]
+    };
+    ctx.fetch.next.push(jsonRes(404, { message: 'not found' }));
+    ctx.fetch.next.push(jsonRes(404, { message: 'not found' }));
+    const packed = await ctx.SupabaseClub.collectRestore(payload);
+    assert.ok(packed && packed.backup);
+    assert.equal(packed.backup.trainings[0].name, 'Гра');
+    assert.equal(packed.files.length, 0);
+    assert.equal(JSON.stringify(packed.missing), JSON.stringify(['media/keep.png']));
+    ctx.fetch.next.push(jsonRes(200, [
+      { name: 'media', id: null }
+    ]));
+    ctx.fetch.next.push(jsonRes(200, [
+      { name: 'keep.png', id: 'c', metadata: { size: 10 } },
+      { name: 'gone.jpg', id: 'd', metadata: { size: 10 } }
+    ]));
+    ctx.fetch.next.push(jsonRes(200, []));
+    const ok = await ctx.SupabaseClub.wipeAndRestore(packed.files, packed.missing);
+    assert.equal(ok, true);
+    const prefixes = ctx.calls
+      .filter(call => call.opts.method === 'DELETE')
+      .flatMap(call => JSON.parse(call.opts.body).prefixes);
+    assert.deepEqual(prefixes, ['media/gone.jpg']);
+  });
+
   it('does not download photos again when there is no page to shrink them', async () => {
     const ctx = boot();
     const payload = {
