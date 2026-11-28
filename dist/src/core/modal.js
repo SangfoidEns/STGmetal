@@ -24,6 +24,7 @@ const Modal = {
     });
   },
   close(result) {
+    try { if (typeof ProfileFx !== 'undefined' && ProfileFx.stop) ProfileFx.stop(); } catch (_) {}
     try { if (typeof App !== 'undefined' && App._armUiQuiet) App._armUiQuiet(700); } catch (_) {}
     document.getElementById('modal').classList.remove('show');
     const res = result != null ? result : { action: 'cancel' };

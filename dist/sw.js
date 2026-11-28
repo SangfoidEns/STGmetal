@@ -1,4 +1,4 @@
-const CACHE_NAME = 'metalist-coach-v20261124z167';
+const CACHE_NAME = 'metalist-coach-v20261124z168';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './assets/metalist-mark.svg',
   './src/styles/app.css',
@@ -7,7 +7,7 @@ const SHELL = [
   './src/core/coachTools.js', './src/core/boardLink.js',
   './src/telegram/TelegramManager.js', './src/data/demo.js', './src/data/schemes.js',
   './src/board/TimerEngine.js', './src/board/BoardEngine.js',
-  './src/ui/views.js', './src/ui/ai.js', './src/ui/app.js', './src/ui/actions.js'
+  './src/ui/views.js', './src/ui/ai.js', './src/ui/profileFx.js', './src/ui/app.js', './src/ui/actions.js'
 ];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));

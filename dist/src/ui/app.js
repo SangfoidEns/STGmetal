@@ -529,7 +529,6 @@ const App = {
       try { html = Views._fifaCard ? Views._fifaCard(p, st) : ''; } catch (_) { html = ''; }
     }
     if (!html) return;
-    try { TelegramManager.haptic && TelegramManager.haptic('light'); } catch (_) {}
     Modal.open('Картка гравця · ' + (p.lastName || p.firstName || ''),
       '<div class="fifa-modal-wrap fifa-modal-anim" data-compare-host="' + p.id + '">' + html + '</div>',
       [{ label: 'Закрити', cls: 'btn-s', action: 'cancel' }]);
@@ -539,6 +538,8 @@ const App = {
         if (wrap) wrap.classList.add('fifa-modal-in');
         const s2 = document.getElementById('playerCompareSel');
         if (s2) { s2._msCmpBound = false; App._bindPlayerCompare(); }
+        const modal = document.getElementById('modal');
+        if (modal && typeof ProfileFx !== 'undefined' && ProfileFx.play) ProfileFx.play(modal);
       } catch (_) {}
     }, 40);
   },
@@ -653,10 +654,11 @@ const App = {
     document.body.appendChild(ov);
     requestAnimationFrame(() => ov.classList.add('show'));
     document.body.classList.add('coach-card-mode');
-    try { TelegramManager.haptic && TelegramManager.haptic('medium'); } catch (_) {}
+    try { if (typeof ProfileFx !== 'undefined' && ProfileFx.play) ProfileFx.play(ov); } catch (_) {}
   },
 
   closeCoachCard() {
+    try { if (typeof ProfileFx !== 'undefined' && ProfileFx.stop) ProfileFx.stop(); } catch (_) {}
     document.querySelectorAll('.coach-card-overlay').forEach(el => {
       el.classList.remove('show');
       setTimeout(() => el.remove(), 280);
