@@ -14482,85 +14482,71 @@ body.board-only-mode #boardToolbarBottom.btb-bottom {
   color: #e8c547;
 }
 
-/* Профіль v3: прожектори, кільце, м’яч */
+/* Профіль: світло всередині картки, м’яч лишається на фото */
 .pf3 { position: relative; }
 .pf3-stage {
   position: absolute;
   inset: 0;
-  pointer-events: none;
   overflow: hidden;
+  pointer-events: none;
   z-index: 0;
+  border-radius: inherit;
 }
-.pf3 .cc-frame,
-.pf3 .md,
-.pf3 .fifa-card { position: relative; z-index: 1; }
 .pf3-lamp {
   position: absolute;
-  top: -8%;
-  width: 58%;
-  height: 72%;
+  top: -12%;
+  width: 46%;
+  height: 58%;
   opacity: 0;
-  filter: blur(6px);
-  background: linear-gradient(180deg, rgba(255, 248, 220, 0.05), rgba(255, 236, 170, 0.72) 18%, rgba(255, 236, 170, 0));
-  clip-path: polygon(42% 0, 58% 0, 100% 100%, 0 100%);
+  background: linear-gradient(180deg, rgba(255, 244, 196, 0.42), rgba(255, 244, 196, 0));
+  clip-path: polygon(38% 0, 62% 0, 100% 100%, 0 100%);
 }
-.pf3-lamp-l { left: -6%; transform: rotate(8deg); }
-.pf3-lamp-r { right: -6%; transform: rotate(-8deg); }
-.pf3-on .pf3-lamp-l { animation: pf3Blink 1.35s ease both; }
-.pf3-on .pf3-lamp-r { animation: pf3Blink 1.35s ease 0.15s both; }
+.pf3-lamp-l { left: 0; }
+.pf3-lamp-r { right: 0; }
+.pf3-on .pf3-lamp-l { animation: pf3Blink 0.72s ease both; }
+.pf3-on .pf3-lamp-r { animation: pf3Blink 0.72s ease 0.16s both; }
 @keyframes pf3Blink {
   0% { opacity: 0; }
-  8% { opacity: 0.95; }
-  18% { opacity: 0.12; }
-  30% { opacity: 0.82; }
-  42% { opacity: 0.08; }
-  58% { opacity: 0.7; }
-  100% { opacity: 0.16; }
+  28% { opacity: 0.9; }
+  52% { opacity: 0.15; }
+  100% { opacity: 0.22; }
 }
-.pf3-pitch {
-  position: absolute;
-  left: 10%;
-  right: 10%;
-  bottom: 6%;
-  height: 22%;
-  border: 2px solid rgba(232, 197, 71, 0.45);
-  border-bottom: none;
-  clip-path: inset(100% 0 0 0);
+.pf3-orbit {
+  position: relative;
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 auto;
+  z-index: 2;
 }
-.pf3-pitch::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: 28%;
-  height: 46%;
-  transform: translateX(-50%);
-  border: 2px solid rgba(232, 197, 71, 0.45);
-  border-bottom: none;
-  border-radius: 80px 80px 0 0;
-}
-.pf3-on .pf3-pitch { animation: pf3Pitch 0.7s ease 0.4s both; }
-@keyframes pf3Pitch { to { clip-path: inset(0 0 0 0); } }
+.cpc-hero > .pf3-orbit { margin: 0; flex: 0 0 auto; }
+.cc-frame > .pf3-orbit { margin: 0 auto 12px; }
+.pf3-orbit .cc-photo { margin: 0; }
+.pf3 .cc-photo,
+.pf3 .cpc-photo { position: relative; }
 .pf3-ball {
   position: absolute;
-  left: 12%;
-  top: 42%;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
+  right: -6px;
+  bottom: -4px;
+  width: 36px;
+  height: 36px;
+  z-index: 5;
+  pointer-events: none;
   opacity: 0;
-  background:
-    radial-gradient(circle at 35% 35%, #fff 0 3px, transparent 4px),
-    radial-gradient(circle at 70% 60%, #111 0 4px, transparent 5px),
-    repeating-conic-gradient(#f4f4f4 0 18deg, #1a1a1a 18deg 36deg);
-  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.35);
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.55));
 }
-.pf3-on .pf3-ball { animation: pf3Ball 1.05s cubic-bezier(0.2, 0.8, 0.2, 1) 0.18s both; }
-@keyframes pf3Ball {
-  0% { opacity: 0; transform: translate(0, 0) scale(0.6) rotate(0deg); }
-  12% { opacity: 1; }
-  55% { transform: translate(38vw, -28px) scale(1) rotate(220deg); }
-  100% { opacity: 0; transform: translate(62vw, 8px) scale(0.7) rotate(420deg); }
+.pf3-ball svg { display: block; width: 36px; height: 36px; }
+.pf3-on .pf3-ball {
+  animation: pf3Roll 0.7s cubic-bezier(0.18, 0.9, 0.22, 1) both, pf3Sit 1.8s ease 0.7s infinite;
+}
+@keyframes pf3Roll {
+  0% { opacity: 0; transform: translate(-72px, -34px) rotate(-180deg); }
+  16% { opacity: 1; }
+  100% { opacity: 1; transform: translate(0, 0) rotate(160deg); }
+}
+@keyframes pf3Sit {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
 }
 .pf3-ring {
   position: absolute;
@@ -14568,59 +14554,26 @@ body.board-only-mode #boardToolbarBottom.btb-bottom {
   border-radius: 50%;
   pointer-events: none;
   z-index: 4;
-  background: conic-gradient(from 0deg, #e8c547, #fff6d2, #1f8a4c, #e8c547);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
   opacity: 0;
+  background: conic-gradient(from 0deg, #e8c547, #fff6d2, #1f8a4c, #e8c547);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
 }
-.pf3-on .pf3-ring { animation: pf3Ring 1.15s cubic-bezier(0.16, 1.2, 0.3, 1) 0.12s both; }
+.pf3-on .pf3-ring { animation: pf3Ring 0.7s ease 0.08s both; }
 @keyframes pf3Ring {
-  0% { opacity: 0; transform: rotate(-140deg) scale(0.82); }
-  50% { opacity: 1; }
-  100% { opacity: 1; transform: rotate(0deg) scale(1); }
+  0% { opacity: 0; transform: rotate(-90deg); }
+  100% { opacity: 1; transform: rotate(0deg); }
 }
-.pf3-on .cc-photo,
-.pf3-on .cpc-photo {
-  animation: pf3Photo 0.95s cubic-bezier(0.16, 1.35, 0.3, 1) both, pf3Halo 1.35s ease both;
-}
-@keyframes pf3Photo {
-  0% { transform: scale(0.62); filter: brightness(2.1); }
-  62% { transform: scale(1.07); filter: brightness(1.05); }
-  100% { transform: scale(1); filter: none; }
-}
-@keyframes pf3Halo {
-  0% { box-shadow: 0 0 0 0 rgba(232, 197, 71, 0); }
-  28% { box-shadow: 0 0 0 3px #e8c547, 0 0 22px rgba(232, 197, 71, 0.55); }
-  48% { box-shadow: 0 0 0 0 rgba(232, 197, 71, 0); }
-  70% { box-shadow: 0 0 0 3px rgba(31, 138, 76, 0.9), 0 0 16px rgba(31, 138, 76, 0.35); }
-  100% { box-shadow: 0 0 0 2px rgba(232, 197, 71, 0.8); }
-}
-.pf3-on .cc-stat,
-.pf3-on .fifa-stat {
-  animation: pf3Stat 0.4s ease both;
-}
-.pf3-on .cc-stat:nth-child(1),
-.pf3-on .fifa-stat:nth-child(1) { animation-delay: 0.42s; }
-.pf3-on .cc-stat:nth-child(2),
-.pf3-on .fifa-stat:nth-child(2) { animation-delay: 0.5s; }
-.pf3-on .cc-stat:nth-child(3),
-.pf3-on .fifa-stat:nth-child(3) { animation-delay: 0.58s; }
-.pf3-on .cc-stat:nth-child(4),
-.pf3-on .fifa-stat:nth-child(4) { animation-delay: 0.66s; }
-.pf3-on .cc-stat:nth-child(n + 5),
-.pf3-on .fifa-stat:nth-child(n + 5) { animation-delay: 0.74s; }
-@keyframes pf3Stat {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: none; }
+.pf3-on .pf3-orbit { animation: pf3Pop 0.55s cubic-bezier(0.16, 1.2, 0.3, 1) both; }
+@keyframes pf3Pop {
+  0% { transform: scale(0.94); }
+  100% { transform: scale(1); }
 }
 @media (prefers-reduced-motion: reduce) {
   .pf3-on .pf3-lamp,
   .pf3-on .pf3-ball,
-  .pf3-on .pf3-pitch,
   .pf3-on .pf3-ring,
-  .pf3-on .cc-photo,
-  .pf3-on .cpc-photo,
-  .pf3-on .cc-stat,
-  .pf3-on .fifa-stat { animation: none !important; }
+  .pf3-on .pf3-orbit { animation: none !important; }
+  .pf3-on .pf3-ball,
   .pf3-on .pf3-ring { opacity: 1; }
 }

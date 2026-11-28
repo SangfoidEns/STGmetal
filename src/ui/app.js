@@ -538,8 +538,8 @@ const App = {
         if (wrap) wrap.classList.add('fifa-modal-in');
         const s2 = document.getElementById('playerCompareSel');
         if (s2) { s2._msCmpBound = false; App._bindPlayerCompare(); }
-        const modal = document.getElementById('modal');
-        if (modal && typeof ProfileFx !== 'undefined' && ProfileFx.play) ProfileFx.play(modal);
+        const card = wrap && wrap.querySelector('.fifa-card, .cc-frame');
+        if (card && typeof ProfileFx !== 'undefined' && ProfileFx.play) ProfileFx.play(card);
       } catch (_) {}
     }, 40);
   },
@@ -654,7 +654,10 @@ const App = {
     document.body.appendChild(ov);
     requestAnimationFrame(() => ov.classList.add('show'));
     document.body.classList.add('coach-card-mode');
-    try { if (typeof ProfileFx !== 'undefined' && ProfileFx.play) ProfileFx.play(ov); } catch (_) {}
+    try {
+      const card = ov.querySelector('.cc-frame') || ov;
+      if (typeof ProfileFx !== 'undefined' && ProfileFx.play) ProfileFx.play(card);
+    } catch (_) {}
   },
 
   closeCoachCard() {
