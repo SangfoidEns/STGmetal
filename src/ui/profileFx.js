@@ -73,8 +73,16 @@ const ProfileFx = {
     const ball = document.createElement('span');
     ball.className = 'pf3-ball';
     ball.setAttribute('aria-hidden', 'true');
-    ball.innerHTML = '<svg viewBox="0 0 64 64" width="36" height="36"><circle cx="32" cy="32" r="30" fill="#f7f7f7" stroke="#161616" stroke-width="2"/><path fill="#161616" d="M32 16.5l7.6 5.5-2.9 8.9H27.3l-2.9-8.9z"/><path fill="none" stroke="#161616" stroke-width="2" stroke-linejoin="round" d="M32 16.5l-4.6 2L23.2 12M32 16.5l4.6 2L40.8 12M24.4 22l-3.6 3.8-7.4-1M39.6 22l3.6 3.8 7.4-1M27.3 30.9L25 40.5l-7.6 1.2M36.7 30.9L39 40.5l7.6 1.2M25 40.5L32 48l7-7.5"/></svg>';
-    orbit.appendChild(ball);
+    ball.innerHTML = '<svg viewBox="0 0 64 64" width="36" height="36"><circle cx="32" cy="32" r="30" fill="#ffffff"/><polygon fill="#161616" points="32,21 38.6,25.8 36.1,34.2 27.9,34.2 25.4,25.8"/><polygon fill="#161616" points="32,7.5 37.4,12.2 34.6,18.8 29.4,18.8 26.6,12.2"/><polygon fill="#161616" points="54,22.4 50.2,28.8 43.2,27.4 41.6,21.2 47.2,16.4"/><polygon fill="#161616" points="47.6,49.2 40.6,46.6 38.8,39.8 44.4,35.2 51,39.4"/><polygon fill="#161616" points="16.4,49.2 13,39.4 19.6,35.2 25.2,39.8 23.4,46.6"/><polygon fill="#161616" points="10,22.4 16.8,16.4 22.4,21.2 20.8,27.4 13.8,28.8"/><circle cx="32" cy="32" r="30" fill="none" stroke="#161616" stroke-width="2.5"/></svg>';
+    const bubble = document.createElement('span');
+    bubble.className = 'pf3-bubble';
+    bubble.setAttribute('aria-hidden', 'true');
+    bubble.appendChild(ball);
+    const spin = document.createElement('span');
+    spin.className = 'pf3-spin';
+    spin.setAttribute('aria-hidden', 'true');
+    spin.appendChild(bubble);
+    orbit.appendChild(spin);
   },
 
   _clear(root) {

@@ -116,9 +116,14 @@ describe('profile lights', () => {
     assert.equal(stage.innerHTML.includes('pf3-lamp'), true);
     const orbit = card.querySelector('.pf3-orbit');
     assert.ok(orbit);
-    assert.equal(orbit.children.some(child => child.className === 'pf3-ball'), true);
+    const spin = orbit.children.find(child => child.className === 'pf3-spin');
+    const bubble = spin && spin.children.find(child => child.className === 'pf3-bubble');
+    const ball = bubble && bubble.children.find(child => child.className === 'pf3-ball');
+    assert.ok(bubble);
+    assert.ok(ball);
     assert.equal(orbit.children.some(child => child.className === 'cc-photo'), true);
-    assert.match(orbit.children.find(child => child.className === 'pf3-ball').innerHTML, /<svg/);
+    assert.match(ball.innerHTML, /<svg/);
+    assert.equal(ball.innerHTML.includes('M32 16.5'), false);
     ctx.timers[2].fn();
     assert.deepEqual(ctx.hits, [16]);
     ctx.ProfileFx.stop();
